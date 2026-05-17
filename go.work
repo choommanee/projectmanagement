@@ -1,6 +1,7 @@
 go 1.24.5
 
 use (
+	./libs/go/config
 	./libs/go/logger
 	./services/_template
 )
