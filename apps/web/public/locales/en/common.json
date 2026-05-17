@@ -1,0 +1,4 @@
+{
+  "shell": { "search": "Search", "notifications": "Notifications", "settings": "Settings" },
+  "common": { "save": "Save", "cancel": "Cancel", "new": "New" }
+}

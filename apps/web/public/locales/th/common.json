@@ -1,0 +1,4 @@
+{
+  "shell": { "search": "ค้นหา", "notifications": "การแจ้งเตือน", "settings": "ตั้งค่า" },
+  "common": { "save": "บันทึก", "cancel": "ยกเลิก", "new": "เพิ่มใหม่" }
+}
