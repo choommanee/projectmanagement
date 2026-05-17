@@ -1,0 +1,23 @@
+global:
+  imageRegistry: ghcr.io/pmplatform
+  imageTag: latest
+  tenancyTier: shared
+
+postgres:
+  external: false
+  dsn: ""
+
+redis:
+  external: false
+  url: ""
+
+nats:
+  external: false
+  url: ""
+
+services:
+  identity:    { enabled: true,  replicas: 2 }
+  tenant:      { enabled: true,  replicas: 2 }
+  project:    { enabled: false, replicas: 2 }
+  workspace:  { enabled: false, replicas: 2 }
+  workflow:   { enabled: false, replicas: 2 }
