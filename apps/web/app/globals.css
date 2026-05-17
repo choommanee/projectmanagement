@@ -1,42 +1,199 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --color-primary: #0B5CFF;
-    --color-primaryHover: #0A53E5;
-    --color-bg: #FFFFFF;
-    --color-bgMuted: #F6F7F9;
-    --color-fg: #0B0C0F;
-    --color-fgMuted: #5C6470;
-    --color-border: #E3E6EB;
-    --color-success: #127C4D;
-    --color-warning: #B5701C;
-    --color-danger: #C0303C;
-    --radius-md: 6px;
-    color-scheme: light;
-  }
-  [data-theme="dark"] {
-    --color-bg: #0E1116;
-    --color-fg: #E6E8EC;
-    --color-border: #2A2F36;
-    --color-fgMuted: #8C95A1;
-    --color-bgMuted: #181D24;
-    color-scheme: dark;
-  }
-  html, body { background: var(--color-bg); color: var(--color-fg); font-family: 'Inter', system-ui, sans-serif; }
-  *, *::before, *::after { box-sizing: border-box; }
+/* ─── Design Tokens ──────────────────────────────────────────────────────────── */
+@theme {
+  /* Typography */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Colors — map CSS vars to Tailwind tokens */
+  --color-ink:          var(--ink);
+  --color-ink-2:        var(--ink-2);
+  --color-ink-3:        var(--ink-3);
+  --color-paper:        var(--paper);
+  --color-surface:      var(--surface);
+  --color-surface-2:    var(--surface-2);
+  --color-line:         var(--line);
+  --color-line-strong:  var(--line-strong);
+
+  --color-accent:       var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft:  var(--accent-soft);
+  --color-signal:       var(--signal);
+  --color-signal-soft:  var(--signal-soft);
+
+  --color-success:      var(--success);
+  --color-warning:      var(--warning);
+  --color-danger:       var(--danger);
+  --color-info:         var(--info);
+
+  /* Shadows */
+  --shadow-xs:  var(--shadow-xs);
+  --shadow-sm:  var(--shadow-sm);
+  --shadow-md:  var(--shadow-md);
+  --shadow-lg:  var(--shadow-lg);
+  --shadow-pop: var(--shadow-pop);
+
+  /* Radii */
+  --radius-xs:  var(--r-xs);
+  --radius-sm:  var(--r-sm);
+  --radius-md:  var(--r-md);
+
+  /* Legacy compat — keep old tokens working */
+  --color-primary:      var(--accent);
+  --color-primaryHover: var(--accent-hover);
+  --color-bg:           var(--paper);
+  --color-bgMuted:      var(--surface-2);
+  --color-fg:           var(--ink);
+  --color-fgMuted:      var(--ink-3);
+  --color-border:       var(--line-strong);
 }
 
-@theme {
-  --color-primary: #0B5CFF;
-  --color-primaryHover: #0A53E5;
-  --color-bg: #FFFFFF;
-  --color-bgMuted: #F6F7F9;
-  --color-fg: #0B0C0F;
-  --color-fgMuted: #5C6470;
-  --color-border: #E3E6EB;
-  --color-success: #127C4D;
-  --color-warning: #B5701C;
-  --color-danger: #C0303C;
-  --radius-md: 6px;
+/* ─── CSS Custom Properties ───────────────────────────────────────────────── */
+:root {
+  /* Light mode */
+  --ink:          #0B0F14;
+  --ink-2:        #2A323D;
+  --ink-3:        #5C6470;
+  --paper:        #FAFAF7;
+  --surface:      #FFFFFF;
+  --surface-2:    #F4F4EF;
+  --line:         rgba(11,15,20,0.08);
+  --line-strong:  rgba(11,15,20,0.16);
+
+  --accent:       #1F4FFF;
+  --accent-hover: #1843DB;
+  --accent-soft:  rgba(31,79,255,0.08);
+  --signal:       #FF6B1F;
+  --signal-soft:  rgba(255,107,31,0.10);
+
+  --success:      #0F8A4E;
+  --warning:      #B5701C;
+  --danger:       #C0303C;
+  --info:         #1F4FFF;
+
+  --shadow-xs:  0 1px 0 rgba(11,15,20,0.04);
+  --shadow-sm:  0 1px 2px rgba(11,15,20,0.06), 0 1px 1px rgba(11,15,20,0.04);
+  --shadow-md:  0 6px 24px -8px rgba(11,15,20,0.10), 0 2px 6px rgba(11,15,20,0.06);
+  --shadow-lg:  0 24px 48px -16px rgba(11,15,20,0.18);
+  --shadow-pop: 0 18px 40px -12px rgba(11,15,20,0.22), 0 0 0 1px rgba(11,15,20,0.06);
+
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper:        #0B0F14;
+  --surface:      #11161D;
+  --surface-2:    #161C24;
+  --ink:          #ECEFF3;
+  --ink-2:        #B6BDC8;
+  --ink-3:        #767E8A;
+  --line:         rgba(236,239,243,0.08);
+  --line-strong:  rgba(236,239,243,0.18);
+  --accent-soft:  rgba(31,79,255,0.16);
+  color-scheme: dark;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-repeat: repeat;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
+  }
+
+  .surface-1 {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .surface-2 {
+    background-color: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .hairline {
+    border: 1px solid var(--line);
+  }
+
+  /* ─── Progress bar — used in project list / detail ──────────────────────── */
+  .progress-bar {
+    display: block;
+    width: 4rem;        /* w-16 */
+    height: 0.25rem;    /* h-1 */
+    border: none;
+    border-radius: 9999px;
+    overflow: hidden;
+    background-color: var(--line);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* WebKit / Blink fill */
+  .progress-bar::-webkit-progress-bar {
+    background-color: var(--line);
+    border-radius: 9999px;
+  }
+  .progress-bar::-webkit-progress-value {
+    background-color: var(--accent);
+    border-radius: 9999px;
+    transition: width 300ms ease;
+  }
+
+  /* Firefox fill */
+  .progress-bar::-moz-progress-bar {
+    background-color: var(--accent);
+    border-radius: 9999px;
+    transition: width 300ms ease;
+  }
+
+  /* ─── Progress range slider — project detail ─────────────────────────────── */
+  .progress-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--line);
+    outline: none;
+    cursor: pointer;
+  }
+  .progress-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .progress-range::-moz-range-thumb {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
 }

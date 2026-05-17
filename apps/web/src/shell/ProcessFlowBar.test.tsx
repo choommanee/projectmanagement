@@ -7,6 +7,6 @@ describe("ProcessFlowBar", () => {
   it("marks current stage with primary background", () => {
     render(<ProcessFlowBar stages={[{id:"a",label:"A"},{id:"b",label:"B"},{id:"c",label:"C"}]} current="b" />);
     const b = screen.getByText("B");
-    expect(b.className).toContain("bg-primary");
+    expect(b.className).toContain("bg-accent");
   });
 });
