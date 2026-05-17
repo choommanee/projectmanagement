@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "engines/_template",
     "libs/rust/obs",
-    # "libs/rust/db",    # added in Task 12
+    "libs/rust/db",    # added in Task 12
 ]
 
 [workspace.package]
