@@ -36,6 +36,7 @@ func NewRouter(svc *service.Service) http.Handler {
 		r.Post("/projects/{id}/tasks", createTask(svc))
 
 		// Tasks standalone
+		r.Get("/tasks", listAllTasks(svc))
 		r.Get("/tasks/{id}", getTask(svc))
 		r.Patch("/tasks/{id}", updateTask(svc))
 		r.Delete("/tasks/{id}", deleteTask(svc))
@@ -328,6 +329,39 @@ func getTask(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, t)
+	}
+}
+
+func listAllTasks(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		q := r.URL.Query().Get("q")
+		status := r.URL.Query().Get("status")
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+		opts := store.ListTasksOpts{
+			ProjectID: nil,
+			Q:         q,
+			Status:    status,
+			Limit:     limit,
+			Offset:    offset,
+		}
+		if assigneeStr := r.URL.Query().Get("assignee"); assigneeStr != "" {
+			if aid, err := uuid.Parse(assigneeStr); err == nil {
+				opts.Assignee = &aid
+			}
+		}
+
+		items, total, err := svc.Tasks.List(r.Context(), tid, opts)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
 	}
 }
 

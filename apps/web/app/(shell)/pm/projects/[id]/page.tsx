@@ -13,6 +13,7 @@ import {
   deleteProject,
   type Project,
 } from "@/lib/api/projects";
+import { ProjectTasksTab } from "@/components/ProjectTasksTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -357,7 +358,7 @@ export default function ProjectDetailPage({
             commitTagInput={commitTagInput}
           />
         )}
-        {tab === "tasks" && <PlaceholderTab message="Tasks UI ships with Page #4" />}
+        {tab === "tasks" && <ProjectTasksTab projectId={id} />}
         {tab === "sprints" && <PlaceholderTab message="Sprints UI ships with Page #4" />}
         {tab === "activity" && (
           <PlaceholderTab message="Activity will surface from audit pipeline (Phase 2)" />
