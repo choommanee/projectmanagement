@@ -6,5 +6,6 @@ use (
 	./libs/go/httpx
 	./libs/go/logger
 	./libs/go/nats
+	./libs/go/otel
 	./services/_template
 )
