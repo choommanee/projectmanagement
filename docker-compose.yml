@@ -1,0 +1,63 @@
+name: pm-platform
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-platform}
+    ports: ["5432:5432"]
+    volumes:
+      - ./infra/local-data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app}"]
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes:
+      - ./infra/local-data/redis:/data
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-sd", "/data"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - ./infra/local-data/nats:/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - ./infra/local-data/clickhouse:/var/lib/clickhouse
+      - ./infra/docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-dev-master-key}
+      MEILI_ENV: development
+    ports: ["7700:7700"]
+    volumes:
+      - ./infra/local-data/meili:/meili_data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9101"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9100:9000"
+      - "9101:9101"
+    volumes:
+      - ./infra/local-data/minio:/data
