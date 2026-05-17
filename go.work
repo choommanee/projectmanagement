@@ -12,5 +12,6 @@ use (
 	./services/_template
 	./services/audit-worker
 	./services/identity-svc
+	./services/project-svc
 	./services/tenant-svc
 )

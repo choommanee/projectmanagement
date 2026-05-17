@@ -12,7 +12,7 @@ DSN="postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@${POSTGRES_HOST:
 
 # Apply in dependency order. Each dir gets its own version table to avoid
 # the shared goose_db_version cross-contamination across directories.
-ORDER=(_shared tenant identity)
+ORDER=(_shared tenant identity project)
 
 for name in "${ORDER[@]}"; do
   dir="infra/migrations/$name"
