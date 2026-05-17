@@ -31,7 +31,7 @@ func main() {
 	}
 	defer p.Close()
 
-	kp, err := jwt.GenerateKeyPair(kid)
+	kp, err := jwt.LoadOrCreate(context.Background(), p, kid)
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
