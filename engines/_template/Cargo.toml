@@ -1,0 +1,22 @@
+[package]
+name = "engine-template"
+version = "0.0.1"
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "engine-template"
+path = "src/main.rs"
