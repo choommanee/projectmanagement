@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { Tag } from "@pmplatform/ui-kit";
 import type { FormDef, FieldDef } from "./form.types";
 import { evaluateRules } from "./rules";
 import { TextField } from "./fields/TextField";
@@ -8,6 +9,7 @@ import { SelectField } from "./fields/SelectField";
 import { DateField } from "./fields/DateField";
 import { BooleanField } from "./fields/BooleanField";
 import { LookupField } from "./fields/LookupField";
+import { statusTone } from "@/primitives/list/cells";
 
 export interface FormRendererProps {
   def: FormDef;
@@ -24,33 +26,53 @@ export function FormRenderer({ def, value, onChange }: FormRendererProps) {
   const active = def.tabs.find((t) => t.id === tab) ?? def.tabs[0];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {def.header && (
-        <div className="rounded-md border border-border bg-bgMuted p-3">
-          <div className="text-base font-medium">{String(value[def.header.titleField] ?? "—")}</div>
-          {def.header.statusField && <div className="text-xs text-fgMuted">{String(value[def.header.statusField] ?? "")}</div>}
+        <div className="rounded-md border border-line bg-surface p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-wider text-ink-3">{def.entity}</div>
+              <h2 className="mt-1 text-xl font-semibold text-ink">{String(value[def.header.titleField] ?? "—")}</h2>
+            </div>
+            {def.header.statusField && (() => {
+              const sv = value[def.header.statusField];
+              if (!sv) return null;
+              return (
+                <Tag tone={statusTone(sv)} dot>
+                  {String(sv)}
+                </Tag>
+              );
+            })()}
+          </div>
         </div>
       )}
 
       {def.tabs.length > 1 && (
-        <div role="tablist" className="flex border-b border-border">
-          {def.tabs.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={tab === t.id}
-              className={`px-3 py-1.5 text-sm ${tab === t.id ? "border-b-2 border-primary font-medium" : "text-fgMuted"}`}
-              onClick={() => setTab(t.id)}
-            >{t.label}</button>
-          ))}
+        <div role="tablist" className="flex gap-1 border-b border-line">
+          {def.tabs.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active ? "true" : "false"}
+                className={`relative px-3 py-2 text-sm transition-colors ${active ? "text-ink font-medium" : "text-ink-3 hover:text-ink-2"}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+                {active && <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-accent rounded-t-sm" />}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {active?.sections.map((s) => (
           <section key={s.id}>
-            <h3 className="mb-2 text-xs font-semibold uppercase text-fgMuted">{s.label}</h3>
-            <div className={`grid gap-3 ${s.columns === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3 mb-3">{s.label}</h3>
+            <div className={`grid gap-x-6 gap-y-4 ${s.columns === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
               {s.fields.map((f) => {
                 const ov = overrides[f.name] ?? {};
                 if (ov.hidden || f.hidden) return null;

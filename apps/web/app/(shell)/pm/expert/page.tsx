@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { Lightbulb } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "Expert Knowledge" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Expert Knowledge</h1>
-        <p className="mt-2 text-sm text-fgMuted">Expert knowledge base + AI Q&A — Phase 2 (Plan #5: PM UI).</p>
-      </div>
+      <ComingSoon title="Expert Knowledge" description="KB + Q&A + semantic search" icon={Lightbulb} plan="Plan #7" />
     </div>
   );
 }

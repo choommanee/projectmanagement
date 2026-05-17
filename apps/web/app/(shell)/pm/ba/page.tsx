@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { Compass } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "BA Workspace" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">BA Workspace</h1>
-        <p className="mt-2 text-sm text-fgMuted">Business Analysis workspace — Phase 2 (Plan #5: PM UI).</p>
-      </div>
+      <ComingSoon title="BA Workspace" description="BRD / FRD / User stories + RTM" icon={Compass} plan="Plan #6: Document Workspaces" />
     </div>
   );
 }

@@ -1,0 +1,5 @@
+.login-brand-panel {
+  background-image:
+    radial-gradient(ellipse at top right, rgba(31, 79, 255, 0.35), transparent 60%),
+    radial-gradient(ellipse at bottom left, rgba(255, 107, 31, 0.18), transparent 50%);
+}

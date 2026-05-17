@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { Factory } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
-      <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "MRP Run" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">MRP Run</h1>
-        <p className="mt-2 text-sm text-fgMuted">Material Requirements Planning run wizard — Phase 2 (Plan #6: MFG UI).</p>
-      </div>
+    <div className="flex h-full flex-col">
+      <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "MRP" }]} />
+      <ComingSoon title="MRP" description="Net requirements + pegging + action messages" icon={Factory} plan="Page #9" />
     </div>
   );
 }

@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { ShieldCheck } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "PPAP" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">PPAP</h1>
-        <p className="mt-2 text-sm text-fgMuted">Production Part Approval Process — Phase 2 (Plan #6: IATF 16949 Quality UI).</p>
-      </div>
+      <ComingSoon title="PPAP" description="Level 1-5 submission builder" icon={ShieldCheck} plan="Page #10" />
     </div>
   );
 }

@@ -35,9 +35,9 @@ export function DashboardGrid({ def, onLayoutChange }: { def: DashboardDef; onLa
 
 function Widget({ def }: { def: WidgetDef }) {
   switch (def.kind) {
-    case "kpi":    return <KpiTile     title={String(def.config.title)} value={String(def.config.value)} sub={def.config.sub as string | undefined} />;
-    case "chart":  return <ChartWidget title={def.config.title as string | undefined} />;
-    case "list":   return <ListWidget  title={def.config.title as string | undefined} items={(def.config.items as { label: string }[]) ?? []} />;
+    case "kpi":    return <KpiTile     title={String(def.config.title)} value={String(def.config.value)} sub={def.config.sub as string | undefined} delta={def.config.delta as number | undefined} spark={def.config.spark as number[] | undefined} />;
+    case "chart":  return <ChartWidget title={def.config.title as string | undefined} data={def.config.data as number[] | undefined} />;
+    case "list":   return <ListWidget  title={def.config.title as string | undefined} items={(def.config.items as { label: string; meta?: string }[]) ?? []} />;
     case "iframe": return <IframeWidget src={String(def.config.src)} title={def.config.title as string | undefined} />;
   }
 }

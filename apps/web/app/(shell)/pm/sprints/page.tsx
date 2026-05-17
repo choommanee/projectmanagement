@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { Timer } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "Sprints" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Sprints</h1>
-        <p className="mt-2 text-sm text-fgMuted">Sprint planning + burndown view — Phase 2 (Plan #5: PM UI).</p>
-      </div>
+      <ComingSoon title="Sprints" description="Sprint planning + Kanban + burndown view" icon={Timer} plan="Plan #5: PM UI" />
     </div>
   );
 }

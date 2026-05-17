@@ -1,13 +1,12 @@
-"use client";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { ComingSoon } from "@/shell/ComingSoon";
+import { Layers } from "lucide-react";
+
 export default function Page() {
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "SA Workspace" }]} />
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">SA Workspace</h1>
-        <p className="mt-2 text-sm text-fgMuted">Solution Architecture workspace — Phase 2 (Plan #5: PM UI).</p>
-      </div>
+      <ComingSoon title="SA Workspace" description="SDD / ADR / ER diagrams / OpenAPI editor" icon={Layers} plan="Plan #6" />
     </div>
   );
 }
