@@ -4,5 +4,6 @@ use (
 	./libs/go/config
 	./libs/go/db
 	./libs/go/logger
+	./libs/go/nats
 	./services/_template
 )
