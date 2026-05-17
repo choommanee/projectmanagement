@@ -71,6 +71,105 @@ func TestSprintList(t *testing.T) {
 	}
 }
 
+func TestSprintGetByID(t *testing.T) {
+	p := openPool(t)
+	defer p.Close()
+	tid := seedTenant(t, p)
+
+	projects := store.NewProjects(p)
+	proj := createTestProject(t, projects, tid, "SP-P004")
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", proj.ID) })
+
+	sprints := store.NewSprints(p)
+	sp := &domain.Sprint{
+		ID: uuid.New(), TenantID: tid, ProjectID: proj.ID,
+		Name: "GetByID Sprint", Goal: "Test Goal", Status: domain.SprintPlanning, Version: 1,
+	}
+	if err := sprints.Create(context.Background(), sp); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sp.ID) })
+
+	got, err := sprints.GetByID(context.Background(), tid, sp.ID)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got.ID != sp.ID {
+		t.Fatalf("expected ID %v, got %v", sp.ID, got.ID)
+	}
+	if got.Name != "GetByID Sprint" {
+		t.Fatalf("expected name 'GetByID Sprint', got %q", got.Name)
+	}
+	if got.Goal != "Test Goal" {
+		t.Fatalf("expected goal 'Test Goal', got %q", got.Goal)
+	}
+}
+
+func TestSprintTasksAfterAssign(t *testing.T) {
+	p := openPool(t)
+	defer p.Close()
+	tid := seedTenant(t, p)
+
+	projects := store.NewProjects(p)
+	proj := createTestProject(t, projects, tid, "SP-P005")
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", proj.ID) })
+
+	sprints := store.NewSprints(p)
+	sp := &domain.Sprint{
+		ID: uuid.New(), TenantID: tid, ProjectID: proj.ID,
+		Name: "Tasks Sprint", Status: domain.SprintPlanning, Version: 1,
+	}
+	_ = sprints.Create(context.Background(), sp)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sp.ID) })
+
+	tasks := store.NewTasks(p)
+	task := &domain.Task{
+		ID: uuid.New(), TenantID: tid, ProjectID: proj.ID,
+		Code: "SP-T002", Title: "Tasks sprint task",
+		Type: domain.TaskTypeTask, Status: domain.TaskTodo,
+		Priority: domain.PrioMed, Tags: []string{}, Version: 1,
+	}
+	_ = tasks.Create(context.Background(), task)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", task.ID) })
+
+	// Before assign, Tasks returns empty
+	items, err := sprints.Tasks(context.Background(), tid, sp.ID)
+	if err != nil {
+		t.Fatalf("Tasks before assign: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 tasks before assign, got %d", len(items))
+	}
+
+	if err := sprints.AssignTask(context.Background(), tid, sp.ID, task.ID); err != nil {
+		t.Fatalf("AssignTask: %v", err)
+	}
+
+	// After assign, Tasks returns 1
+	items, err = sprints.Tasks(context.Background(), tid, sp.ID)
+	if err != nil {
+		t.Fatalf("Tasks after assign: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 task after assign, got %d", len(items))
+	}
+	if items[0].ID != task.ID {
+		t.Fatalf("expected task ID %v, got %v", task.ID, items[0].ID)
+	}
+
+	// Unassign clears
+	if err := sprints.UnassignTask(context.Background(), tid, sp.ID, task.ID); err != nil {
+		t.Fatalf("UnassignTask: %v", err)
+	}
+	items, err = sprints.Tasks(context.Background(), tid, sp.ID)
+	if err != nil {
+		t.Fatalf("Tasks after unassign: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 tasks after unassign, got %d", len(items))
+	}
+}
+
 func TestSprintAssignUnassignTask(t *testing.T) {
 	p := openPool(t)
 	defer p.Close()

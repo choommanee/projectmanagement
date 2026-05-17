@@ -238,6 +238,101 @@ func TestCreateTaskUnderProject(t *testing.T) {
 	}
 }
 
+func TestGetSprintHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Create project
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "GSP-001", "name": "GetSprint Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	// Create sprint
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/sprints", map[string]any{"name": "GetSprint S1", "goal": "Test goal"}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("Create sprint: expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var sprint map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
+	sprintID := sprint["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
+
+	// GET /v1/sprints/:id
+	rr = doJSON(t, h, "GET", "/v1/sprints/"+sprintID, nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("GetSprint: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["ID"].(string) != sprintID {
+		t.Fatalf("expected sprint ID %s, got %v", sprintID, got["ID"])
+	}
+	if got["Name"] != "GetSprint S1" {
+		t.Fatalf("expected name 'GetSprint S1', got %v", got["Name"])
+	}
+}
+
+func TestListSprintTasksHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Create project
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "LST-S01", "name": "ListSprintTasks Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	// Create task
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "LST-T01", "title": "List Sprint Task"}, headers)
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+
+	// Create sprint
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/sprints", map[string]any{"name": "List Tasks Sprint"}, headers)
+	var sprint map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
+	sprintID := sprint["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
+
+	// List tasks before assign → empty
+	rr = doJSON(t, h, "GET", fmt.Sprintf("/v1/sprints/%s/tasks", sprintID), nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("ListSprintTasks before assign: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var listResp map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &listResp)
+	if int(listResp["total"].(float64)) != 0 {
+		t.Fatalf("expected 0 tasks before assign, got %v", listResp["total"])
+	}
+
+	// Assign task
+	rr = doJSON(t, h, "POST", fmt.Sprintf("/v1/sprints/%s/tasks/%s", sprintID, taskID), nil, headers)
+	if rr.Code != 204 {
+		t.Fatalf("Assign: expected 204, got %d", rr.Code)
+	}
+
+	// List tasks after assign → 1
+	rr = doJSON(t, h, "GET", fmt.Sprintf("/v1/sprints/%s/tasks", sprintID), nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("ListSprintTasks after assign: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &listResp)
+	if int(listResp["total"].(float64)) != 1 {
+		t.Fatalf("expected 1 task after assign, got %v", listResp["total"])
+	}
+}
+
 func TestAssignTaskToSprint(t *testing.T) {
 	p := openTestPool(t)
 	defer p.Close()

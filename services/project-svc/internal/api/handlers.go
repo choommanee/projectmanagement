@@ -48,7 +48,9 @@ func NewRouter(svc *service.Service) http.Handler {
 		// Sprints
 		r.Get("/projects/{id}/sprints", listSprints(svc))
 		r.Post("/projects/{id}/sprints", createSprint(svc))
+		r.Get("/sprints/{id}", getSprint(svc))
 		r.Patch("/sprints/{id}", updateSprint(svc))
+		r.Get("/sprints/{id}/tasks", listSprintTasks(svc))
 		r.Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
 		r.Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
 	})
@@ -630,6 +632,50 @@ func createSprint(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 201, sp)
+	}
+}
+
+func getSprint(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		sp, err := svc.Sprints.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, sp)
+	}
+}
+
+func listSprintTasks(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		tasks, err := svc.Sprints.Tasks(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": tasks, "total": len(tasks)})
 	}
 }
 

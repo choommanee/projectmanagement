@@ -119,3 +119,37 @@ func (s *Sprints) UnassignTask(ctx context.Context, tid, sprintID, taskID uuid.U
 		return err
 	})
 }
+
+func (s *Sprints) Tasks(ctx context.Context, tid, sprintID uuid.UUID) ([]*domain.Task, error) {
+	var items []*domain.Task
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT t.id, t.tenant_id, t.project_id, t.parent_id, t.code, t.title, COALESCE(t.description,''),
+			  t.type, t.status, t.priority, t.assignee_id, t.reviewer_id, t.estimate_md, t.actual_md, t.progress_pct,
+			  t.start_date, t.due_date, t.sort_order, t.tags, t.created_at, t.updated_at, t.version
+			FROM task t
+			JOIN sprint_task st ON st.task_id = t.id
+			WHERE st.sprint_id = $1 AND t.deleted_at IS NULL
+			ORDER BY t.status, t.sort_order`, sprintID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var t domain.Task
+			var startDate, dueDate *time.Time
+			if err := rows.Scan(
+				&t.ID, &t.TenantID, &t.ProjectID, &t.ParentID, &t.Code, &t.Title, &t.Description,
+				&t.Type, &t.Status, &t.Priority, &t.AssigneeID, &t.ReviewerID, &t.EstimateMd, &t.ActualMd, &t.ProgressPct,
+				&startDate, &dueDate, &t.SortOrder, &t.Tags, &t.CreatedAt, &t.UpdatedAt, &t.Version,
+			); err != nil {
+				return err
+			}
+			t.StartDate = startDate
+			t.DueDate = dueDate
+			items = append(items, &t)
+		}
+		return rows.Err()
+	})
+	return items, err
+}
