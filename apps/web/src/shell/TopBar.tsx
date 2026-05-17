@@ -1,15 +1,26 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Settings, Search, Menu, ChevronDown, LogOut, User as UserIcon } from "lucide-react";
-import { Button } from "@pmplatform/ui-kit";
+import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon } from "lucide-react";
+import { Button, Kbd } from "@pmplatform/ui-kit";
 import type { AppDef } from "./shell.types";
 import { AppSwitcher } from "./AppSwitcher";
 import { NotificationCenter } from "./NotificationCenter";
 import { mockNotifications } from "@/lib/mock/notifications";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { useTheme } from "@/theme/ThemeProvider";
 import Link from "next/link";
 
 interface AppMeta { id: string; name: string }
+
+const AVATAR_PALETTE = ["#1F4FFF", "#FF6B1F", "#0F8A4E", "#B5701C", "#7C3AED", "#0EA5E9"];
+
+function avatarColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+}
 
 export function TopBar({
   app, apps = [], onAppSwitch,
@@ -19,10 +30,10 @@ export function TopBar({
   onAppSwitch?: (id: string) => void;
 }) {
   const { user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -37,75 +48,107 @@ export function TopBar({
 
   const displayName = user?.displayName ?? "Demo User";
   const tenantSlug = user?.tenantSlug ?? "acme";
-  const email = user?.email ?? "";
   const avatarLetter = displayName.charAt(0).toUpperCase();
+  const bgColor = user?.id ? avatarColor(user.id) : AVATAR_PALETTE[0];
 
   return (
-    <header className="flex h-12 items-center gap-3 border-b border-border bg-bg px-3">
-      <Button variant="ghost" size="sm" aria-label="Toggle nav"><Menu size={16} /></Button>
-      <AppSwitcher
-        current={app.id}
-        apps={apps.length > 0 ? apps : [{ id: app.id, name: app.name }]}
-        onSelect={onAppSwitch ?? (() => {})}
-      />
-      <div className="ml-4 flex max-w-md flex-1 items-center gap-2 rounded-md bg-bgMuted px-2 py-1 text-sm text-fgMuted">
-        <Search size={14} /><input className="flex-1 bg-transparent outline-none" placeholder="Search" />
+    <header className="flex h-14 items-center gap-3 border-b border-line bg-paper/95 backdrop-blur supports-backdrop-filter:bg-paper/70 px-4">
+      {/* Left: logo + app switcher */}
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="grid h-9 w-9 place-items-center rounded-sm bg-ink text-paper font-mono text-[13px] font-semibold tracking-tight select-none">
+          PM
+        </div>
+        <AppSwitcher
+          current={app.id}
+          apps={apps.length > 0 ? apps : [{ id: app.id, name: app.name }]}
+          onSelect={onAppSwitch ?? (() => {})}
+        />
       </div>
+
+      {/* Center: search */}
+      <div className="mx-auto flex w-105 items-center gap-2 rounded-sm bg-surface-2 border border-transparent hover:border-line h-9 px-2.5 text-sm transition-colors">
+        <Search size={14} className="text-ink-3 shrink-0" />
+        <input
+          className="flex-1 bg-transparent text-ink placeholder:text-ink-3 outline-none"
+          placeholder="Search projects, work orders, people…"
+        />
+        <Kbd>⌘K</Kbd>
+      </div>
+
+      {/* Right: notifications, theme toggle, user */}
       <div className="ml-auto flex items-center gap-1">
         <NotificationCenter items={mockNotifications} />
-        <Button variant="ghost" size="sm" aria-label="Settings"><Settings size={16} /></Button>
+
+        {/* Theme toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+        </Button>
 
         {/* User dropdown */}
-        <div className="relative ml-1" ref={dropdownRef}>
-          <button
-            type="button"
-            onClick={() => setDropdownOpen((o) => !o)}
-            className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-bgMuted"
-            aria-haspopup="true"
-            aria-expanded={dropdownOpen ? "true" : "false"}
-          >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-xs text-white">
-              {avatarLetter}
-            </span>
-            <span>{displayName}</span>
-            <span className="text-xs text-fgMuted">{tenantSlug}</span>
-            <ChevronDown size={12} className="text-fgMuted" />
-          </button>
+        {user ? (
+          <div className="relative ml-1" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex items-center gap-2 rounded-sm pl-1 pr-2 h-9 hover:bg-surface-2 transition-colors"
+              aria-haspopup="true"
+              aria-expanded={dropdownOpen}
+            >
+              <span
+                className="grid h-7 w-7 place-items-center rounded-full text-white text-[11px] font-medium shrink-0 bg-[--avatar-bg]"
+                // eslint-disable-next-line react/forbid-dom-props
+                style={{ ["--avatar-bg" as string]: bgColor }}
+              >
+                {avatarLetter}
+              </span>
+              <span className="flex flex-col items-start">
+                <span className="text-[13px] text-ink leading-tight">{displayName}</span>
+                <span className="text-[11px] text-ink-3 leading-tight">{tenantSlug}</span>
+              </span>
+              <ChevronDown size={12} className="text-ink-3" />
+            </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-bg shadow-md">
-              {/* User info header */}
-              <div className="border-b border-border px-3 py-2">
-                <p className="text-sm font-medium">{displayName}</p>
-                {email && <p className="text-xs text-fgMuted">{email}</p>}
-                <p className="text-xs text-fgMuted">{tenantSlug}</p>
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-sm border border-line bg-surface shadow-pop">
+                <div className="border-b border-line px-3 py-2">
+                  <p className="text-[13px] font-medium text-ink">{displayName}</p>
+                  {user.email && <p className="text-[11px] text-ink-3">{user.email}</p>}
+                  <p className="text-[11px] text-ink-3">{tenantSlug}</p>
+                </div>
+                <div className="py-1">
+                  <Link
+                    href="/profile"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
+                  >
+                    <UserIcon size={14} />
+                    Profile
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDropdownOpen(false);
+                      await signOut();
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
               </div>
-
-              {/* Menu items */}
-              <div className="py-1">
-                <Link
-                  href="/profile"
-                  onClick={() => setDropdownOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-bgMuted"
-                >
-                  <UserIcon size={14} />
-                  Profile
-                </Link>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setDropdownOpen(false);
-                    await signOut();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10"
-                >
-                  <LogOut size={14} />
-                  Sign out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <Link href="/login" className="text-sm text-ink-2 hover:text-ink px-2 py-1 rounded-sm hover:bg-surface-2 transition-colors">
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   );

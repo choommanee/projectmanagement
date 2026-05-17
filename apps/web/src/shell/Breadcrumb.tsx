@@ -1,16 +1,22 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 export function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
   return (
-    <nav aria-label="Breadcrumb" className="px-3 py-1 text-xs text-fgMuted">
-      <ol className="flex items-center gap-1">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-center gap-1">
-            {it.href ? <Link className="hover:text-fg" href={it.href}>{it.label}</Link> : <span>{it.label}</span>}
-            {i < items.length - 1 && <span aria-hidden>›</span>}
-          </li>
-        ))}
-      </ol>
+    <nav aria-label="Breadcrumb" className="flex items-center gap-1 px-4 py-2.5 text-[12px] text-ink-3">
+      {items.map((it, i) => {
+        const last = i === items.length - 1;
+        return (
+          <span key={i} className="flex items-center gap-1">
+            {it.href && !last ? (
+              <Link href={it.href} className="hover:text-ink transition-colors">{it.label}</Link>
+            ) : (
+              <span className={last ? "font-medium text-ink" : ""}>{it.label}</span>
+            )}
+            {!last && <ChevronRight size={12} className="opacity-50" />}
+          </span>
+        );
+      })}
     </nav>
   );
 }

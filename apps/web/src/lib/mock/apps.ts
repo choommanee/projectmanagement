@@ -6,25 +6,25 @@ export const mockApps: AppDef[] = [
     areas: [
       { id: "home", name: "Home", groups: [
         { id: "h1", name: "Overview", subareas: [
-          { id: "dash",  name: "Dashboard",  href: "/pm/home" },
+          { id: "dash",  name: "Dashboard",  href: "/pm/home",    icon: "dashboard" },
         ]},
       ]},
       { id: "work", name: "My Work", groups: [
         { id: "w1", name: "Projects", subareas: [
-          { id: "projects", name: "Active Projects", href: "/pm/projects" },
-          { id: "tasks",    name: "My Tasks",        href: "/pm/tasks" },
-          { id: "sprints",  name: "Sprints",         href: "/pm/sprints" },
+          { id: "projects", name: "Active Projects", href: "/pm/projects", icon: "folder",    count: 7  },
+          { id: "tasks",    name: "My Tasks",        href: "/pm/tasks",    icon: "tasks",     count: 12 },
+          { id: "sprints",  name: "Sprints",         href: "/pm/sprints",  icon: "sprint",    count: 2  },
         ]},
         { id: "w2", name: "Workspaces", subareas: [
-          { id: "ba", name: "BA Workspace",     href: "/pm/ba" },
-          { id: "sa", name: "SA Workspace",     href: "/pm/sa" },
-          { id: "ex", name: "Expert Knowledge", href: "/pm/expert" },
+          { id: "ba", name: "BA Workspace",     href: "/pm/ba",     icon: "ba"        },
+          { id: "sa", name: "SA Workspace",     href: "/pm/sa",     icon: "sa"        },
+          { id: "ex", name: "Expert Knowledge", href: "/pm/expert", icon: "knowledge" },
         ]},
       ]},
       { id: "admin", name: "Admin", groups: [
         { id: "a1", name: "Settings", subareas: [
-          { id: "tenants",   name: "Tenants",   href: "/pm/tenants" },
-          { id: "workflows", name: "Workflows", href: "/pm/workflows" },
+          { id: "tenants",   name: "Tenants",   href: "/pm/tenants",   icon: "people"   },
+          { id: "workflows", name: "Workflows", href: "/pm/workflows", icon: "workflow" },
         ]},
       ]},
     ],
@@ -34,22 +34,22 @@ export const mockApps: AppDef[] = [
     areas: [
       { id: "home", name: "Home", groups: [
         { id: "h1", name: "Overview", subareas: [
-          { id: "dash",  name: "Dashboard",  href: "/mfg/home" },
+          { id: "dash",  name: "Dashboard",  href: "/mfg/home", icon: "dashboard" },
         ]},
       ]},
       { id: "prod", name: "Production", groups: [
         { id: "g1", name: "Orders", subareas: [
-          { id: "wo",  name: "Work Orders", href: "/mfg/work-orders" },
-          { id: "bom", name: "BOM",         href: "/mfg/bom" },
-          { id: "mrp", name: "MRP Run",     href: "/mfg/mrp" },
+          { id: "wo",  name: "Work Orders", href: "/mfg/work-orders", icon: "factory", count: 6 },
+          { id: "bom", name: "BOM",         href: "/mfg/bom",         icon: "bom"               },
+          { id: "mrp", name: "MRP Run",     href: "/mfg/mrp",         icon: "workflow"           },
         ]},
       ]},
       { id: "quality", name: "Quality", groups: [
         { id: "q1", name: "IATF 16949", subareas: [
-          { id: "apqp",  name: "APQP",          href: "/mfg/apqp" },
-          { id: "ppap",  name: "PPAP",          href: "/mfg/ppap" },
-          { id: "fmea",  name: "FMEA",          href: "/mfg/fmea" },
-          { id: "trace", name: "Traceability",  href: "/mfg/traceability" },
+          { id: "apqp",  name: "APQP",         href: "/mfg/apqp",         icon: "quality" },
+          { id: "ppap",  name: "PPAP",         href: "/mfg/ppap",         icon: "quality" },
+          { id: "fmea",  name: "FMEA",         href: "/mfg/fmea",         icon: "quality" },
+          { id: "trace", name: "Traceability", href: "/mfg/traceability", icon: "trace"   },
         ]},
       ]},
     ],

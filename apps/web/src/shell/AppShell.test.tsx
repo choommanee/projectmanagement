@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { AppShell } from "./AppShell";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
+import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const app = {
   id: "pm", name: "PM Hub",
@@ -10,7 +11,7 @@ const app = {
 };
 
 function Wrapper({ children }: { children: React.ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return <ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider>;
 }
 
 describe("AppShell", () => {

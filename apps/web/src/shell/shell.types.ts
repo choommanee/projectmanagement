@@ -23,6 +23,7 @@ export interface AppSubarea {
   href: string;
   entity?: string;
   icon?: string;
+  count?: number;
 }
 
 export interface UserCtx {
