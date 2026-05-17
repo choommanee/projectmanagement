@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	"github.com/pmplatform/libs/go/audit"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/store"
@@ -18,10 +19,11 @@ type Auth struct {
 	users    *store.Users
 	sessions *store.Sessions
 	signer   *libauth.Signer
+	aud      *audit.Publisher
 }
 
-func NewAuth(u *store.Users, s *store.Sessions, signer *libauth.Signer) *Auth {
-	return &Auth{users: u, sessions: s, signer: signer}
+func NewAuth(u *store.Users, s *store.Sessions, signer *libauth.Signer, aud *audit.Publisher) *Auth {
+	return &Auth{users: u, sessions: s, signer: signer, aud: aud}
 }
 
 type LoginInput struct {
@@ -38,12 +40,35 @@ type TokenPair struct {
 func (a *Auth) Login(ctx context.Context, in LoginInput) (*TokenPair, error) {
 	u, err := a.users.FindByEmail(ctx, in.TenantID, in.Email)
 	if err != nil {
+		if a.aud != nil {
+			_ = a.aud.Publish(ctx, "user.login", audit.Event{
+				TenantID: in.TenantID.String(),
+				Result:   "denied",
+				Meta:     map[string]any{"email": in.Email},
+			})
+		}
 		return nil, domain.ErrInvalidCreds
 	}
 	if u.Status != domain.StatusActive {
+		if a.aud != nil {
+			_ = a.aud.Publish(ctx, "user.login", audit.Event{
+				TenantID: in.TenantID.String(),
+				UserID:   u.ID.String(),
+				Result:   "denied",
+				Meta:     map[string]any{"email": in.Email, "reason": "inactive"},
+			})
+		}
 		return nil, domain.ErrInvalidCreds
 	}
 	if err := domain.CheckPassword(u.PasswordHash, in.Password); err != nil {
+		if a.aud != nil {
+			_ = a.aud.Publish(ctx, "user.login", audit.Event{
+				TenantID: in.TenantID.String(),
+				UserID:   u.ID.String(),
+				Result:   "denied",
+				Meta:     map[string]any{"email": in.Email},
+			})
+		}
 		return nil, err
 	}
 
@@ -67,6 +92,14 @@ func (a *Auth) Login(ctx context.Context, in LoginInput) (*TokenPair, error) {
 	}
 	if err := a.sessions.Create(ctx, sess); err != nil {
 		return nil, err
+	}
+
+	if a.aud != nil {
+		_ = a.aud.Publish(ctx, "user.login", audit.Event{
+			TenantID: u.TenantID.String(),
+			UserID:   u.ID.String(),
+			Result:   "success",
+		})
 	}
 
 	return &TokenPair{

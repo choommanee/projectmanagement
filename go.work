@@ -1,6 +1,7 @@
 go 1.25.0
 
 use (
+	./libs/go/audit
 	./libs/go/auth
 	./libs/go/config
 	./libs/go/db
@@ -9,6 +10,7 @@ use (
 	./libs/go/nats
 	./libs/go/otel
 	./services/_template
+	./services/audit-worker
 	./services/identity-svc
 	./services/tenant-svc
 )

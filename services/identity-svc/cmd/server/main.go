@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	"github.com/pmplatform/libs/go/audit"
+	natsx "github.com/pmplatform/libs/go/nats"
 
 	"github.com/pmplatform/services/identity-svc/internal/api"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -24,6 +26,7 @@ func main() {
 	port := envOr("PORT", "8082")
 	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
 	kid := envOr("JWT_KID", "kid-dev-1")
+	natsURL := envOr("NATS_URL", "nats://localhost:4222")
 
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -37,7 +40,17 @@ func main() {
 	}
 	signer := libauth.NewSigner(kp.Priv, issuer)
 
-	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer)
+	nc, err := natsx.Connect(natsURL)
+	if err != nil {
+		log.Fatal().Err(err).Send()
+	}
+	defer nc.Close()
+	if err := nc.EnsureStream(context.Background(), "AUDIT", []string{"audit.>"}); err != nil {
+		log.Fatal().Err(err).Send()
+	}
+	pub := audit.NewPublisher(nc, "identity-svc")
+
+	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
 	h := api.NewRouter(auth, kp)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 

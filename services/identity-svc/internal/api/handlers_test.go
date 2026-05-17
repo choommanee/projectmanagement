@@ -13,6 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	"github.com/pmplatform/libs/go/audit"
+	natsx "github.com/pmplatform/libs/go/nats"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -59,12 +61,25 @@ func setup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, func()) {
 
 	kp, _ := jwt.GenerateKeyPair("kid-test")
 	signer := libauth.NewSigner(kp.Priv, "test")
-	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer)
+
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		natsURL = "nats://localhost:4222"
+	}
+	nc, err := natsx.Connect(natsURL)
+	if err != nil {
+		p.Close()
+		t.Skip(err)
+	}
+	_ = nc.EnsureStream(context.Background(), "AUDIT", []string{"audit.>"})
+	pub := audit.NewPublisher(nc, "test")
+	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
 
 	h := NewRouter(auth, kp)
 	cleanup := func() {
 		p.Exec(context.Background(), "DELETE FROM tenant WHERE id=$1", tid)
 		p.Close()
+		nc.Close()
 	}
 	return h, p, tid, cleanup
 }
