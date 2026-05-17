@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "engines/_template",
-    # "libs/rust/obs",   # added in Task 11
+    "libs/rust/obs",
     # "libs/rust/db",    # added in Task 12
 ]
 
