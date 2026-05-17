@@ -2,15 +2,14 @@
 import type { ReactNode } from "react";
 import { TopBar } from "./TopBar";
 import { NavPane } from "./NavPane";
-import type { AppDef, UserCtx } from "./shell.types";
+import type { AppDef } from "./shell.types";
 
 interface AppMeta { id: string; name: string }
 
 export function AppShell({
-  app, user, children, apps, onAppSwitch,
+  app, children, apps, onAppSwitch,
 }: {
   app: AppDef;
-  user: UserCtx;
   children: ReactNode;
   apps?: AppMeta[];
   onAppSwitch?: (id: string) => void;
@@ -19,7 +18,6 @@ export function AppShell({
     <div className="flex h-screen flex-col">
       <TopBar
         app={app}
-        user={user}
         apps={apps}
         onAppSwitch={onAppSwitch}
       />

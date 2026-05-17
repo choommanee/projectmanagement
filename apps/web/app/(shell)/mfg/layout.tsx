@@ -3,8 +3,6 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/shell/AppShell";
 import { useAppDefinition, useAppList } from "@/shell/useAppDefinition";
 
-const mockUser = { id: "u1", displayName: "Demo User", email: "demo@x.com", tenantSlug: "acme" };
-
 export default function MfgLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const q = useAppDefinition("mfg");
@@ -14,7 +12,6 @@ export default function MfgLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       app={q.data}
-      user={mockUser}
       apps={appList}
       onAppSwitch={(id) => router.push(`/${id}/home`)}
     >
