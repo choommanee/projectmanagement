@@ -1,6 +1,7 @@
 go 1.25.0
 
 use (
+	./libs/go/auth
 	./libs/go/config
 	./libs/go/db
 	./libs/go/httpx
