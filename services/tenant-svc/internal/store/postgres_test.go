@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -76,5 +77,46 @@ func TestGetBySlug(t *testing.T) {
 	}
 	if got.ID != tn.ID {
 		t.Fatal("mismatch")
+	}
+}
+
+func TestListSearchAndPagination(t *testing.T) {
+	p := openPool(t)
+	defer p.Close()
+	s := New(p)
+	// Seed 3 tenants with a unique marker so we can filter them out
+	marker := uuid.NewString()[:8]
+	for i := 0; i < 3; i++ {
+		tn, _ := domain.NewTenant(fmt.Sprintf("lst-%s-%d", marker, i), fmt.Sprintf("Co %s %d", marker, i), "", "")
+		_ = s.Create(context.Background(), tn)
+		defer p.Exec(context.Background(), "DELETE FROM tenant WHERE id=$1", tn.ID)
+	}
+	got, total, err := s.List(context.Background(), "lst-"+marker, 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || total != 3 {
+		t.Fatalf("got %d/%d", len(got), total)
+	}
+	// Pagination
+	p1, _, _ := s.List(context.Background(), "lst-"+marker, 2, 0)
+	p2, _, _ := s.List(context.Background(), "lst-"+marker, 2, 2)
+	if len(p1) != 2 || len(p2) != 1 {
+		t.Fatalf("paging wrong: %d %d", len(p1), len(p2))
+	}
+}
+
+func TestSoftDelete(t *testing.T) {
+	p := openPool(t)
+	defer p.Close()
+	s := New(p)
+	tn, _ := domain.NewTenant("del-"+uuid.NewString()[:8], "ToDelete", "", "")
+	_ = s.Create(context.Background(), tn)
+	defer p.Exec(context.Background(), "DELETE FROM tenant WHERE id=$1", tn.ID)
+	if err := s.SoftDelete(context.Background(), tn.ID, tn.Version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetByID(context.Background(), tn.ID); err != domain.ErrNotFound {
+		t.Fatalf("expected ErrNotFound after soft delete, got %v", err)
 	}
 }

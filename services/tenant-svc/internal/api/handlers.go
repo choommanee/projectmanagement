@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,11 +19,91 @@ func NewRouter(svc *service.Service) http.Handler {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 	r.Route("/v1/tenants", func(r chi.Router) {
+		r.Get("/", list(svc))
 		r.Post("/", create(svc))
-		r.Get("/{id}", get(svc))
 		r.Get("/by-slug/{slug}", getBySlug(svc))
+		r.Get("/{id}", get(svc))
+		r.Patch("/{id}", update(svc))
+		r.Delete("/{id}", del(svc))
 	})
 	return r
+}
+
+func list(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("q")
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		res, err := svc.List(r.Context(), service.ListInput{Q: q, Limit: limit, Offset: offset})
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": res.Items, "total": res.Total})
+	}
+}
+
+type updateReq struct {
+	Name    string        `json:"name,omitempty"`
+	Tier    domain.Tier   `json:"tier,omitempty"`
+	Status  domain.Status `json:"status,omitempty"`
+	Region  string        `json:"region,omitempty"`
+	Version int           `json:"version"`
+}
+
+func update(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var in updateReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		t, err := svc.Update(r.Context(), service.UpdateInput{
+			ID: id, Name: in.Name, Tier: in.Tier, Status: in.Status, Region: in.Region, Version: in.Version,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		writeJSON(w, 200, t)
+	}
+}
+
+func del(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		version, _ := strconv.Atoi(r.URL.Query().Get("version"))
+		if version <= 0 {
+			writeErr(w, 400, errors.New("version query param required"))
+			return
+		}
+		if err := svc.Delete(r.Context(), id, version); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		w.WriteHeader(204)
+	}
 }
 
 type createReq struct {
