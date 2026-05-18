@@ -11,6 +11,7 @@ use (
 	./libs/go/otel
 	./services/_template
 	./services/audit-worker
+	./services/document-svc
 	./services/identity-svc
 	./services/project-svc
 	./services/tenant-svc
