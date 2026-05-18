@@ -1,0 +1,93 @@
+/* Tiptap ProseMirror editor styles — scoped to .ProseMirror */
+@reference "tailwindcss";
+
+.ProseMirror {
+  @apply text-ink leading-relaxed outline-none;
+  min-height: 480px;
+}
+
+.ProseMirror h1 {
+  @apply text-2xl font-semibold mt-6 mb-2;
+}
+
+.ProseMirror h2 {
+  @apply text-xl font-semibold mt-5 mb-2;
+}
+
+.ProseMirror h3 {
+  @apply text-base font-semibold mt-4 mb-1.5;
+}
+
+.ProseMirror p {
+  @apply text-[14px] mt-1.5;
+}
+
+.ProseMirror ul {
+  @apply list-disc pl-6;
+}
+
+.ProseMirror ol {
+  @apply list-decimal pl-6;
+}
+
+.ProseMirror code {
+  @apply font-mono text-[12px] bg-surface-2 px-1 py-0.5 rounded-xs;
+}
+
+.ProseMirror pre {
+  @apply font-mono text-[12px] bg-surface-2 p-3 rounded-sm overflow-auto;
+}
+
+.ProseMirror pre code {
+  @apply bg-transparent p-0;
+}
+
+.ProseMirror blockquote {
+  @apply border-l-2 border-line-strong pl-3 italic text-ink-2;
+}
+
+.ProseMirror a {
+  @apply text-accent underline;
+}
+
+.ProseMirror hr {
+  @apply border-line my-4;
+}
+
+.ProseMirror table {
+  @apply border-collapse w-full text-[13px] my-3;
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  @apply border border-line px-2 py-1.5;
+}
+
+.ProseMirror th {
+  @apply bg-surface-2 font-semibold text-left;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  @apply text-ink-3;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Task list checkboxes */
+.ProseMirror ul[data-type="taskList"] {
+  @apply list-none pl-0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  @apply flex items-center;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  @apply mt-0.5 cursor-pointer;
+}

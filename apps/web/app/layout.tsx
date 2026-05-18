@@ -1,18 +1,18 @@
 import "./globals.css";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 import { QueryProvider } from "@/lib/query";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const mono  = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
+const sans = Geist({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
 
 export const metadata = { title: "PM + Manufacturing Platform" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>
         <QueryProvider>
           <ThemeProvider>
