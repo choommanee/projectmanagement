@@ -13,6 +13,7 @@ use (
 	./services/audit-worker
 	./services/document-svc
 	./services/identity-svc
+	./services/mfg-svc
 	./services/project-svc
 	./services/tenant-svc
 )
