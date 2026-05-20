@@ -87,6 +87,8 @@ func NewRouter(svc *service.Service) http.Handler {
 		// Lots standalone
 		r.Post("/lots", createLot(svc))
 		r.Patch("/lots/{id}/status", updateLotStatus(svc))
+		r.Post("/lots/{id}/genealogy", addLotGenealogy(svc))
+		r.Get("/lots/{id}/trace", traceLot(svc))
 
 		// MRP
 		r.Post("/mrp/runs", createMRPRun(svc))
@@ -1542,6 +1544,70 @@ func listMRPActions(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
+	}
+}
+
+// --- Lot Genealogy ---
+
+type addGenealogyReq struct {
+	ParentLotID uuid.UUID  `json:"parent_lot_id"`
+	WorkOrderID *uuid.UUID `json:"work_order_id,omitempty"`
+	Qty         *float64   `json:"qty,omitempty"`
+}
+
+func addLotGenealogy(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		childID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req addGenealogyReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if req.ParentLotID == uuid.Nil {
+			writeErr(w, 400, errors.New("parent_lot_id required"))
+			return
+		}
+		if err := svc.Genealogy.AddGenealogy(r.Context(), tid, req.ParentLotID, childID, req.WorkOrderID, req.Qty); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 201, map[string]string{"status": "ok"})
+	}
+}
+
+func traceLot(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		lotID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		direction := r.URL.Query().Get("direction")
+		if direction != "forward" && direction != "backward" {
+			direction = "forward"
+		}
+		maxDepth, _ := strconv.Atoi(r.URL.Query().Get("max_depth"))
+		if maxDepth <= 0 {
+			maxDepth = 20
+		}
+		result, err := svc.Genealogy.TraceViaEngine(r.Context(), tid, lotID, direction, maxDepth, svc.TraceEngineURL)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, result)
 	}
 }
 

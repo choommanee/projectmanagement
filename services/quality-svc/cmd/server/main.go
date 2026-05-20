@@ -11,16 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
-	"github.com/pmplatform/services/mfg-svc/internal/api"
-	"github.com/pmplatform/services/mfg-svc/internal/service"
-	"github.com/pmplatform/services/mfg-svc/internal/store"
+	"github.com/pmplatform/services/quality-svc/internal/api"
+	"github.com/pmplatform/services/quality-svc/internal/service"
+	"github.com/pmplatform/services/quality-svc/internal/store"
 )
 
 func main() {
 	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5432/platform?sslmode=disable")
-	port := envOr("PORT", "8085")
-	mrpEngineURL := envOr("MRP_ENGINE_URL", "http://localhost:8086")
-	traceEngineURL := envOr("TRACE_ENGINE_URL", "http://localhost:8088")
+	port := envOr("PORT", "8087")
 
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -28,20 +26,19 @@ func main() {
 	}
 	defer p.Close()
 
-	items := store.NewItems(p)
-	wcs := store.NewWorkCenters(p)
-	boms := store.NewBOMs(p)
-	routings := store.NewRoutings(p)
-	workOrders := store.NewWorkOrders(p, boms)
-	mrp := store.NewMRP(p)
-	genealogy := store.NewGenealogy(p)
+	apqp := store.NewAPQP(p)
+	ppap := store.NewPPAP(p)
+	fmea := store.NewFMEA(p)
+	cp := store.NewControlPlan(p)
+	insp := store.NewInspection(p)
+	ncr := store.NewNCR(p)
 
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, mrpEngineURL, traceEngineURL)
+	svc := service.New(apqp, ppap, fmea, cp, insp, ncr)
 	h := api.NewRouter(svc)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {
-		log.Info().Str("addr", srv.Addr).Msg("mfg-svc listening")
+		log.Info().Str("addr", srv.Addr).Msg("quality-svc listening")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Send()
 		}

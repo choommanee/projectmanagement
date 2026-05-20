@@ -15,5 +15,6 @@ use (
 	./services/identity-svc
 	./services/mfg-svc
 	./services/project-svc
+	./services/quality-svc
 	./services/tenant-svc
 )

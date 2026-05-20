@@ -18,13 +18,15 @@ import (
 
 // Service is the aggregate application service.
 type Service struct {
-	Items       *store.Items
-	WorkCenters *store.WorkCenters
-	BOMs        *store.BOMs
-	Routings    *store.Routings
-	WorkOrders  *store.WorkOrders
-	MRP         *store.MRP
-	MRPEngineURL string
+	Items        *store.Items
+	WorkCenters  *store.WorkCenters
+	BOMs         *store.BOMs
+	Routings     *store.Routings
+	WorkOrders   *store.WorkOrders
+	MRP          *store.MRP
+	Genealogy    *store.Genealogy
+	MRPEngineURL  string
+	TraceEngineURL string
 }
 
 func New(
@@ -34,16 +36,20 @@ func New(
 	routings *store.Routings,
 	wos *store.WorkOrders,
 	mrp *store.MRP,
+	genealogy *store.Genealogy,
 	mrpEngineURL string,
+	traceEngineURL string,
 ) *Service {
 	return &Service{
-		Items:        items,
-		WorkCenters:  wcs,
-		BOMs:         boms,
-		Routings:     routings,
-		WorkOrders:   wos,
-		MRP:          mrp,
-		MRPEngineURL: mrpEngineURL,
+		Items:          items,
+		WorkCenters:    wcs,
+		BOMs:           boms,
+		Routings:       routings,
+		WorkOrders:     wos,
+		MRP:            mrp,
+		Genealogy:      genealogy,
+		MRPEngineURL:   mrpEngineURL,
+		TraceEngineURL: traceEngineURL,
 	}
 }
 

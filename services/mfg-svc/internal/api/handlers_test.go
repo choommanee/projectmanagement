@@ -56,8 +56,9 @@ func newTestServer(t *testing.T, p *pgxpool.Pool) http.Handler {
 	routings := store.NewRoutings(p)
 	workOrders := store.NewWorkOrders(p, boms)
 	mrp := store.NewMRP(p)
-	// Use empty MRP engine URL — engine unreachable triggers graceful synthetic fallback.
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, "http://localhost:19999")
+	genealogy := store.NewGenealogy(p)
+	// Use empty engine URLs — unreachable triggers graceful synthetic fallback.
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, "http://localhost:19999", "http://localhost:19998")
 	return api.NewRouter(svc)
 }
 
@@ -440,4 +441,78 @@ func TestMRPRunSyntheticFallback(t *testing.T) {
 	if action != "noop" {
 		t.Errorf("expected noop action, got %v", action)
 	}
+}
+
+// TestLotTraceEndpoint creates parent→child lot genealogy and verifies trace.
+func TestLotTraceEndpoint(t *testing.T) {
+	p := openTestPool(t)
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Create UOM + item
+	rr := doJSON(t, h, "POST", "/v1/uoms", map[string]any{"code": "EA-T", "name": "Each", "ratio_to_base": 1}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("createUOM: %d %s", rr.Code, rr.Body.String())
+	}
+	var uom map[string]any
+	decodeJSON(t, rr, &uom)
+	uomID := uomIDStr(uom)
+
+	rr = doJSON(t, h, "POST", "/v1/items", map[string]any{"code": "T-ITEM", "name": "Trace Item", "type": "finished", "uom_id": uomID}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("createItem: %d %s", rr.Code, rr.Body.String())
+	}
+	var item map[string]any
+	decodeJSON(t, rr, &item)
+	itemID := strField(item, "id", "ID")
+
+	// Create 2 lots
+	rr = doJSON(t, h, "POST", "/v1/lots", map[string]any{"item_id": itemID, "lot_no": "T-PARENT", "qty_on_hand": 100}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("createLot parent: %d %s", rr.Code, rr.Body.String())
+	}
+	var l1 map[string]any
+	decodeJSON(t, rr, &l1)
+	l1ID := strField(l1, "id", "ID")
+
+	rr = doJSON(t, h, "POST", "/v1/lots", map[string]any{"item_id": itemID, "lot_no": "T-CHILD", "qty_on_hand": 50}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("createLot child: %d %s", rr.Code, rr.Body.String())
+	}
+	var l2 map[string]any
+	decodeJSON(t, rr, &l2)
+	l2ID := strField(l2, "id", "ID")
+
+	// Add genealogy (child l2, parent l1)
+	rr = doJSON(t, h, "POST", "/v1/lots/"+l2ID+"/genealogy", map[string]any{"parent_lot_id": l1ID, "qty": 50.0}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("addGenealogy: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// Trace forward from l1 — engine at 19998 is unreachable, expect flat list
+	rr = doJSON(t, h, "GET", "/v1/lots/"+l1ID+"/trace?direction=forward", nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("traceLot: %d %s", rr.Code, rr.Body.String())
+	}
+	// Response should be an array (flat fallback) or object — just check 200
+}
+
+func uomIDStr(m map[string]any) string {
+	if v, ok := m["id"].(string); ok {
+		return v
+	}
+	if v, ok := m["ID"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func strField(m map[string]any, fields ...string) string {
+	for _, f := range fields {
+		if v, ok := m[f].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
 }

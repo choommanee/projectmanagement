@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "engines/_template",
     "engines/mrp-engine",
+    "engines/traceability-engine",
     "libs/rust/obs",
     "libs/rust/db",    # added in Task 12
 ]

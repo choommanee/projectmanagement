@@ -1,4 +1,4 @@
-module github.com/pmplatform/services/mfg-svc
+module github.com/pmplatform/services/quality-svc
 
 go 1.25.0
 
