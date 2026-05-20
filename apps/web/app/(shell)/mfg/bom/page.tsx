@@ -1,35 +1,201 @@
 "use client";
-import { ListView } from "@/primitives/list/ListView";
+import { useCallback, useEffect, useState } from "react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { mockBOM } from "@/lib/mock/bom";
-import type { ListDef } from "@/primitives/list/list.types";
+import { Tag } from "@pmplatform/ui-kit";
+import { Button } from "@pmplatform/ui-kit";
+import { Input } from "@pmplatform/ui-kit";
+import { BomTree } from "@/components/BomTree";
+import {
+  listItems, listBomsForItem, createBomForItem, getBom, listUoms,
+  type Item, type BOMHeader, type BOMLine, type UOM,
+} from "@/lib/api/mfg";
 
-const def: ListDef = {
-  entity: "bom",
-  views: [
-    { id: "all", name: "BRK-ASSY-V2 (multi-level)", isSystem: true, columns: [
-      { name: "level",  label: "Lv",     width: 50 },
-      { name: "parent", label: "Parent", width: 160 },
-      { name: "child",  label: "Child",  width: 200 },
-      { name: "qty",    label: "Qty",    width: 80 },
-      { name: "uom",    label: "UoM",    width: 60 },
-    ]},
-  ],
-};
+export default function BomExplorerPage() {
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemResults, setItemResults] = useState<Item[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [uoms, setUoms] = useState<UOM[]>([]);
 
-export default function Page() {
+  const [boms, setBoms] = useState<BOMHeader[]>([]);
+  const [bomsLoading, setBomsLoading] = useState(false);
+  const [bomsErr, setBomsErr] = useState<string | null>(null);
+
+  const [selectedBom, setSelectedBom] = useState<BOMHeader | null>(null);
+  const [selectedBomFull, setSelectedBomFull] = useState<BOMHeader | null>(null);
+  const [bomDetailLoading, setBomDetailLoading] = useState(false);
+
+  useEffect(() => {
+    void listUoms().then(setUoms).catch(() => {});
+  }, []);
+
+  async function searchItem(q: string) {
+    if (!q.trim()) { setItemResults([]); return; }
+    try {
+      const r = await listItems({ q, limit: 10 });
+      setItemResults(r.items);
+    } catch { setItemResults([]); }
+  }
+
+  function selectItem(item: Item) {
+    setSelectedItem(item);
+    setItemQuery(`${item.code} — ${item.name}`);
+    setItemResults([]);
+    setSelectedBom(null);
+    setSelectedBomFull(null);
+    void loadBoms(item.id);
+  }
+
+  const loadBoms = useCallback(async (itemId: string) => {
+    setBomsLoading(true);
+    setBomsErr(null);
+    try {
+      const list = await listBomsForItem(itemId);
+      setBoms(list);
+    } catch (err) {
+      setBomsErr(err instanceof Error ? err.message : "Failed to load BOMs");
+    } finally {
+      setBomsLoading(false);
+    }
+  }, []);
+
+  async function handleSelectBom(bom: BOMHeader) {
+    setSelectedBom(bom);
+    setSelectedBomFull(null);
+    setBomDetailLoading(true);
+    try {
+      const full = await getBom(bom.id);
+      // getBom header doesn't include lines — fetch them via the proxy
+      const lineRes = await fetch(`/api/mfg/boms/${bom.id}`);
+      const lineData = await lineRes.json() as Record<string, unknown>;
+      const lines = (lineData.lines ?? lineData.Lines ?? []) as BOMLine[];
+      setSelectedBomFull({ ...full, lines });
+    } catch {
+      setSelectedBomFull(bom);
+    } finally {
+      setBomDetailLoading(false);
+    }
+  }
+
+  async function handleNewBomVersion() {
+    if (!selectedItem) return;
+    setBomsErr(null);
+    try {
+      const newBom = await createBomForItem(selectedItem.id);
+      await loadBoms(selectedItem.id);
+      void handleSelectBom(newBom);
+    } catch (err) {
+      setBomsErr(err instanceof Error ? err.message : "Failed to create BOM");
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
-      <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "BOM" }]} />
+      <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "BOM Explorer" }]} />
       <CommandBar actions={[
-        { id: "new", label: "+ New BOM", variant: "primary", onClick: () => alert("New BOM (mock)") },
-        { id: "ver", label: "Version",   variant: "ghost",   onClick: () => alert("Create version (mock)") },
-        { id: "exp", label: "Explode",   variant: "ghost",   onClick: () => alert("Explode BOM (mock)") },
+        { id: "new", label: "+ New BOM Version", variant: "primary", onClick: handleNewBomVersion, disabled: !selectedItem },
+        { id: "refresh", label: "Refresh", variant: "ghost", onClick: () => selectedItem && loadBoms(selectedItem.id), disabled: !selectedItem },
       ]} />
-      <div className="min-h-0 flex-1">
-        <ListView def={def} rows={mockBOM as never} />
+
+      {/* Item picker */}
+      <div className="border-b border-line bg-paper px-4 py-3">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-ink-2 whitespace-nowrap">Select Item</label>
+          <div className="relative w-80">
+            <Input
+              value={itemQuery}
+              onChange={(e) => { setItemQuery(e.target.value); void searchItem(e.target.value); }}
+              placeholder="Search by code or name…"
+              className="h-9"
+            />
+            {itemResults.length > 0 && (
+              <ul className="absolute left-0 top-full z-30 mt-1 w-full rounded-sm border border-line bg-surface shadow-pop">
+                {itemResults.map(it => (
+                  <li key={it.id}
+                    className="cursor-pointer px-3 py-2 text-xs hover:bg-surface-2"
+                    onClick={() => selectItem(it)}>
+                    <span className="font-mono font-medium">{it.code}</span>
+                    <span className="ml-2 text-ink-3">{it.name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {selectedItem && (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-semibold text-ink">{selectedItem.code}</span>
+              <span className="text-sm text-ink-2">{selectedItem.name}</span>
+              <Button type="button" size="sm" variant="ghost" onClick={() => { setSelectedItem(null); setItemQuery(""); setBoms([]); setSelectedBom(null); setSelectedBomFull(null); }}>✕ Clear</Button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {!selectedItem ? (
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="w-full max-w-sm rounded-md border border-dashed border-line-strong bg-surface p-8 text-center">
+            <div className="text-3xl mb-3">📋</div>
+            <h2 className="text-base font-semibold text-ink">Select an Item</h2>
+            <p className="mt-1 text-sm text-ink-3">Use the search above to find a finished good or assembly to view its bill of materials.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* Left rail — BOM version list */}
+          <div className="flex w-72 flex-col border-r border-line bg-surface">
+            <div className="flex items-center justify-between border-b border-line px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-ink-3">BOM Versions</span>
+              <Button type="button" size="sm" variant="ghost" onClick={handleNewBomVersion}>+ New</Button>
+            </div>
+            {bomsErr && <p className="px-3 py-2 text-xs text-danger">{bomsErr}</p>}
+            {bomsLoading ? (
+              <div className="flex flex-1 items-center justify-center text-xs text-ink-3">Loading…</div>
+            ) : boms.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center p-4 text-center text-xs text-ink-3">
+                No BOMs. Create one with &quot;+ New&quot;.
+              </div>
+            ) : (
+              <ul className="flex-1 overflow-auto">
+                {boms.map(bom => (
+                  <li key={bom.id}
+                    className={`cursor-pointer border-b border-line px-3 py-2.5 hover:bg-surface-2 ${selectedBom?.id === bom.id ? "bg-accent-soft/20 border-l-2 border-l-accent" : ""}`}
+                    onClick={() => handleSelectBom(bom)}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-semibold">v{bom.version}</span>
+                      <Tag tone={bom.status === "active" ? "success" : "neutral"} dot>{bom.status}</Tag>
+                    </div>
+                    <div className="mt-1 flex gap-2">
+                      {bom.isDefault && <Tag tone="accent">Default</Tag>}
+                    </div>
+                    {bom.effectiveFrom && (
+                      <div className="mt-1 text-[10px] text-ink-3">From {new Date(bom.effectiveFrom).toLocaleDateString()}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Right pane — BOM tree */}
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            {!selectedBom && (
+              <div className="flex h-full items-center justify-center text-sm text-ink-3">
+                Select a BOM version from the left panel.
+              </div>
+            )}
+            {selectedBom && bomDetailLoading && (
+              <div className="flex h-full items-center justify-center text-sm text-ink-3">Loading BOM…</div>
+            )}
+            {selectedBomFull && !bomDetailLoading && (
+              <BomTree
+                bom={selectedBomFull}
+                uoms={uoms}
+                onChange={() => selectedItem && loadBoms(selectedItem.id)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

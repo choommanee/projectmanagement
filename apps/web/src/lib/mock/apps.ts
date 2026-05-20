@@ -43,6 +43,11 @@ export const mockApps: AppDef[] = [
           { id: "bom", name: "BOM",         href: "/mfg/bom",         icon: "bom"               },
           { id: "mrp", name: "MRP Run",     href: "/mfg/mrp",         icon: "workflow"           },
         ]},
+        { id: "g2", name: "Master Data", subareas: [
+          { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"  },
+          { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow" },
+          { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"    },
+        ]},
       ]},
       { id: "quality", name: "Quality", groups: [
         { id: "q1", name: "IATF 16949", subareas: [
