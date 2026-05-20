@@ -51,10 +51,13 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "quality", name: "Quality", groups: [
         { id: "q1", name: "IATF 16949", subareas: [
-          { id: "apqp",  name: "APQP",         href: "/mfg/apqp",         icon: "quality" },
-          { id: "ppap",  name: "PPAP",         href: "/mfg/ppap",         icon: "quality" },
-          { id: "fmea",  name: "FMEA",         href: "/mfg/fmea",         icon: "quality" },
-          { id: "trace", name: "Traceability", href: "/mfg/traceability", icon: "trace"   },
+          { id: "apqp",  name: "APQP",          href: "/mfg/apqp",          icon: "quality" },
+          { id: "ppap",  name: "PPAP",          href: "/mfg/ppap",          icon: "quality" },
+          { id: "fmea",  name: "FMEA",          href: "/mfg/fmea",          icon: "quality" },
+          { id: "cp",    name: "Control Plans", href: "/mfg/control-plans", icon: "quality" },
+          { id: "ncrs",  name: "NCR / CAPA",   href: "/mfg/ncrs",          icon: "quality" },
+          { id: "insp",  name: "Inspections",   href: "/mfg/inspections",   icon: "quality" },
+          { id: "trace", name: "Traceability",  href: "/mfg/traceability",  icon: "trace"   },
         ]},
       ]},
     ],
