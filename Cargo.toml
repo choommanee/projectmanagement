@@ -4,6 +4,7 @@ members = [
     "engines/_template",
     "engines/mrp-engine",
     "engines/traceability-engine",
+    "engines/workflow-runtime",
     "libs/rust/obs",
     "libs/rust/db",    # added in Task 12
 ]

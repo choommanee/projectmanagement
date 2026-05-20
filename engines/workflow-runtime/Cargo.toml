@@ -1,0 +1,28 @@
+[package]
+name = "workflow-runtime"
+version = "0.0.1"
+edition.workspace = true
+
+[dependencies]
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid = { version = "1", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[lib]
+name = "workflow_runtime"
+path = "src/lib.rs"
+
+[[bin]]
+name = "workflow-runtime"
+path = "src/main.rs"

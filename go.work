@@ -17,4 +17,5 @@ use (
 	./services/project-svc
 	./services/quality-svc
 	./services/tenant-svc
+	./services/workflow-svc
 )
