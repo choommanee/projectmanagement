@@ -14,6 +14,7 @@ export const mockApps: AppDef[] = [
           { id: "projects", name: "Active Projects", href: "/pm/projects", icon: "folder",    count: 7  },
           { id: "tasks",    name: "My Tasks",        href: "/pm/tasks",    icon: "tasks",     count: 12 },
           { id: "sprints",  name: "Sprints",         href: "/pm/sprints",  icon: "sprint",    count: 2  },
+          { id: "inbox",    name: "My Tasks (Approvals)", href: "/pm/inbox", icon: "tasks",   count: 0  },
         ]},
         { id: "w2", name: "Workspaces", subareas: [
           { id: "ba", name: "BA Workspace",     href: "/pm/ba",     icon: "ba"        },
