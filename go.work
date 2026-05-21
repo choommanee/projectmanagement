@@ -17,6 +17,7 @@ use (
 	./services/mfg-svc
 	./services/project-svc
 	./services/quality-svc
+	./services/reports-svc
 	./services/tenant-svc
 	./services/workflow-svc
 )

@@ -27,6 +27,7 @@ export const mockApps: AppDef[] = [
           { id: "tenants",   name: "Tenants",        href: "/pm/tenants",   icon: "people"   },
           { id: "workflows", name: "Workflows",      href: "/pm/workflows", icon: "workflow" },
           { id: "audit",     name: "Audit Explorer", href: "/pm/audit",     icon: "settings" },
+          { id: "reports",   name: "Reports & BI",   href: "/pm/reports",   icon: "dashboard" },
         ]},
       ]},
     ],
