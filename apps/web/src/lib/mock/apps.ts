@@ -24,8 +24,9 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "admin", name: "Admin", groups: [
         { id: "a1", name: "Settings", subareas: [
-          { id: "tenants",   name: "Tenants",   href: "/pm/tenants",   icon: "people"   },
-          { id: "workflows", name: "Workflows", href: "/pm/workflows", icon: "workflow" },
+          { id: "tenants",   name: "Tenants",        href: "/pm/tenants",   icon: "people"   },
+          { id: "workflows", name: "Workflows",      href: "/pm/workflows", icon: "workflow" },
+          { id: "audit",     name: "Audit Explorer", href: "/pm/audit",     icon: "settings" },
         ]},
       ]},
     ],

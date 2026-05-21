@@ -40,15 +40,24 @@ func main() {
 	}
 	signer := libauth.NewSigner(kp.Priv, issuer)
 
-	nc, err := natsx.Connect(natsURL)
-	if err != nil {
-		log.Fatal().Err(err).Send()
+	// PG publisher always works — direct Postgres write, no NATS dependency.
+	pgPub := audit.NewPgPublisher(p, "identity-svc")
+
+	// NATS publisher is optional; used as primary when available.
+	var natsFn audit.PublishFn
+	if nc, err := natsx.Connect(natsURL); err != nil {
+		log.Warn().Err(err).Msg("nats unavailable — audit will fall back to postgres")
+	} else {
+		defer nc.Close()
+		if err := nc.EnsureStream(context.Background(), "AUDIT", []string{"audit.>"}); err != nil {
+			log.Warn().Err(err).Msg("nats stream init failed — audit will fall back to postgres")
+		} else {
+			natsFn = audit.NewPublisher(nc, "identity-svc").Publish
+		}
 	}
-	defer nc.Close()
-	if err := nc.EnsureStream(context.Background(), "AUDIT", []string{"audit.>"}); err != nil {
-		log.Fatal().Err(err).Send()
-	}
-	pub := audit.NewPublisher(nc, "identity-svc")
+
+	// Composite: try NATS first, PG as fallback.
+	pub := audit.NewFallback(natsFn, pgPub.Publish)
 
 	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
 	h := api.NewRouter(auth, kp)

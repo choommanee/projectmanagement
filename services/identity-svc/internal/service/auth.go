@@ -15,14 +15,20 @@ import (
 	"github.com/pmplatform/services/identity-svc/internal/store"
 )
 
+// AuditPublisher is the interface satisfied by *audit.Publisher, *audit.Fallback,
+// and any other publisher that can record events.
+type AuditPublisher interface {
+	Publish(ctx context.Context, action string, ev audit.Event) error
+}
+
 type Auth struct {
 	users    *store.Users
 	sessions *store.Sessions
 	signer   *libauth.Signer
-	aud      *audit.Publisher
+	aud      AuditPublisher
 }
 
-func NewAuth(u *store.Users, s *store.Sessions, signer *libauth.Signer, aud *audit.Publisher) *Auth {
+func NewAuth(u *store.Users, s *store.Sessions, signer *libauth.Signer, aud AuditPublisher) *Auth {
 	return &Auth{users: u, sessions: s, signer: signer, aud: aud}
 }
 
