@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Timer, ChevronRight, Calendar } from "lucide-react";
+import { Plus, RefreshCw, ChevronRight, Calendar } from "lucide-react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { Button, Input, Tag } from "@pmplatform/ui-kit";
+import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { listProjects, type Project } from "@/lib/api/projects";
 import {
   listSprintsForProject,
@@ -35,12 +35,13 @@ function fmtDate(d?: string | null) {
 // ── Create Sprint Dialog ───────────────────────────────────────────────────
 
 interface CreateDialogProps {
+  open: boolean;
   projects: Project[];
   onClose: () => void;
   onCreated: (sprintId: string) => void;
 }
 
-function CreateSprintDialog({ projects, onClose, onCreated }: CreateDialogProps) {
+function CreateSprintDialog({ open, projects, onClose, onCreated }: CreateDialogProps) {
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -50,8 +51,12 @@ function CreateSprintDialog({ projects, onClose, onCreated }: CreateDialogProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    if (open && projects.length > 0 && !projectId) setProjectId(projects[0].id);
+  }, [open, projects, projectId]);
+
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!name.trim()) { setError("Name is required"); return; }
     if (!projectId) { setError("Select a project"); return; }
     setLoading(true);
@@ -72,58 +77,63 @@ function CreateSprintDialog({ projects, onClose, onCreated }: CreateDialogProps)
     }
   }
 
+  const lbl = "mb-1 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3";
+  const fld = "h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-md bg-paper shadow-pop border border-line p-6" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-base font-semibold text-ink mb-4">New Sprint</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="New sprint"
+      description="Plan a time-boxed iteration with capacity and goal"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={() => void handleSubmit()}>Create Sprint</Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div>
+          <label htmlFor="create-sprint-project" className={lbl}>Project *</label>
+          <select
+            id="create-sprint-project"
+            aria-label="Project"
+            className={fld}
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            required
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <span className={lbl}>Sprint name *</span>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Sprint 1" required data-autofocus />
+        </div>
+        <div>
+          <span className={lbl}>Goal</span>
+          <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="What should we achieve?" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label htmlFor="create-sprint-project" className="text-xs font-medium text-ink-2 mb-1 block">Project *</label>
-            <select
-              id="create-sprint-project"
-              aria-label="Project"
-              className="w-full rounded-xs border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-              required
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-              ))}
-            </select>
+            <label htmlFor="create-sprint-start" className={lbl}>Start date</label>
+            <input id="create-sprint-start" aria-label="Start date" type="date" className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-ink-2 mb-1 block">Sprint name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Sprint 1" required />
+            <label htmlFor="create-sprint-end" className={lbl}>End date</label>
+            <input id="create-sprint-end" aria-label="End date" type="date" className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
-          <div>
-            <label className="text-xs font-medium text-ink-2 mb-1 block">Goal</label>
-            <Input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="What should we achieve?" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label htmlFor="create-sprint-start" className="text-xs font-medium text-ink-2 mb-1 block">Start date</label>
-              <input id="create-sprint-start" aria-label="Start date" type="date" className="w-full rounded-xs border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-            <div>
-              <label htmlFor="create-sprint-end" className="text-xs font-medium text-ink-2 mb-1 block">End date</label>
-              <input id="create-sprint-end" aria-label="End date" type="date" className="w-full rounded-xs border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-ink-2 mb-1 block">Capacity (story points)</label>
-            <Input type="number" value={capacityPts} onChange={(e) => setCapacityPts(e.target.value)} placeholder="40" min="0" />
-          </div>
-          {error && <p className="text-xs text-danger">{error}</p>}
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" size="sm" disabled={loading}>
-              {loading ? "Creating…" : "Create Sprint"}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div>
+          <span className={lbl}>Capacity (story points)</span>
+          <Input type="number" value={capacityPts} onChange={(e) => setCapacityPts(e.target.value)} placeholder="40" min="0" />
+        </div>
+        {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      </form>
+    </Dialog>
   );
 }
 
@@ -170,13 +180,8 @@ export default function SprintsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadProjects().then(() => {});
-  }, [loadProjects]);
-
-  useEffect(() => {
-    loadSprints(selectedProjectId, projects).then(() => {});
-  }, [selectedProjectId, projects, loadSprints]);
+  useEffect(() => { loadProjects().then(() => {}); }, [loadProjects]);
+  useEffect(() => { loadSprints(selectedProjectId, projects).then(() => {}); }, [selectedProjectId, projects, loadSprints]);
 
   function handleCreated(sprintId: string) {
     setShowCreate(false);
@@ -185,22 +190,21 @@ export default function SprintsPage() {
 
   const projectById = Object.fromEntries(projects.map((p) => [p.id, p]));
 
+  // ── KPI strip ────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const byStatus = { planning: 0, active: 0, closed: 0 };
+    let capacity = 0;
+    for (const s of sprints) {
+      byStatus[s.status]++;
+      capacity += s.capacityPts ?? 0;
+    }
+    return { byStatus, capacity };
+  }, [sprints]);
+
   const commandActions = [
-    {
-      id: "new-sprint",
-      label: "New Sprint",
-      icon: <Plus size={14} />,
-      variant: "primary" as const,
-      onClick: () => setShowCreate(true),
-      disabled: projects.length === 0,
-    },
+    { id: "new-sprint", label: "New Sprint", icon: <Plus size={14} />, variant: "primary" as const, onClick: () => setShowCreate(true), disabled: projects.length === 0 },
     { kind: "separator" as const, id: "sep1" },
-    {
-      id: "refresh",
-      label: "Refresh",
-      icon: <RefreshCw size={14} />,
-      onClick: () => loadSprints(selectedProjectId, projects),
-    },
+    { id: "refresh", label: "Refresh", icon: <RefreshCw size={14} />, onClick: () => loadSprints(selectedProjectId, projects) },
   ];
 
   return (
@@ -208,112 +212,145 @@ export default function SprintsPage() {
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "Sprints" }]} />
       <CommandBar actions={commandActions} />
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-line bg-paper">
-        <span className="text-xs text-ink-3 font-medium">Project:</span>
-        <select
-          aria-label="Filter by project"
-          className="rounded-xs border border-line bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-          value={selectedProjectId}
-          onChange={(e) => setSelectedProjectId(e.target.value)}
-        >
-          <option value="all">All projects</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-          ))}
-        </select>
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] space-y-6 px-6 py-6">
+          {/* Editorial header */}
+          <header className="reveal-up flex items-end justify-between gap-6 border-b border-line pb-5">
+            <div className="flex flex-col gap-1.5">
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-3">
+                ◢ control room · sprints
+              </div>
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">Sprints</h1>
+            </div>
+            <div className="hidden flex-col items-end gap-1 sm:flex">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">scope</div>
+              <div className="font-mono text-[11px] tabular-nums text-ink-2">
+                {selectedProjectId === "all" ? "all projects" : projectById[selectedProjectId]?.code ?? "—"}
+              </div>
+            </div>
+          </header>
+
+          {/* KPI strip */}
+          <section className="reveal-up relative overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs" aria-label="Sprint KPIs">
+            <div aria-hidden className="pointer-events-none absolute inset-0 blueprint-grid" />
+            <div className="relative grid grid-cols-2 sm:grid-cols-5 divide-y divide-line sm:divide-y-0 sm:divide-x">
+              {[
+                { label: "total",    value: sprints.length,         tone: "accent" as const },
+                { label: "planning", value: kpis.byStatus.planning, tone: "accent" as const },
+                { label: "active",   value: kpis.byStatus.active,   tone: "accent" as const },
+                { label: "closed",   value: kpis.byStatus.closed,   tone: "accent" as const },
+                { label: "capacity",  value: kpis.capacity > 0 ? `${kpis.capacity}pts` : "—", tone: "accent" as const },
+              ].map((k) => (
+                <div key={k.label} className="flex flex-col gap-1 px-4 py-4">
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${k.tone === "signal" ? "bg-signal" : "bg-accent"}`} />
+                    {k.label}
+                  </div>
+                  <div className="font-mono text-[22px] font-semibold leading-none tabular-nums text-ink">{k.value}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Project filter */}
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3">Project</span>
+            <select
+              aria-label="Filter by project"
+              className="h-8 rounded-sm border border-line-strong bg-surface px-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+            >
+              <option value="all">All projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">{error}</div>
+          )}
+
+          {loading ? (
+            <LoadingState rows={4} ariaLabel="Loading sprints" />
+          ) : sprints.length === 0 ? (
+            <EmptyState
+              code="◇ no sprints"
+              title={projects.length === 0 ? "Create a project first." : "No sprints yet."}
+              description={projects.length === 0 ? "Sprints live inside projects — create a project before planning iterations." : "Plan a time-boxed iteration with a goal and capacity."}
+              action={projects.length > 0 ? <Button variant="primary" onClick={() => setShowCreate(true)}><Plus size={13} className="mr-1" />Create Sprint</Button> : undefined}
+            />
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-paper text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <th className="px-3 py-2.5">Sprint</th>
+                    <th className="px-3 py-2.5">Project</th>
+                    <th className="px-3 py-2.5">Status</th>
+                    <th className="px-3 py-2.5">Dates</th>
+                    <th className="px-3 py-2.5 text-right">Capacity</th>
+                    <th className="px-3 py-2.5 text-right">Created</th>
+                    <th className="w-6" aria-label="Open" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sprints.map((sp) => {
+                    const proj = projectById[sp.projectId];
+                    return (
+                      <tr
+                        key={sp.id}
+                        className="border-b border-line/60 last:border-0 hover:bg-paper cursor-pointer transition-colors"
+                        onClick={() => router.push(`/pm/sprints/${sp.id}`)}
+                      >
+                        <td className="px-3 py-2.5">
+                          <span className="font-medium text-ink">{sp.name}</span>
+                          {sp.goal && (
+                            <span className="ml-2 text-xs text-ink-3 truncate max-w-xs">{sp.goal}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {proj ? (
+                            <span className="font-mono text-[11px] text-ink-2 bg-paper border border-line-strong px-1.5 py-0.5 rounded-xs">{proj.code}</span>
+                          ) : (
+                            <span className="text-xs text-ink-3">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <Tag tone={STATUS_TONE[sp.status]}>{STATUS_LABEL[sp.status]}</Tag>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-ink-2">
+                            <Calendar size={11} className="opacity-50" />
+                            {fmtDate(sp.startDate)} → {fmtDate(sp.endDate)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-ink-2">
+                          {sp.capacityPts > 0 ? `${sp.capacityPts}pts` : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-mono text-[11px] tabular-nums text-ink-3">
+                          {fmtDate(sp.createdAt)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <ChevronRight size={14} className="text-ink-3 opacity-50" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
-        {error && (
-          <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-4 py-2 text-sm text-danger">{error}</div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center h-40 text-ink-3 text-sm">Loading sprints…</div>
-        ) : sprints.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-60 gap-3">
-            <Timer size={40} className="text-ink-3 opacity-40" />
-            <p className="text-ink-3 text-sm font-medium">No sprints yet</p>
-            {projects.length === 0 ? (
-              <p className="text-ink-3 text-xs">Create a project first, then plan your sprints.</p>
-            ) : (
-              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-                <Plus size={14} /> Create Sprint
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-md border border-line overflow-hidden bg-paper">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-surface-2 text-xs text-ink-3">
-                  <th className="px-3 py-2 text-left font-medium">Sprint</th>
-                  <th className="px-3 py-2 text-left font-medium">Project</th>
-                  <th className="px-3 py-2 text-left font-medium">Status</th>
-                  <th className="px-3 py-2 text-left font-medium">Dates</th>
-                  <th className="px-3 py-2 text-right font-medium">Capacity</th>
-                  <th className="px-3 py-2 text-right font-medium">Created</th>
-                  <th className="w-6" aria-label="Open" />
-                </tr>
-              </thead>
-              <tbody>
-                {sprints.map((sp, i) => {
-                  const proj = projectById[sp.projectId];
-                  return (
-                    <tr
-                      key={sp.id}
-                      className={`border-b border-line hover:bg-surface cursor-pointer transition-colors ${i % 2 === 0 ? "" : "bg-surface-2/30"}`}
-                      onClick={() => router.push(`/pm/sprints/${sp.id}`)}
-                    >
-                      <td className="px-3 py-2.5">
-                        <span className="font-medium text-ink">{sp.name}</span>
-                        {sp.goal && (
-                          <span className="ml-2 text-xs text-ink-3 truncate max-w-xs">{sp.goal}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {proj ? (
-                          <span className="font-mono text-xs text-ink-2 bg-surface-2 px-1.5 py-0.5 rounded-xs">{proj.code}</span>
-                        ) : (
-                          <span className="text-xs text-ink-3">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Tag tone={STATUS_TONE[sp.status]}>{STATUS_LABEL[sp.status]}</Tag>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className="flex items-center gap-1 text-xs text-ink-2">
-                          <Calendar size={11} className="opacity-50" />
-                          {fmtDate(sp.startDate)} → {fmtDate(sp.endDate)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-xs text-ink-2">
-                        {sp.capacityPts > 0 ? `${sp.capacityPts} pts` : "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-xs text-ink-3">
-                        {fmtDate(sp.createdAt)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <ChevronRight size={14} className="text-ink-3 opacity-50" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {showCreate && (
-        <CreateSprintDialog
-          projects={projects}
-          onClose={() => setShowCreate(false)}
-          onCreated={handleCreated}
-        />
-      )}
+      <CreateSprintDialog
+        open={showCreate}
+        projects={projects}
+        onClose={() => setShowCreate(false)}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }

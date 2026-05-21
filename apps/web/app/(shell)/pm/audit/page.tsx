@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { RefreshCw, Download, ChevronDown, ChevronRight, Search } from "lucide-react";
-import { Button, Input, Tag } from "@pmplatform/ui-kit";
+import { Button, Input, Tag, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import {
@@ -99,7 +99,9 @@ function SparklineChart({ buckets, onSelectDay }: SparklineProps) {
                   const h = cnt === 0 ? 2 : Math.max(4, Math.round((cnt / maxCount) * 22));
                   return (
                     <button
+                      type="button"
                       key={day}
+                      aria-label={`${day}: ${cnt} events`}
                       title={`${day}: ${cnt} events`}
                       className={`w-3 rounded-[1px] opacity-80 hover:opacity-100 transition-opacity cursor-pointer ${
                         cnt === 0 ? "bg-surface-2" : "bg-accent"
@@ -147,6 +149,7 @@ function FilterToolbar({ filters, services, onChange, onApply, onClear }: Toolba
       <div className="flex flex-wrap items-center gap-2">
         {/* Service select */}
         <select
+          aria-label="Filter by service"
           className="h-8 rounded border border-line bg-paper px-2 text-[13px] text-ink-1 focus:outline-none focus:ring-1 focus:ring-accent"
           value={local.service ?? ""}
           onChange={(e) => set("service", e.target.value)}
@@ -189,6 +192,7 @@ function FilterToolbar({ filters, services, onChange, onApply, onClear }: Toolba
 
         {/* Result select */}
         <select
+          aria-label="Filter by result"
           className="h-8 rounded border border-line bg-paper px-2 text-[13px] text-ink-1 focus:outline-none focus:ring-1 focus:ring-accent"
           value={local.result ?? ""}
           onChange={(e) => set("result", e.target.value)}
@@ -202,6 +206,8 @@ function FilterToolbar({ filters, services, onChange, onApply, onClear }: Toolba
         {/* From date */}
         <input
           type="date"
+          aria-label="From date"
+          title="From date"
           className="h-8 rounded border border-line bg-paper px-2 text-[13px] text-ink-1 focus:outline-none focus:ring-1 focus:ring-accent"
           value={local.from ?? ""}
           onChange={(e) => set("from", e.target.value)}
@@ -210,6 +216,8 @@ function FilterToolbar({ filters, services, onChange, onApply, onClear }: Toolba
         {/* To date */}
         <input
           type="date"
+          aria-label="To date"
+          title="To date"
           className="h-8 rounded border border-line bg-paper px-2 text-[13px] text-ink-1 focus:outline-none focus:ring-1 focus:ring-accent"
           value={local.to ?? ""}
           onChange={(e) => set("to", e.target.value)}
@@ -367,6 +375,18 @@ export default function AuditPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  // ── KPI strip (computed from current page + 14-day buckets) ──────────────
+  const kpis = useMemo(() => {
+    let success = 0, denied = 0, error = 0;
+    for (const e of items) {
+      if (e.result === "success") success++;
+      else if (e.result === "denied") denied++;
+      else if (e.result === "error") error++;
+    }
+    const last14d = buckets.reduce((s, b) => s + b.count, 0);
+    return { success, denied, error, services: services.length, last14d };
+  }, [items, buckets, services]);
+
   return (
     <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "Audit Explorer" }]} />
@@ -386,89 +406,132 @@ export default function AuditPage() {
         ]}
       />
 
-      {/* Sparklines */}
-      <SparklineChart buckets={buckets} onSelectDay={handleSparkClick} />
-
-      {/* Filters */}
-      <FilterToolbar
-        filters={filters}
-        services={services}
-        onChange={setFilters}
-        onApply={() => { setPage(0); refresh(); }}
-        onClear={() => { setPage(0); }}
-      />
-
-      {/* Error */}
-      {error && (
-        <div className="mx-3 mt-2 rounded border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
-          {error}
-        </div>
-      )}
-
-      {/* Table */}
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-collapse text-left">
-          <thead className="sticky top-0 z-10 bg-paper border-b border-line">
-            <tr>
-              {["Timestamp","Service","Action","Entity","User","Result","IP",""].map((h, i) => (
-                <th key={i} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-ink-3">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-[13px] text-ink-3">
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-12 text-center text-[13px] text-ink-3">
-                  No audit events found. Try adjusting filters or trigger a login.
-                </td>
-              </tr>
-            )}
-            {items.map((ev) => (
-              <EventRow
-                key={ev.id}
-                ev={ev}
-                expanded={expandedId === ev.id}
-                onToggle={() => setExpandedId(expandedId === ev.id ? null : ev.id)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+        <div className="mx-auto max-w-[1400px] space-y-5 px-6 py-6">
+          {/* Editorial header */}
+          <header className="reveal-up flex items-end justify-between gap-6 border-b border-line pb-5">
+            <div className="flex flex-col gap-1.5">
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-3">
+                ◢ control room · audit timeline
+              </div>
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
+                Audit Explorer
+              </h1>
+            </div>
+            <div className="hidden flex-col items-end gap-1 sm:flex">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">page</div>
+              <div className="font-mono text-[11px] tabular-nums text-ink-2">
+                {items.length}/{total} · pg {page + 1}
+              </div>
+            </div>
+          </header>
 
-      {/* Pagination footer */}
-      <div className="flex items-center justify-between border-t border-line bg-paper px-3 py-2">
-        <span className="text-[12px] text-ink-3">
-          {total === 0 ? "No events" : `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total}`}
-        </span>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="h-7 px-2 text-[12px]"
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] text-ink-3 px-1">
-            {page + 1} / {totalPages || 1}
-          </span>
-          <Button
-            variant="ghost"
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-            className="h-7 px-2 text-[12px]"
-          >
-            Next
-          </Button>
+          {/* KPI strip */}
+          <section className="reveal-up relative overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs" aria-label="Audit KPIs">
+            <div aria-hidden className="pointer-events-none absolute inset-0 blueprint-grid" />
+            <div className="relative grid grid-cols-2 sm:grid-cols-5 divide-y divide-line sm:divide-y-0 sm:divide-x">
+              {[
+                { label: "total",     value: total,         tone: "accent" as const },
+                { label: "success",   value: kpis.success,  tone: "accent" as const },
+                { label: "denied",    value: kpis.denied,   tone: "signal" as const },
+                { label: "error",     value: kpis.error,    tone: "signal" as const },
+                { label: "14d total", value: kpis.last14d,  tone: "accent" as const },
+              ].map((k) => (
+                <div key={k.label} className="flex flex-col gap-1 px-4 py-4">
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${k.tone === "signal" ? "bg-signal" : "bg-accent"}`} />
+                    {k.label}
+                  </div>
+                  <div className={`font-mono text-[22px] font-semibold leading-none tabular-nums ${k.tone === "signal" && Number(k.value) > 0 ? "text-signal" : "text-ink"}`}>
+                    {k.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Sparklines */}
+          <SparklineChart buckets={buckets} onSelectDay={handleSparkClick} />
+
+          {/* Filters */}
+          <FilterToolbar
+            filters={filters}
+            services={services}
+            onChange={setFilters}
+            onApply={() => { setPage(0); refresh(); }}
+            onClear={() => { setPage(0); }}
+          />
+
+          {error && (
+            <div role="alert" className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
+              {error}
+            </div>
+          )}
+
+          {/* Table card */}
+          <div className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs">
+            {loading && items.length === 0 ? (
+              <div className="p-4"><LoadingState rows={5} ariaLabel="Loading audit events" /></div>
+            ) : items.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  code="◇ no events"
+                  title="No audit events match these filters."
+                  description="Adjust service/action/from/to filters above, or trigger an action (login, save) to populate the timeline."
+                />
+              </div>
+            ) : (
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-paper border-b border-line">
+                  <tr>
+                    {["Timestamp","Service","Action","Entity","User","Result","IP",""].map((h, i) => (
+                      <th key={i} className="px-3 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((ev) => (
+                    <EventRow
+                      key={ev.id}
+                      ev={ev}
+                      expanded={expandedId === ev.id}
+                      onToggle={() => setExpandedId(expandedId === ev.id ? null : ev.id)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination footer */}
+          <div className="flex items-center justify-between border-t border-line bg-paper px-3 py-2 rounded-b-lg">
+            <span className="font-mono text-[12px] tabular-nums text-ink-3">
+              {total === 0 ? "No events" : `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total}`}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="h-7 px-2 text-[12px]"
+              >
+                Prev
+              </Button>
+              <span className="font-mono text-[12px] tabular-nums text-ink-3 px-1">
+                {page + 1} / {totalPages || 1}
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="h-7 px-2 text-[12px]"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
