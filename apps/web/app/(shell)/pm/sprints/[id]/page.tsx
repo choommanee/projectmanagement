@@ -29,7 +29,7 @@ import {
   type SprintStatus,
 } from "@/lib/api/sprints";
 import { listTasksForProject, updateTask, type Task, type TaskStatus } from "@/lib/api/tasks";
-import { statusTone, statusLabel, priorityTone, priorityLabel } from "@/lib/api/taskTones";
+import { statusTone, statusLabel, priorityTone, priorityLabel, toneBg } from "@/lib/api/taskTones";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ function TaskCard({ task, isDragging, onClick }: TaskCardProps) {
     >
       <span className="font-mono text-[10px] text-ink-3 shrink-0 w-14 truncate">{task.code}</span>
       <span className="flex-1 text-xs text-ink truncate leading-tight">{task.title}</span>
-      <span className={`w-2 h-2 rounded-full shrink-0 bg-${priorityTone(task.priority)}`} title={priorityLabel(task.priority)} />
+      <span className={`w-2 h-2 rounded-full shrink-0 ${toneBg(priorityTone(task.priority))}`} title={priorityLabel(task.priority)} />
       {task.assigneeId && (
         <span className="w-5 h-5 rounded-full bg-accent-soft text-[9px] font-medium text-accent flex items-center justify-center shrink-0" title={task.assigneeId}>
           {initials(task.assigneeId.slice(0, 4))}
@@ -107,7 +107,7 @@ function TaskCardOverlay({ task }: { task: Task }) {
     <div className="flex min-h-12 w-60 items-center gap-2 rounded-xs border border-accent bg-paper px-2 py-1.5 shadow-pop rotate-1 opacity-90">
       <span className="font-mono text-[10px] text-ink-3 shrink-0 w-14 truncate">{task.code}</span>
       <span className="flex-1 text-xs text-ink truncate leading-tight">{task.title}</span>
-      <span className={`w-2 h-2 rounded-full shrink-0 bg-${priorityTone(task.priority)}`} />
+      <span className={`w-2 h-2 rounded-full shrink-0 ${toneBg(priorityTone(task.priority))}`} />
     </div>
   );
 }

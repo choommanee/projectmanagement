@@ -198,8 +198,22 @@ const ROW_H = 60;  // px per row
 function StaticDashboardGrid({ widgets }: { widgets: ResolvedWidget[] }) {
   if (widgets.length === 0) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-line text-sm text-ink-3">
-        No widgets configured
+      <div className="relative flex h-48 items-center justify-center overflow-hidden rounded-lg border border-dashed border-line-strong bg-paper">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.4]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+        <div className="relative text-center">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-3">
+            ◇ empty canvas
+          </div>
+          <div className="mt-1.5 text-[13px] text-ink-3">No widgets configured</div>
+        </div>
       </div>
     );
   }
@@ -209,21 +223,42 @@ function StaticDashboardGrid({ widgets }: { widgets: ResolvedWidget[] }) {
 
   return (
     <div className="relative w-full overflow-x-auto" style={{ height: gridH }}>
-      {widgets.map((w) => (
+      {/* Blueprint grid background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, var(--line) 1px, transparent 1px), linear-gradient(to bottom, var(--line) 1px, transparent 1px)",
+          backgroundSize: `${COL_W}px ${ROW_H}px`,
+        }}
+      />
+      {widgets.map((w, i) => (
         <div
           key={w.id}
-          className="absolute"
+          className="absolute reveal-w"
           style={{
             left: w.x * COL_W,
             top: w.y * ROW_H,
             width: w.w * COL_W,
             height: w.h * ROW_H,
             padding: 4,
+            animationDelay: `${i * 50}ms`,
           }}
         >
           <WidgetRenderer widget={w} />
         </div>
       ))}
+      <style jsx>{`
+        :global(.reveal-w) {
+          opacity: 0;
+          transform: translateY(8px);
+          animation: revealW 460ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        @keyframes revealW {
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -330,63 +365,78 @@ export default function DashboardViewerPage() {
     <div className="flex h-full flex-col gap-0">
       <Breadcrumb items={[{ label: "Reports & BI", href: "/pm/reports" }, { label: name }]} />
 
-      <div className="flex-1 overflow-auto px-6 py-5 space-y-5">
-        {/* Header card */}
-        <div className="flex items-start justify-between rounded-xl border border-line bg-surface p-5 shadow-xs">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <button
-                className="rounded p-1 text-ink-3 hover:bg-surface-2 hover:text-ink"
-                onClick={() => router.push("/pm/reports")}
-              >
-                <ArrowLeft size={15} />
-              </button>
-              <h1 className="text-lg font-semibold text-ink">{name}</h1>
-              <Tag tone={visibilityTone(visibility)} size="sm">{visibility}</Tag>
-              {dashboard?.isPinned && <Tag tone="signal" size="sm">Pinned</Tag>}
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] px-6 py-6 space-y-5">
+          {/* Editorial header */}
+          <header className="flex items-end justify-between gap-6 border-b border-line pb-5">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-3">
+                <button
+                  type="button"
+                  aria-label="Back to reports"
+                  title="Back to reports"
+                  className="rounded p-0.5 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+                  onClick={() => router.push("/pm/reports")}
+                >
+                  <ArrowLeft size={13} />
+                </button>
+                <span>◢ dashboard</span>
+                <span className="rounded-sm border border-line-strong bg-paper px-1.5 py-0.5">
+                  {isPrebuilt ? (params.id as string).toUpperCase() : `id·${(dashboard?.id ?? "").slice(0, 8)}`}
+                </span>
+                {isPrebuilt && <span>prebuilt</span>}
+              </div>
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">{name}</h1>
+              {description && <p className="max-w-2xl text-[13px] leading-relaxed text-ink-3">{description}</p>}
+              <div className="flex items-center gap-2 pt-1">
+                <Tag tone={visibilityTone(visibility)} size="sm">{visibility}</Tag>
+                {dashboard?.isPinned && <Tag tone="signal" size="sm">Pinned</Tag>}
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+                  {resolvedWidgets.length}·widgets
+                </span>
+              </div>
             </div>
-            {description && <p className="pl-7 text-[13px] text-ink-3">{description}</p>}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {!isPrebuilt && dashboard && (
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handlePin}
-                  disabled={pinning}
-                  title={dashboard.isPinned ? "Unpin" : "Pin to top"}
-                >
-                  {dashboard.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => router.push(`/pm/reports/${dashboard.id}/edit`)}
-                >
-                  <Pencil size={14} className="mr-1" />Edit
-                </Button>
-              </>
-            )}
-            <Button size="sm" variant="secondary" onClick={handleDuplicate}>
-              <Copy size={14} className="mr-1" />Duplicate
-            </Button>
-            {!isPrebuilt && dashboard && (
-              <Button
-                size="sm"
-                variant="danger"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                <Trash2 size={14} className="mr-1" />Delete
+            <div className="flex shrink-0 items-center gap-2">
+              {!isPrebuilt && dashboard && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handlePin}
+                    disabled={pinning}
+                    title={dashboard.isPinned ? "Unpin" : "Pin to top"}
+                  >
+                    {dashboard.isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => router.push(`/pm/reports/${dashboard.id}/edit`)}
+                  >
+                    <Pencil size={14} className="mr-1" />Edit
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="secondary" onClick={handleDuplicate}>
+                <Copy size={14} className="mr-1" />Duplicate
               </Button>
-            )}
-          </div>
-        </div>
+              {!isPrebuilt && dashboard && (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  <Trash2 size={14} className="mr-1" />Delete
+                </Button>
+              )}
+            </div>
+          </header>
 
-        {/* Dashboard grid */}
-        <div className="rounded-xl border border-line bg-surface p-5 shadow-xs min-h-[400px]">
-          <StaticDashboardGrid widgets={resolvedWidgets} />
+          {/* Dashboard canvas */}
+          <div className="rounded-lg border border-line-strong bg-surface p-5 shadow-xs min-h-[400px]">
+            <StaticDashboardGrid widgets={resolvedWidgets} />
+          </div>
         </div>
       </div>
     </div>

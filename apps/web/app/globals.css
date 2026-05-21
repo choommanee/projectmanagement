@@ -82,7 +82,33 @@
   --r-sm: 6px;
   --r-md: 8px;
 
+  /* ─── Density scale (Phase A·3) ─────────────────────────────────────────── */
+  /* These are the *defaults* (cozy). [data-density="compact"|"comfortable"]
+     overrides on <html> swap them globally so spacing utilities that read
+     these vars adapt at runtime. */
+  --density-row-y:       0.5rem;   /* table/list row vertical padding */
+  --density-row-x:       0.75rem;
+  --density-card-p:      1rem;
+  --density-section-gap: 1.25rem;
+  --density-control-h:   2.25rem;  /* default control height */
+
   color-scheme: light;
+}
+
+[data-density="compact"] {
+  --density-row-y:       0.375rem;
+  --density-row-x:       0.625rem;
+  --density-card-p:      0.75rem;
+  --density-section-gap: 1rem;
+  --density-control-h:   2rem;
+}
+
+[data-density="comfortable"] {
+  --density-row-y:       0.75rem;
+  --density-row-x:       1rem;
+  --density-card-p:      1.25rem;
+  --density-section-gap: 1.75rem;
+  --density-control-h:   2.5rem;
 }
 
 [data-theme="dark"] {
@@ -239,5 +265,57 @@
   .ProseMirror ul[data-type="taskList"] li > label { @apply flex items-center; }
   .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
     @apply mt-0.5 cursor-pointer;
+  }
+}
+
+/* ─── Dialog animations (Phase A·2) ──────────────────────────────────────── */
+@keyframes dialog-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes dialog-pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);     }
+}
+
+.animate-dialog-fade {
+  animation: dialog-fade-in 180ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.animate-dialog-pop {
+  animation: dialog-pop-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Reduced motion respect — required for WCAG */
+@media (prefers-reduced-motion: reduce) {
+  .animate-dialog-fade,
+  .animate-dialog-pop {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ─── Blueprint grid utility (industrial-instrument detail) ──────────────── */
+.blueprint-grid {
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.35;
+}
+
+/* ─── Reveal animation (used in Reports + soon other modules) ────────────── */
+@keyframes reveal-up {
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal-up {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: reveal-up 480ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-up {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 }

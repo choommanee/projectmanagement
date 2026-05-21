@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon } from "lucide-react";
+import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon, Rows3, Rows2, Rows4 } from "lucide-react";
 import { Button, Kbd } from "@pmplatform/ui-kit";
 import type { AppDef } from "./shell.types";
 import { AppSwitcher } from "./AppSwitcher";
@@ -30,7 +30,13 @@ export function TopBar({
   onAppSwitch?: (id: string) => void;
 }) {
   const { user, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, density, cycleDensity } = useTheme();
+  const DensityIcon = density === "compact" ? Rows4 : density === "comfortable" ? Rows2 : Rows3;
+  const densityLabel: Record<typeof density, string> = {
+    compact: "Compact",
+    cozy: "Cozy",
+    comfortable: "Comfortable",
+  };
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -79,11 +85,23 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-1">
         <NotificationCenter items={mockNotifications} />
 
+        {/* Density toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Density: ${densityLabel[density]} — click to change`}
+          title={`Density · ${densityLabel[density]}`}
+          onClick={cycleDensity}
+        >
+          <DensityIcon size={15} />
+        </Button>
+
         {/* Theme toggle */}
         <Button
           variant="ghost"
           size="sm"
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Theme · Dark" : "Theme · Light"}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}

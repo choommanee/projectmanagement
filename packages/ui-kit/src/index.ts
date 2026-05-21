@@ -3,3 +3,8 @@ export * from "./primitives/Input";
 export * from "./primitives/Tag";
 export * from "./primitives/Kbd";
 export * from "./primitives/TextArea";
+export * from "./primitives/Dialog";
+export * from "./primitives/EmptyState";
+export * from "./primitives/LoadingState";
+export * from "./primitives/SectionHeader";
+export * from "./primitives/InstrumentTile";
