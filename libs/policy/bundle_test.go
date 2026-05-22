@@ -146,6 +146,116 @@ func TestBundleGrid(t *testing.T) {
 	}
 }
 
+// TestBundleABACGrid exercises the ABAC forbid layer added in Plan #6
+// Task 6. Each row supplies ResourceAttrs (the per-instance attrs the
+// libauth middleware would have loaded via a ResourceLoader) plus a
+// typed resource UID so Cedar can dereference `resource.tenant_id`.
+// The matrix targets cross-tenant denies that pure RBAC could not catch
+// and confirms same-tenant requests still resolve through the role permit.
+func TestBundleABACGrid(t *testing.T) {
+	a := loadEngine(t)
+
+	type row struct {
+		name      string
+		action    string
+		resource  string
+		attrs     map[string]any
+		roles     []string
+		ctxTenant string
+		confirm   bool
+		wantAllow bool
+	}
+
+	// "t-call" is the JWT tenant the request rides on; "t-other" is the
+	// tenant the resource actually belongs to. The forbid layer must fire
+	// whenever those disagree, even when the role would otherwise allow.
+	rows := []row{
+		// --- project.read --------------------------------------------------
+		{"project.read same-tenant", "project.read", `Project::"p1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
+		{"project.read cross-tenant deny", "project.read", `Project::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.read no attrs (legacy)", "project.read", `Project::"p1"`, nil, []string{"project-manager"}, "t-call", false, true},
+		{"project.read cross-tenant deny tenant-admin", "project.read", `Project::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"tenant-admin"}, "t-call", false, false},
+
+		// --- project.update / delete --------------------------------------
+		{"project.update same-tenant allow", "project.update", `Project::"p1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
+		{"project.update cross-tenant deny", "project.update", `Project::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.update cross-tenant deny tenant-admin", "project.update", `Project::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"tenant-admin"}, "t-call", false, false},
+		{"project.delete same-tenant platform-admin+confirm allow", "project.delete", `Project::"p1"`, map[string]any{"tenant_id": "t-call"}, []string{"platform-admin"}, "t-call", true, true},
+		{"project.delete cross-tenant platform-admin+confirm deny", "project.delete", `Project::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"platform-admin"}, "t-call", true, false},
+
+		// --- project.task.* ------------------------------------------------
+		{"project.task.update same-tenant allow", "project.task.update", `Task::"t1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
+		{"project.task.update cross-tenant deny", "project.task.update", `Task::"t1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.task.delete cross-tenant deny", "project.task.delete", `Task::"t1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.sprint.update cross-tenant deny", "project.sprint.update", `Sprint::"s1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.sprint.assign_task cross-tenant deny", "project.sprint.assign_task", `Sprint::"s1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"project.sprint.unassign_task cross-tenant deny", "project.sprint.unassign_task", `Sprint::"s1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+
+		// --- document.update ----------------------------------------------
+		{"document.update same-tenant allow", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
+		{"document.update cross-tenant deny", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"document.update cross-tenant deny tenant-admin", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"tenant-admin"}, "t-call", false, false},
+
+		// --- mfg.* --------------------------------------------------------
+		{"mfg.item.update same-tenant allow", "mfg.item.update", `Item::"i1"`, map[string]any{"tenant_id": "t-call"}, []string{"mfg-operator"}, "t-call", false, true},
+		{"mfg.item.update cross-tenant deny", "mfg.item.update", `Item::"i1"`, map[string]any{"tenant_id": "t-other"}, []string{"mfg-operator"}, "t-call", false, false},
+		{"mfg.bom.activate cross-tenant deny", "mfg.bom.activate", `BOM::"b1"`, map[string]any{"tenant_id": "t-other"}, []string{"mfg-operator"}, "t-call", false, false},
+		{"mfg.work_order.update cross-tenant deny", "mfg.work_order.update", `WorkOrder::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"mfg-operator"}, "t-call", false, false},
+		{"mfg.work_order.release cross-tenant deny", "mfg.work_order.release", `WorkOrder::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"mfg-operator"}, "t-call", false, false},
+		{"mfg.work_order.delete cross-tenant platform-admin+confirm deny", "mfg.work_order.delete", `WorkOrder::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"platform-admin"}, "t-call", true, false},
+
+		// --- quality.* ----------------------------------------------------
+		{"quality.apqp.update same-tenant allow", "quality.apqp.update", `APQP::"a1"`, map[string]any{"tenant_id": "t-call"}, []string{"quality-engineer"}, "t-call", false, true},
+		{"quality.apqp.update cross-tenant deny", "quality.apqp.update", `APQP::"a1"`, map[string]any{"tenant_id": "t-other"}, []string{"quality-engineer"}, "t-call", false, false},
+		{"quality.ppap.update cross-tenant deny", "quality.ppap.update", `PPAP::"p1"`, map[string]any{"tenant_id": "t-other"}, []string{"quality-engineer"}, "t-call", false, false},
+		{"quality.fmea.update cross-tenant deny", "quality.fmea.update", `FMEA::"f1"`, map[string]any{"tenant_id": "t-other"}, []string{"quality-engineer"}, "t-call", false, false},
+		{"quality.ncr.update cross-tenant deny", "quality.ncr.update", `NCR::"n1"`, map[string]any{"tenant_id": "t-other"}, []string{"quality-engineer"}, "t-call", false, false},
+		{"quality.capa.update cross-tenant deny", "quality.capa.update", `CAPA::"c1"`, map[string]any{"tenant_id": "t-other"}, []string{"quality-engineer"}, "t-call", false, false},
+
+		// --- workflow.* ---------------------------------------------------
+		{"workflow.update same-tenant allow", "workflow.update", `Workflow::"w1"`, map[string]any{"tenant_id": "t-call"}, []string{"workflow-author"}, "t-call", false, true},
+		{"workflow.update cross-tenant deny", "workflow.update", `Workflow::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"workflow-author"}, "t-call", false, false},
+		{"workflow.publish cross-tenant deny", "workflow.publish", `Workflow::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"workflow-author"}, "t-call", false, false},
+		{"workflow.instance.resume cross-tenant deny", "workflow.instance.resume", `Instance::"i1"`, map[string]any{"tenant_id": "t-other"}, []string{"workflow-author"}, "t-call", false, false},
+		{"workflow.instance.cancel cross-tenant deny", "workflow.instance.cancel", `Instance::"i1"`, map[string]any{"tenant_id": "t-other"}, []string{"workflow-author"}, "t-call", false, false},
+		{"workflow.human_task.complete cross-tenant deny", "workflow.human_task.complete", `HumanTask::"h1"`, map[string]any{"tenant_id": "t-other"}, []string{"workflow-author"}, "t-call", false, false},
+		{"workflow.delete cross-tenant platform-admin+confirm deny", "workflow.delete", `Workflow::"w1"`, map[string]any{"tenant_id": "t-other"}, []string{"platform-admin"}, "t-call", true, false},
+
+		// --- report.dashboard.* -------------------------------------------
+		{"report.dashboard.update same-tenant allow", "report.dashboard.update", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-call"}, []string{"bi-author"}, "t-call", false, true},
+		{"report.dashboard.update cross-tenant deny", "report.dashboard.update", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"bi-author"}, "t-call", false, false},
+		{"report.dashboard.delete cross-tenant deny", "report.dashboard.delete", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"bi-author"}, "t-call", false, false},
+	}
+
+	for _, r := range rows {
+		r := r
+		t.Run(r.name, func(t *testing.T) {
+			roles := r.roles
+			if roles == nil {
+				roles = []string{}
+			}
+			allow, err := a.IsAllowed(libauth.AuthzRequest{
+				Principal: `User::"sub-1"`,
+				Action:    `Action::"` + r.action + `"`,
+				Resource:  r.resource,
+				Context: map[string]any{
+					"roles":               roles,
+					"tenant_id":           r.ctxTenant,
+					"confirm_destructive": r.confirm,
+				},
+				ResourceAttrs: r.attrs,
+			})
+			if err != nil {
+				t.Fatalf("IsAllowed(%s): %v", r.action, err)
+			}
+			if allow != r.wantAllow {
+				t.Fatalf("action=%s roles=%v attrs=%v ctxTenant=%s: got allow=%v want=%v",
+					r.action, roles, r.attrs, r.ctxTenant, allow, r.wantAllow)
+			}
+		})
+	}
+}
+
 func TestAdapterNilDenies(t *testing.T) {
 	var a *Adapter
 	allow, err := a.IsAllowed(libauth.AuthzRequest{

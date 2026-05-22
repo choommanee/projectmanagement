@@ -260,6 +260,114 @@ when {
   context.roles.contains("bi-author")
 };
 
+// --- ABAC: per-instance tenant scoping (Plan #6 Task 6 Step 4) -------------
+//
+// These rules layer on top of the role-based permits above. They DO NOT
+// replace them — Cedar requires at least one matching `permit` for any
+// allow decision — but they tighten the safety net so a manufactured request
+// with a forged tenant_id cannot read or update a resource owned by another
+// tenant.
+//
+// The middleware-resolved resource carries attributes loaded from the
+// service's store (`tenant_id`, `owner_user`). Policies here are written so
+// the absence of those attributes (e.g. create endpoints, legacy callers,
+// loaders returning {} for unknown types) is a no-op rather than a deny —
+// the underlying role permit still governs in that case.
+
+// Project read: deny when the resource declares a tenant_id that disagrees
+// with the caller's tenant context. Encoded as a forbid so it overrides any
+// over-broad permit. The `has` guards keep this from firing on resources
+// without loaded attrs.
+forbid (
+  principal,
+  action == Action::"project.read",
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
+// Document read: same pattern as project.read — never cross tenants.
+forbid (
+  principal,
+  action == Action::"document.update",
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
+// Project write actions: forbid mutating a project that belongs to a
+// different tenant, regardless of which role the principal holds.
+forbid (
+  principal,
+  action in [
+    Action::"project.update",
+    Action::"project.delete",
+    Action::"project.task.update",
+    Action::"project.task.delete",
+    Action::"project.sprint.update",
+    Action::"project.sprint.assign_task",
+    Action::"project.sprint.unassign_task"
+  ],
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
+// Mfg write actions: forbid mutating items / boms / work orders that belong
+// to a different tenant.
+forbid (
+  principal,
+  action in [
+    Action::"mfg.item.update",
+    Action::"mfg.item.delete",
+    Action::"mfg.bom.update",
+    Action::"mfg.bom.activate",
+    Action::"mfg.work_order.update",
+    Action::"mfg.work_order.delete",
+    Action::"mfg.work_order.release"
+  ],
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
+// Quality / Workflow / Reports write actions: same cross-tenant guard.
+forbid (
+  principal,
+  action in [
+    Action::"quality.apqp.update",
+    Action::"quality.apqp.delete",
+    Action::"quality.ppap.update",
+    Action::"quality.ppap.delete",
+    Action::"quality.fmea.update",
+    Action::"quality.fmea.delete",
+    Action::"quality.control_plan.update",
+    Action::"quality.ncr.update",
+    Action::"quality.capa.update",
+    Action::"workflow.update",
+    Action::"workflow.delete",
+    Action::"workflow.publish",
+    Action::"workflow.instance.resume",
+    Action::"workflow.instance.cancel",
+    Action::"workflow.human_task.complete",
+    Action::"report.dashboard.update",
+    Action::"report.dashboard.delete"
+  ],
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
 // --- Platform-admin overlay for destructive actions ------------------------
 //
 // Without this overlay the destructive permits would resolve only via the
