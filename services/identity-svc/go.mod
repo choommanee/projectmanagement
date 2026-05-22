@@ -3,7 +3,6 @@ module github.com/pmplatform/services/identity-svc
 go 1.25.0
 
 require (
-	github.com/cedar-policy/cedar-go v1.6.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
@@ -12,11 +11,14 @@ require (
 	github.com/pmplatform/libs/go/auth v0.0.0
 	github.com/pmplatform/libs/go/nats v0.0.0
 	github.com/pmplatform/libs/policy v0.0.0
+	github.com/pquerna/otp v1.5.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/crypto v0.51.0
 )
 
 require (
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+	github.com/cedar-policy/cedar-go v1.6.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

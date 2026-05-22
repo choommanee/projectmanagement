@@ -1,15 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	libauth "github.com/pmplatform/libs/go/auth"
 	libpolicy "github.com/pmplatform/libs/policy"
@@ -66,6 +69,30 @@ func NewRouterWithRefreshAndReset(
 	dynAuthz *libpolicy.DynamicAdapter,
 	pool *pgxpool.Pool,
 ) http.Handler {
+	return NewRouterFull(auth, refresh, reset, nil, kp, store, issuer, authz, dynAuthz, pool)
+}
+
+// NewRouterFull layers the MFA endpoints on top of the refresh+reset router.
+// A nil mfa omits the MFA endpoints (mirrors the refresh / reset nil-skip).
+//
+// MFA endpoints split two ways:
+//   * /v1/auth/mfa/{enroll,verify,disable} — auth.Require, dynamic JWKS
+//   * /v1/auth/mfa/challenge               — anonymous (mfa_token is the credential)
+//
+// The auth-required endpoints reuse requireBearerDynamic so any rotated
+// signing key still verifies without restart, mirroring the admin path.
+func NewRouterFull(
+	auth *service.Auth,
+	refresh *service.Refresh,
+	reset *service.PasswordReset,
+	mfa *service.MFA,
+	kp *sjwt.KeyPair,
+	store *sjwt.Store,
+	issuer string,
+	authz libauth.Authorizer,
+	dynAuthz *libpolicy.DynamicAdapter,
+	pool *pgxpool.Pool,
+) http.Handler {
 	h := NewRouterWithPolicy(auth, kp, store, issuer, authz, dynAuthz, pool).(*chi.Mux)
 	if refresh != nil {
 		h.Post("/v1/auth/refresh", refreshHandler(refresh))
@@ -73,6 +100,34 @@ func NewRouterWithRefreshAndReset(
 	if reset != nil {
 		h.Post("/v1/auth/password/request-reset", requestPasswordReset(reset))
 		h.Post("/v1/auth/password/reset", consumePasswordReset(reset))
+	}
+	if mfa != nil {
+		// Challenge is anonymous; the mfa_token is the credential.
+		h.Post("/v1/auth/mfa/challenge", mfaChallenge(auth, mfa, store, issuer))
+
+		// Enroll / verify / disable need a real authenticated user.
+		// When store + issuer are wired we can build the dynamic-JWKS
+		// middleware; otherwise we expose the endpoints with a static
+		// verifier built from kp so tests still work without a store.
+		if store != nil && issuer != "" {
+			h.Group(func(pr chi.Router) {
+				pr.Use(requireBearerDynamic(store, issuer))
+				pr.Post("/v1/auth/mfa/enroll", mfaEnroll(mfa, auth))
+				pr.Post("/v1/auth/mfa/verify", mfaVerify(mfa))
+				pr.Post("/v1/auth/mfa/disable", mfaDisable(mfa, auth))
+			})
+		} else if kp != nil {
+			// Test path: seed the global kp registry so mfaChallenge can
+			// verify step-up tokens without a Store. Production never
+			// hits this branch (store is always non-nil).
+			mfaSeedTestKP(kp)
+			h.Group(func(pr chi.Router) {
+				pr.Use(requireBearerStatic(kp, issuer))
+				pr.Post("/v1/auth/mfa/enroll", mfaEnroll(mfa, auth))
+				pr.Post("/v1/auth/mfa/verify", mfaVerify(mfa))
+				pr.Post("/v1/auth/mfa/disable", mfaDisable(mfa, auth))
+			})
+		}
 	}
 	return h
 }
@@ -178,7 +233,7 @@ func login(auth *service.Auth) http.HandlerFunc {
 			writeErr(w, 400, errors.New("bad tenant_id"))
 			return
 		}
-		tp, err := auth.Login(r.Context(), service.LoginInput{TenantID: tid, Email: in.Email, Password: in.Password})
+		resp, err := auth.Login(r.Context(), service.LoginInput{TenantID: tid, Email: in.Email, Password: in.Password})
 		if err != nil {
 			if errors.Is(err, domain.ErrInvalidCreds) {
 				writeErr(w, 401, err)
@@ -187,7 +242,7 @@ func login(auth *service.Auth) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, tp)
+		writeJSON(w, 200, resp)
 	}
 }
 
@@ -369,6 +424,282 @@ func consumePasswordReset(svc *service.PasswordReset) http.HandlerFunc {
 type policyReloadResp struct {
 	ReloadedAt time.Time `json:"reloaded_at"`
 	Version    int       `json:"version"`
+}
+
+// requireBearerStatic is the test-friendly sibling of requireBearerDynamic:
+// it verifies the bearer token against a single in-memory keypair (kp) so
+// tests can mount the auth-required MFA endpoints without standing up a
+// DB-backed Store. When issuer is empty, the issuer check is skipped — this
+// matches the test setup which signs with the same empty/"test" issuer it
+// passes to the router.
+func requireBearerStatic(kp *sjwt.KeyPair, issuer string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tok := bearerFromRequest(r)
+			if tok == "" {
+				http.Error(w, "missing token", http.StatusUnauthorized)
+				return
+			}
+			set, err := kp.JWKS()
+			if err != nil {
+				http.Error(w, "jwks unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			iss := issuer
+			if iss == "" {
+				iss = "test"
+			}
+			v := libauth.NewVerifier(set, iss)
+			c, err := v.Verify(tok)
+			if err != nil {
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(libauth.WithClaims(r.Context(), c)))
+		})
+	}
+}
+
+// mfaEnrollReq is empty by design — the user/tenant are taken from the
+// authenticated claims. We accept a body for forward-compat (e.g. a future
+// `display_name` for the otpauth label) without requiring one today.
+type mfaEnrollReq struct{}
+
+// mfaEnroll handler. Authenticated. Returns the otpauth URL + plaintext
+// backup codes ONCE; subsequent calls (when confirmed) return 409.
+func mfaEnroll(mfa *service.MFA, auth *service.Auth) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("no claims"))
+			return
+		}
+		tid, err := uuid.Parse(c.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad tenant in claims"))
+			return
+		}
+		uid, err := uuid.Parse(c.Subject)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad subject in claims"))
+			return
+		}
+		// Resolve the email so the otpauth label is human-readable.
+		email, err := auth.LookupEmail(r.Context(), tid, uid)
+		if err != nil {
+			email = c.Subject
+		}
+		resp, err := mfa.Enroll(r.Context(), tid, uid, email)
+		if err != nil {
+			if errors.Is(err, domain.ErrMFAAlreadyEnrolled) {
+				writeErr(w, http.StatusConflict, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+type mfaVerifyReq struct {
+	Code string `json:"code"`
+}
+
+func mfaVerify(mfa *service.MFA) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in mfaVerifyReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		c, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("no claims"))
+			return
+		}
+		tid, _ := uuid.Parse(c.TenantID)
+		uid, _ := uuid.Parse(c.Subject)
+		if err := mfa.Verify(r.Context(), tid, uid, in.Code); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrMFAInvalidCode):
+				writeErr(w, http.StatusUnauthorized, err)
+			case errors.Is(err, domain.ErrMFARateLimited):
+				writeErr(w, http.StatusTooManyRequests, err)
+			case errors.Is(err, domain.ErrMFANotEnrolled):
+				writeErr(w, http.StatusNotFound, err)
+			case errors.Is(err, domain.ErrMFAAlreadyEnrolled):
+				writeErr(w, http.StatusConflict, err)
+			default:
+				writeErr(w, http.StatusInternalServerError, err)
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "confirmed"})
+	}
+}
+
+type mfaDisableReq struct {
+	CurrentPassword string `json:"current_password"`
+}
+
+func mfaDisable(mfa *service.MFA, auth *service.Auth) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in mfaDisableReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if in.CurrentPassword == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("current_password required"))
+			return
+		}
+		c, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("no claims"))
+			return
+		}
+		tid, _ := uuid.Parse(c.TenantID)
+		uid, _ := uuid.Parse(c.Subject)
+		hash, err := auth.LookupPasswordHash(r.Context(), tid, uid)
+		if err != nil {
+			writeErr(w, http.StatusUnauthorized, err)
+			return
+		}
+		if err := mfa.Disable(r.Context(), tid, uid, hash, in.CurrentPassword); err != nil {
+			if errors.Is(err, domain.ErrInvalidCreds) {
+				writeErr(w, http.StatusUnauthorized, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "disabled"})
+	}
+}
+
+type mfaChallengeReq struct {
+	MFAToken string `json:"mfa_token"`
+	Code     string `json:"code"`
+}
+
+// mfaChallenge is anonymous: the mfa_token is the only credential. We
+// verify it against the current JWKS, confirm it carries the MFA pending
+// sentinel role, run the challenge, and on success mint the real
+// access/refresh pair via Auth.IssueSession.
+func mfaChallenge(auth *service.Auth, mfa *service.MFA, store *sjwt.Store, issuer string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in mfaChallengeReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.MFAToken == "" || in.Code == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("mfa_token and code required"))
+			return
+		}
+		c, err := verifyMFAToken(r.Context(), in.MFAToken, store, issuer)
+		if err != nil {
+			writeErr(w, http.StatusUnauthorized, domain.ErrMFATokenInvalid)
+			return
+		}
+		tid, _ := uuid.Parse(c.TenantID)
+		uid, _ := uuid.Parse(c.Subject)
+		if err := mfa.Challenge(r.Context(), tid, uid, in.Code); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrMFAInvalidCode):
+				writeErr(w, http.StatusUnauthorized, err)
+			case errors.Is(err, domain.ErrMFARateLimited):
+				writeErr(w, http.StatusTooManyRequests, err)
+			case errors.Is(err, domain.ErrMFANotEnrolled):
+				writeErr(w, http.StatusUnauthorized, err)
+			default:
+				writeErr(w, http.StatusInternalServerError, err)
+			}
+			return
+		}
+		tp, err := auth.IssueSession(r.Context(), tid, uid)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tp)
+	}
+}
+
+// verifyMFAToken parses the short-lived step-up JWT. Source-of-truth for
+// the verifier:
+//   * Production / live: store.JWKS (rotated-aware).
+//   * Tests with a nil store: build a JWKS from the bootstrap keypair held
+//     by the static-verifier middleware. The challenge handler doesn't have
+//     direct access to kp, so we accept it as a fallback path through
+//     store == nil + a process-global registry seeded by NewRouterFull.
+//
+// We also require the Roles claim to contain MFAStepUpRoleSentinel — that's
+// what distinguishes a step-up token from a full access token. Without this
+// check, any valid access token could be used as a step-up credential.
+func verifyMFAToken(ctx context.Context, tok string, store *sjwt.Store, issuer string) (*libauth.ParsedClaims, error) {
+	var v *libauth.Verifier
+	if store != nil {
+		set, err := store.JWKS(ctx)
+		if err != nil {
+			return nil, err
+		}
+		iss := issuer
+		if iss == "" {
+			iss = "test"
+		}
+		v = libauth.NewVerifier(set, iss)
+	} else {
+		set := mfaTestJWKS()
+		if set == nil {
+			return nil, errors.New("no jwks available")
+		}
+		iss := issuer
+		if iss == "" {
+			iss = "test"
+		}
+		v = libauth.NewVerifier(set, iss)
+	}
+	c, err := v.Verify(tok)
+	if err != nil {
+		return nil, err
+	}
+	hasSentinel := false
+	for _, r := range c.Roles {
+		if r == service.MFAStepUpRoleSentinel {
+			hasSentinel = true
+			break
+		}
+	}
+	if !hasSentinel {
+		return nil, errors.New("not an mfa step-up token")
+	}
+	return c, nil
+}
+
+// mfaTestKP is the bootstrap keypair NewRouterFull seeds when no Store is
+// wired (test path). It's process-global because the challenge handler
+// needs to verify a token without a closure over the kp. Production never
+// hits this path because store is always non-nil.
+var (
+	mfaTestKPMu sync.Mutex
+	mfaTestKP   *sjwt.KeyPair
+)
+
+func mfaSeedTestKP(kp *sjwt.KeyPair) {
+	mfaTestKPMu.Lock()
+	defer mfaTestKPMu.Unlock()
+	mfaTestKP = kp
+}
+
+func mfaTestJWKS() jwk.Set {
+	mfaTestKPMu.Lock()
+	defer mfaTestKPMu.Unlock()
+	if mfaTestKP == nil {
+		return nil
+	}
+	set, err := mfaTestKP.JWKS()
+	if err != nil {
+		return nil
+	}
+	return set
 }
 
 // reloadPolicy re-reads the active policy_bundle row, parses it, and atomically

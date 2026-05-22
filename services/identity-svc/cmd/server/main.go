@@ -88,16 +88,37 @@ func main() {
 	users := store.NewUsers(p)
 	tokens := store.NewRefreshTokens(p)
 	resets := store.NewPasswordResets(p)
+	mfaEnrollments := store.NewMFAEnrollments(p)
 	refreshTTL := parseDurEnv("REFRESH_TOKEN_TTL", 720*time.Hour)
 	resetTTL := parseDurEnv("PASSWORD_RESET_TTL", time.Hour)
 	resetLinkURL := envOr("PASSWORD_RESET_LINK_URL", "http://localhost:3000/reset-password?token=")
+	mfaMasterKey := os.Getenv("MFA_MASTER_KEY")
 	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
-		WithRefreshTokens(tokens, refreshTTL)
+		WithRefreshTokens(tokens, refreshTTL).
+		WithMFA(mfaEnrollments)
 	refresh := service.NewRefresh(users, tokens, signer, pub)
 	mailer := service.NewLogMailer()
 	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL)
+
+	// MFA service is OPTIONAL at boot: an empty MFA_MASTER_KEY skips the
+	// endpoints entirely so dev environments without an externally-supplied
+	// key still come up. Production MUST set the key — if anyone has
+	// confirmed_at on a row and the key is missing, login still functions
+	// (step-up returns mfa_required), but challenge/enroll/verify won't be
+	// reachable. Operators get a Warn log so this isn't silent.
+	var mfaSvc *service.MFA
+	if mfaMasterKey != "" {
+		m, err := service.NewMFA(mfaEnrollments, users, mfaMasterKey, signer, pub)
+		if err != nil {
+			log.Fatal().Err(err).Msg("mfa init failed")
+		}
+		mfaSvc = m
+	} else {
+		log.Warn().Msg("MFA_MASTER_KEY not set — /v1/auth/mfa/* endpoints disabled")
+	}
+
 	var _ libauth.Authorizer = authz // compile-time interface check
-	h := api.NewRouterWithRefreshAndReset(auth, refresh, passwordReset, kp, keyStore, issuer, authz, authz, p)
+	h := api.NewRouterFull(auth, refresh, passwordReset, mfaSvc, kp, keyStore, issuer, authz, authz, p)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).

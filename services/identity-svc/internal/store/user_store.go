@@ -73,6 +73,18 @@ func (s *Users) RolesForUser(ctx context.Context, tid, userID uuid.UUID) ([]stri
 	return out, nil
 }
 
+// QuerySlug resolves a tenant UUID to its slug. The result is written into
+// *out (a small contract to keep the signature symmetric with Scan-style
+// helpers). Returns domain.ErrNotFound on miss.
+func (s *Users) QuerySlug(ctx context.Context, tid uuid.UUID, out *string) error {
+	err := s.p.QueryRow(ctx, `
+        SELECT slug FROM tenant WHERE id = $1 AND deleted_at IS NULL`, tid).Scan(out)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrNotFound
+	}
+	return err
+}
+
 // FindTenantIDBySlug resolves a tenant slug to its UUID. Used by the
 // password-reset request flow where the caller knows the slug but not
 // the UUID. Returns domain.ErrNotFound on miss so callers can collapse
@@ -104,6 +116,27 @@ func (s *Users) UpdatePassword(ctx context.Context, tid, uid uuid.UUID, hash str
              WHERE id = $2 AND deleted_at IS NULL`, hash, uid)
 		return err
 	})
+}
+
+// FindByID returns the user row for (tenant, id). Mirrors FindByEmail; used
+// by MFA handlers that already have the user ID from JWT claims.
+func (s *Users) FindByID(ctx context.Context, tid, id uuid.UUID) (*domain.User, error) {
+	var u domain.User
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		row := tx.QueryRow(ctx, `
+            SELECT id, tenant_id, email, display_name, status, COALESCE(password_hash,''),
+                   COALESCE(external_idp,''), COALESCE(external_sub,''), created_at, updated_at, version
+            FROM app_user WHERE id = $1 AND deleted_at IS NULL`, id)
+		return row.Scan(&u.ID, &u.TenantID, &u.Email, &u.DisplayName, &u.Status,
+			&u.PasswordHash, &u.ExternalIDP, &u.ExternalSub, &u.CreatedAt, &u.UpdatedAt, &u.Version)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 func (s *Users) FindByEmail(ctx context.Context, tid uuid.UUID, email string) (*domain.User, error) {
