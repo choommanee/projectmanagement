@@ -11,12 +11,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/audit-svc/internal/service"
 	"github.com/pmplatform/services/audit-svc/internal/store"
 )
 
 // NewRouter returns the chi router for audit-svc.
-func NewRouter(svc *service.Service) http.Handler {
+//
+// authz is accepted for parity with other services (Plan #4 Task 3) even
+// though audit-svc has zero WRITE_GUARD endpoints today — writes flow via
+// NATS through audit-worker per ADR-0002. When future write endpoints (e.g.
+// audit.export, audit.purge) land, wrap them with libauth.RequireAction.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	_ = authz // intentionally unused until a write route is added
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 

@@ -46,7 +46,7 @@ func setupRouter(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID) {
 	})
 
 	svc := service.New(store.New(p))
-	return api.NewRouter(svc), p, tid
+	return api.NewRouter(svc, nil), p, tid
 }
 
 func insertTestEvent(t *testing.T, p *pgxpool.Pool, tid uuid.UUID) {

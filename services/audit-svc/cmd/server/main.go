@@ -11,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+	libpolicy "github.com/pmplatform/libs/policy"
+
 	"github.com/pmplatform/services/audit-svc/internal/api"
 	"github.com/pmplatform/services/audit-svc/internal/service"
 	"github.com/pmplatform/services/audit-svc/internal/store"
@@ -26,8 +29,20 @@ func main() {
 	}
 	defer p.Close()
 
+	// Cedar policy bundle: scaffolded at boot for consistency with other
+	// services even though audit-svc has zero write HTTP endpoints today
+	// (writes flow via NATS through audit-worker per ADR-0002). Pre-wiring
+	// keeps future read-side scoping / export-or-purge endpoints cheap to
+	// add without a separate plumbing change.
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		log.Fatal().Err(err).Msg("load policy bundle")
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	var _ libauth.Authorizer = authz // compile-time interface check
+
 	svc := service.New(store.New(p))
-	h := api.NewRouter(svc)
+	h := api.NewRouter(svc, authz)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {
