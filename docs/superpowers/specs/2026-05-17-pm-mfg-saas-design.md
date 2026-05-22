@@ -308,7 +308,7 @@ Example:
 | Schema-isolated | Same cluster, `tenant_<id>` schema | Mid-tier enterprise |
 | Dedicated | Separate DB + namespace + S3 bucket + Redis | Tier-1 manufacturers (C) |
 
-- Middleware sets `app.current_tenant` Postgres session var; RLS enforces
+- Middleware sets `app.current_tenant` Postgres session var; RLS enforces (early drafts of this spec called the variable `app.tenant_id` — the canonical name across code, migrations, and policies is `app.current_tenant`)
 - Tenant routing: subdomain (`acme.app.com`) or `X-Tenant-Id` header for dedicated
 - Cross-tenant ops require `super_tenant` role + explicit audit
 
