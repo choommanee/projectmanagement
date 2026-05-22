@@ -1,0 +1,60 @@
+{{- if .Values.auditWorker.enabled -}}
+{{- $svc := "audit-worker" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.auditWorker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.auditWorker.image.repository }}:{{ .Values.auditWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.auditWorker.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: health
+              containerPort: {{ .Values.auditWorker.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: HEALTH_PORT
+              value: {{ .Values.auditWorker.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.auditWorker.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.auditWorker.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: NATS_STREAM
+              value: {{ .Values.auditWorker.env.NATS_STREAM | quote }}
+            - name: NATS_CONSUMER
+              value: {{ .Values.auditWorker.env.NATS_CONSUMER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.auditWorker.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.auditWorker.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.auditWorker.resources | nindent 12 }}
+{{- end }}

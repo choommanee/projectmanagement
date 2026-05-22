@@ -1,0 +1,64 @@
+{{- if .Values.identity.enabled -}}
+{{- $svc := "identity-svc" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.identity.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.identity.image.repository }}:{{ .Values.identity.image.tag }}"
+          imagePullPolicy: {{ .Values.identity.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.identity.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.identity.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.identity.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.identity.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.identity.env.JWT_ISSUER | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ .Values.identity.env.JWT_AUDIENCE | quote }}
+            - name: JWT_SECRET
+              value: {{ .Values.identity.env.JWT_SECRET | quote }}
+            - name: JWT_TTL
+              value: {{ .Values.identity.env.JWT_TTL | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.identity.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.identity.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.identity.resources | nindent 12 }}
+{{- end }}

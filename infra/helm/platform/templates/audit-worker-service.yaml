@@ -1,0 +1,22 @@
+{{- if .Values.auditWorker.enabled -}}
+{{- $svc := "audit-worker" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  annotations:
+    # audit-worker has no public API; this Service exists solely so the
+    # kubelet/Prometheus can scrape /healthz on the worker pods.
+    platform.pm/internal-only: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: health
+      port: {{ .Values.auditWorker.service.port }}
+      targetPort: {{ .Values.auditWorker.service.targetPort }}
+      protocol: TCP
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+{{- end }}

@@ -1,0 +1,56 @@
+{{- if .Values.tenant.enabled -}}
+{{- $svc := "tenant-svc" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.tenant.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.tenant.image.repository }}:{{ .Values.tenant.image.tag }}"
+          imagePullPolicy: {{ .Values.tenant.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.tenant.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.tenant.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.tenant.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.tenant.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tenant.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.tenant.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.tenant.resources | nindent 12 }}
+{{- end }}

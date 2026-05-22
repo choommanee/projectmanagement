@@ -1,0 +1,49 @@
+# OpenTelemetry Collector config for local dev.
+# Receives OTLP traces/metrics/logs from services (via gRPC :4317 and HTTP :4318),
+# batches them, and forwards traces to Jaeger. Also logs to stdout for quick triage.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+exporters:
+  # Jaeger via OTLP gRPC (Jaeger >= 1.35 accepts OTLP natively on :4317).
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

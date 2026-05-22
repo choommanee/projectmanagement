@@ -1,0 +1,18 @@
+{{- if .Values.tenant.enabled -}}
+{{- $svc := "tenant-svc" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.tenant.service.type | default "ClusterIP" }}
+  ports:
+    - name: http
+      port: {{ .Values.tenant.service.port }}
+      targetPort: {{ .Values.tenant.service.targetPort }}
+      protocol: TCP
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+{{- end }}

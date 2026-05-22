@@ -1,6 +1,8 @@
 global:
   imageRegistry: ghcr.io/pmplatform
-  imageTag: latest
+  # Default image tag — pinned to chart appVersion; override per-service block below
+  # or via `--set global.imageTag=<sha>` for digest-pinned production deploys.
+  imageTag: 0.1.0
   tenancyTier: shared
 
 postgres:
@@ -15,9 +17,104 @@ nats:
   external: false
   url: ""
 
+# Top-level observability configuration. Each service reads OTEL_EXPORTER_OTLP_ENDPOINT
+# from this block (overridable per-service).
+observability:
+  otlpEndpoint: http://otel-collector:4318
+
+# Toggle blocks (legacy). Per-service config blocks below are the source of truth
+# for image/resources/env.
 services:
   identity:    { enabled: true,  replicas: 2 }
   tenant:      { enabled: true,  replicas: 2 }
-  project:    { enabled: false, replicas: 2 }
-  workspace:  { enabled: false, replicas: 2 }
-  workflow:   { enabled: false, replicas: 2 }
+  project:     { enabled: false, replicas: 2 }
+  workspace:   { enabled: false, replicas: 2 }
+  workflow:    { enabled: false, replicas: 2 }
+  audit:       { enabled: true,  replicas: 1 }
+
+# ---------------------------------------------------------------------------
+# identity-svc
+# ---------------------------------------------------------------------------
+identity:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/identity-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8082
+    targetPort: 8082
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    JWT_ISSUER: "pm-platform"
+    JWT_AUDIENCE: "pm-platform-clients"
+    JWT_SECRET: ""
+    JWT_TTL: "3600"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "identity-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# tenant-svc
+# ---------------------------------------------------------------------------
+tenant:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/tenant-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8081
+    targetPort: 8081
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "tenant-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# audit-worker (NATS consumer; exposes /healthz on 8091)
+# ---------------------------------------------------------------------------
+auditWorker:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/pmplatform/audit-worker
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8091
+    targetPort: 8091
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    NATS_STREAM: "AUDIT"
+    NATS_CONSUMER: "audit-worker"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "audit-worker"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
