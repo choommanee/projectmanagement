@@ -9,6 +9,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "react-resizable/css/styles.css": path.resolve(__dirname, "src/__mocks__/empty.css"),
       "next/navigation": path.resolve(__dirname, "src/__mocks__/next-navigation.ts"),
+      "next-intl": path.resolve(__dirname, "src/__mocks__/next-intl.ts"),
     },
   },
 });

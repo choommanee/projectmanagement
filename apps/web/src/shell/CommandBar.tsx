@@ -1,6 +1,7 @@
 "use client";
 import { MoreHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@pmplatform/ui-kit";
 
 export type CommandAction =
@@ -11,9 +12,10 @@ export function CommandBar({ actions, maxVisible = 7 }: { actions: CommandAction
   const visible = actions.slice(0, maxVisible);
   const overflow = actions.slice(maxVisible);
   const [open, setOpen] = useState(false);
+  const t = useTranslations("shell");
 
   return (
-    <div role="toolbar" aria-label="Commands"
+    <div role="toolbar" aria-label={t("commands")}
       className="flex items-center gap-1 bg-paper px-3 py-1.5 border-b border-line shadow-[inset_0_-1px_0_var(--line)]">
       {visible.map((a) => {
         if ("kind" in a && a.kind === "separator") {
@@ -29,7 +31,7 @@ export function CommandBar({ actions, maxVisible = 7 }: { actions: CommandAction
       })}
       {overflow.length > 0 && (
         <div className="relative">
-          <Button variant="ghost" size="sm" aria-label="More" onClick={() => setOpen((v) => !v)}>
+          <Button variant="ghost" size="sm" aria-label={t("more")} onClick={() => setOpen((v) => !v)}>
             <MoreHorizontal size={14} />
           </Button>
           {open && (

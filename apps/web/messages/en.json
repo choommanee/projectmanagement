@@ -1,0 +1,29 @@
+{
+  "shell": {
+    "search": "Search",
+    "searchPlaceholder": "Search projects, work orders, people…",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "profile": "Profile",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "selectApp": "Select app",
+    "more": "More",
+    "commands": "Commands",
+    "primaryNav": "Primary",
+    "breadcrumb": "Breadcrumb",
+    "themeLight": "Switch to light mode",
+    "themeDark": "Switch to dark mode",
+    "themeLabelLight": "Theme · Light",
+    "themeLabelDark": "Theme · Dark",
+    "density": "Density",
+    "densityCompact": "Compact",
+    "densityCozy": "Cozy",
+    "densityComfortable": "Comfortable"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "new": "New"
+  }
+}

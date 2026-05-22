@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   FolderKanban, ListTodo, Timer, Factory, GitBranch, Workflow,
   ShieldCheck, Network, Users, Settings, Lightbulb, Compass,
@@ -28,9 +29,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 export function NavPane({ app }: { app: AppDef }) {
   const pathname = usePathname();
+  const t = useTranslations("shell");
 
   return (
-    <nav aria-label="Primary" className="h-full w-[248px] shrink-0 overflow-y-auto border-r border-line bg-surface py-3 px-2">
+    <nav aria-label={t("primaryNav")} className="h-full w-[248px] shrink-0 overflow-y-auto border-r border-line bg-surface py-3 px-2">
       {app.areas.map((area, areaIdx) => (
         <div key={area.id}>
           <div className={`text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3 px-3 mb-1 ${areaIdx === 0 ? "mt-2" : "mt-4"}`}>

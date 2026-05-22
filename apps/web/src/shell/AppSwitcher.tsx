@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface AppMeta { id: string; name: string }
 
@@ -8,6 +9,7 @@ export function AppSwitcher({
 }: { current: string; apps: AppMeta[]; onSelect: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const cur = apps.find((a) => a.id === current);
+  const t = useTranslations("shell");
   return (
     <div className="relative">
       <button
@@ -15,7 +17,7 @@ export function AppSwitcher({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
       >
-        {cur?.name ?? "Select app"} <span aria-hidden>▾</span>
+        {cur?.name ?? t("selectApp")} <span aria-hidden>▾</span>
       </button>
       {open && (
         <ul role="menu" className="absolute z-50 mt-1 min-w-48 rounded-md border border-border bg-bg p-1 shadow-md">

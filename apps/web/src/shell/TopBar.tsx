@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon, Rows3, Rows2, Rows4 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button, Kbd } from "@pmplatform/ui-kit";
 import type { AppDef } from "./shell.types";
 import { AppSwitcher } from "./AppSwitcher";
@@ -31,11 +32,12 @@ export function TopBar({
 }) {
   const { user, signOut } = useAuth();
   const { theme, setTheme, density, cycleDensity } = useTheme();
+  const t = useTranslations("shell");
   const DensityIcon = density === "compact" ? Rows4 : density === "comfortable" ? Rows2 : Rows3;
   const densityLabel: Record<typeof density, string> = {
-    compact: "Compact",
-    cozy: "Cozy",
-    comfortable: "Comfortable",
+    compact: t("densityCompact"),
+    cozy: t("densityCozy"),
+    comfortable: t("densityComfortable"),
   };
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -75,8 +77,9 @@ export function TopBar({
       <div className="mx-auto flex w-105 items-center gap-2 rounded-sm bg-surface-2 border border-transparent hover:border-line h-9 px-2.5 text-sm transition-colors">
         <Search size={14} className="text-ink-3 shrink-0" />
         <input
+          aria-label={t("search")}
           className="flex-1 bg-transparent text-ink placeholder:text-ink-3 outline-none"
-          placeholder="Search projects, work orders, people…"
+          placeholder={t("searchPlaceholder")}
         />
         <Kbd>⌘K</Kbd>
       </div>
@@ -89,8 +92,8 @@ export function TopBar({
         <Button
           variant="ghost"
           size="sm"
-          aria-label={`Density: ${densityLabel[density]} — click to change`}
-          title={`Density · ${densityLabel[density]}`}
+          aria-label={`${t("density")}: ${densityLabel[density]}`}
+          title={`${t("density")} · ${densityLabel[density]}`}
           onClick={cycleDensity}
         >
           <DensityIcon size={15} />
@@ -100,8 +103,8 @@ export function TopBar({
         <Button
           variant="ghost"
           size="sm"
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          title={theme === "dark" ? "Theme · Dark" : "Theme · Light"}
+          aria-label={theme === "dark" ? t("themeLight") : t("themeDark")}
+          title={theme === "dark" ? t("themeLabelDark") : t("themeLabelLight")}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
@@ -145,7 +148,7 @@ export function TopBar({
                     className="flex items-center gap-2 px-3 py-2 text-sm text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
                   >
                     <UserIcon size={14} />
-                    Profile
+                    {t("profile")}
                   </Link>
                   <button
                     type="button"
@@ -156,7 +159,7 @@ export function TopBar({
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
                   >
                     <LogOut size={14} />
-                    Sign out
+                    {t("signOut")}
                   </button>
                 </div>
               </div>
@@ -164,7 +167,7 @@ export function TopBar({
           </div>
         ) : (
           <Link href="/login" className="text-sm text-ink-2 hover:text-ink px-2 py-1 rounded-sm hover:bg-surface-2 transition-colors">
-            Sign in
+            {t("signIn")}
           </Link>
         )}
       </div>

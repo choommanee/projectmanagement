@@ -1,9 +1,12 @@
+"use client";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
+  const t = useTranslations("shell");
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 px-4 py-2.5 text-[12px] text-ink-3">
+    <nav aria-label={t("breadcrumb")} className="flex items-center gap-1 px-4 py-2.5 text-[12px] text-ink-3">
       {items.map((it, i) => {
         const last = i === items.length - 1;
         return (

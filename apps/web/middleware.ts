@@ -1,30 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 
+const SUPPORTED_LOCALES = ["en", "th"] as const;
+const LOCALE_COOKIE = "NEXT_LOCALE";
+const AUTH_PROTECTED = /^\/(pm|mfg)(\/|$)/;
+
+function stripLocalePrefix(pathname: string): { locale: string | null; rest: string } {
+  for (const lc of SUPPORTED_LOCALES) {
+    if (pathname === `/${lc}`) return { locale: lc, rest: "/" };
+    if (pathname.startsWith(`/${lc}/`)) return { locale: lc, rest: pathname.slice(lc.length + 1) };
+  }
+  return { locale: null, rest: pathname };
+}
+
 export const config = {
+  // Match every route except Next internals, static assets, and api/_vercel.
   matcher: [
-    "/(pm|mfg)/:path*",
+    "/((?!_next/static|_next/image|favicon\\.ico|api/|.*\\..*).*)",
   ],
 };
 
 export function middleware(req: NextRequest) {
-  const { pathname, searchParams } = req.nextUrl;
+  const url = req.nextUrl;
+  const { locale: pathLocale, rest } = stripLocalePrefix(url.pathname);
 
-  // Demo mode bypass
-  const demoCookie = req.cookies.get("demo")?.value;
-  if (demoCookie === "1") {
-    return NextResponse.next();
+  // Effective path after potential locale strip — used for auth checks.
+  const effectivePath = pathLocale ? rest : url.pathname;
+  const needsAuth = AUTH_PROTECTED.test(effectivePath);
+
+  // Auth gate (matches previous /(pm|mfg)/ behavior, now locale-aware).
+  if (needsAuth) {
+    const demoCookie = req.cookies.get("demo")?.value;
+    const accessToken = req.cookies.get("access_token")?.value;
+    if (demoCookie !== "1" && !accessToken) {
+      const loginUrl = url.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.search = "";
+      const nextParam = effectivePath + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : "");
+      loginUrl.searchParams.set("next", nextParam);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
-  // Check access_token cookie
-  const accessToken = req.cookies.get("access_token")?.value;
-  if (accessToken) {
-    return NextResponse.next();
+  // If URL has a locale prefix, rewrite to strip it and persist the locale cookie.
+  if (pathLocale) {
+    const rewriteUrl = url.clone();
+    rewriteUrl.pathname = rest;
+    const res = NextResponse.rewrite(rewriteUrl);
+    res.cookies.set(LOCALE_COOKIE, pathLocale, {
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+    return res;
   }
 
-  // Redirect to login with next= parameter
-  const loginUrl = req.nextUrl.clone();
-  loginUrl.pathname = "/login";
-  loginUrl.search = "";
-  loginUrl.searchParams.set("next", pathname + (searchParams.toString() ? `?${searchParams.toString()}` : ""));
-  return NextResponse.redirect(loginUrl);
+  return NextResponse.next();
 }

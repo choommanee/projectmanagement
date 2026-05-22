@@ -1,0 +1,29 @@
+{
+  "shell": {
+    "search": "ค้นหา",
+    "searchPlaceholder": "ค้นหาโครงการ ใบสั่งงาน ผู้คน…",
+    "notifications": "การแจ้งเตือน",
+    "settings": "ตั้งค่า",
+    "profile": "โปรไฟล์",
+    "signIn": "เข้าสู่ระบบ",
+    "signOut": "ออกจากระบบ",
+    "selectApp": "เลือกแอป",
+    "more": "เพิ่มเติม",
+    "commands": "คำสั่ง",
+    "primaryNav": "เมนูหลัก",
+    "breadcrumb": "เส้นทาง",
+    "themeLight": "สลับไปโหมดสว่าง",
+    "themeDark": "สลับไปโหมดมืด",
+    "themeLabelLight": "ธีม · สว่าง",
+    "themeLabelDark": "ธีม · มืด",
+    "density": "ความหนาแน่น",
+    "densityCompact": "แน่น",
+    "densityCozy": "ปกติ",
+    "densityComfortable": "โปร่ง"
+  },
+  "common": {
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "new": "เพิ่มใหม่"
+  }
+}

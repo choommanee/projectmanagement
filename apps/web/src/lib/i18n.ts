@@ -1,9 +1,10 @@
-// Phase 1 stub — real next-intl middleware wiring deferred to Phase 2.
-export const locales = ["en", "th"] as const;
-export type Locale = typeof locales[number];
-export const defaultLocale: Locale = "en";
+// Legacy helper kept for tests and non-React callers.
+// The canonical next-intl config lives at src/i18n/request.ts.
+export { locales, defaultLocale, type Locale } from "@/i18n/config";
+
+import type { Locale } from "@/i18n/config";
 
 export async function loadMessages(locale: Locale): Promise<Record<string, unknown>> {
-  if (locale === "th") return (await import("../../public/locales/th/common.json")).default;
-  return (await import("../../public/locales/en/common.json")).default;
+  if (locale === "th") return (await import("../../messages/th.json")).default;
+  return (await import("../../messages/en.json")).default;
 }
