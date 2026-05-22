@@ -78,6 +78,17 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	return api.NewRouter(svc, authz)
 }
 
+func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
+	svc := service.New(
+		store.NewDefinitions(p),
+		store.NewVersions(p),
+		store.NewInstances(p),
+		store.NewHumanTasks(p),
+		"http://localhost:19999",
+	)
+	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
+}
+
 func TestCedarGatesWorkflowCreate_AllowsWorkflowAuthor(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
@@ -108,6 +119,61 @@ func TestCedarGatesWorkflowCreate_AllowsWorkflowAuthor(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("want 201 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarPerInstanceWorkflowUpdate_AllowsSameTenant exercises the
+// Plan #6 Task 6 per-instance scope: a workflow-author updating a
+// workflow_definition that belongs to their tenant should not be 403'd
+// by the scoped middleware.
+func TestCedarPerInstanceWorkflowUpdate_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-wf-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"workflow-author"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	wfID := uuid.New()
+	tx, err := p.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO workflow_definition(id,tenant_id,name) VALUES ($1,$2,$3)`,
+		wfID, tid, "ABAC WF "+uuid.NewString()[:6]); e != nil {
+		t.Fatalf("seed workflow: %v", e)
+	}
+	if e := tx.Commit(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM workflow_definition WHERE id=$1", wfID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed", "version": 1})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/workflows/"+wfID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant workflow update: %s", rec.Body.String())
 	}
 }
 

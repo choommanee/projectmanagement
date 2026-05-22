@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +18,10 @@ import (
 	"github.com/pmplatform/services/workflow-svc/internal/store"
 )
 
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the workflow-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -25,11 +30,21 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Workflow::"<id>", Instance::"<id>", HumanTask::"<id>", etc. derived from
-// chi.URLParam) are a Plan #4 polish pass / Plan #6 ABAC follow-up — the ADR
-// rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): every write route with
+// an id in the path now uses RequireActionScoped against the matching Cedar
+// entity (Workflow / Instance / HumanTask). CedarLoader supplies tenant_id.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires workflow-svc with an optional Cedar loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -40,28 +55,29 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Definitions
 		r.Get("/workflows", listWorkflows(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "workflow.create", "*")).Post("/workflows", createWorkflow(svc))
 		r.Get("/workflows/{id}", getWorkflow(svc))
-		r.With(libauth.RequireAction(authz, "workflow.update", "*")).Patch("/workflows/{id}", updateWorkflow(svc))
-		r.With(libauth.RequireAction(authz, "workflow.delete", "*")).Delete("/workflows/{id}", deleteWorkflow(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.update", "Workflow::{:id}", loaderOpts...)).Patch("/workflows/{id}", updateWorkflow(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.delete", "Workflow::{:id}", loaderOpts...)).Delete("/workflows/{id}", deleteWorkflow(svc))
 
-		// Versions
+		// Versions — resource is the parent Workflow for create/publish/list.
 		r.Get("/workflows/{id}/versions", listVersions(svc))
-		r.With(libauth.RequireAction(authz, "workflow.version.create", "*")).Post("/workflows/{id}/versions", createVersion(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.version.create", "Workflow::{:id}", loaderOpts...)).Post("/workflows/{id}/versions", createVersion(svc))
 		r.Get("/workflow-versions/{id}", getVersion(svc))
-		r.With(libauth.RequireAction(authz, "workflow.publish", "*")).Post("/workflows/{id}/publish", publishWorkflow(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.publish", "Workflow::{:id}", loaderOpts...)).Post("/workflows/{id}/publish", publishWorkflow(svc))
 
 		// Instances
 		r.Get("/workflows/{id}/instances", listInstances(svc))
-		r.With(libauth.RequireAction(authz, "workflow.instance.start", "*")).Post("/workflows/{id}/start", startInstance(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.instance.start", "Workflow::{:id}", loaderOpts...)).Post("/workflows/{id}/start", startInstance(svc))
 		r.Get("/instances/{id}", getInstance(svc))
-		r.With(libauth.RequireAction(authz, "workflow.instance.resume", "*")).Post("/instances/{id}/resume", resumeInstance(svc))
-		r.With(libauth.RequireAction(authz, "workflow.instance.cancel", "*")).Post("/instances/{id}/cancel", cancelInstance(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.instance.resume", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/resume", resumeInstance(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.instance.cancel", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/cancel", cancelInstance(svc))
 
 		// Human tasks
 		r.Get("/human-tasks", listHumanTasks(svc))
 		r.Get("/instances/{id}/human-tasks", listInstanceHumanTasks(svc))
-		r.With(libauth.RequireAction(authz, "workflow.human_task.complete", "*")).Post("/human-tasks/{id}/complete", completeHumanTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.human_task.complete", "HumanTask::{:id}", loaderOpts...)).Post("/human-tasks/{id}/complete", completeHumanTask(svc))
 	})
 
 	return r

@@ -43,7 +43,9 @@ func main() {
 	}
 	authz := &libpolicy.Adapter{Policies: ps}
 
-	h := api.NewRouter(svc, authz)
+	// Plan #6 Task 6 — wire the Cedar resource loader.
+	loader := api.NewCedarLoader(p)
+	h := api.NewRouterWithLoader(svc, authz, loader)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {
