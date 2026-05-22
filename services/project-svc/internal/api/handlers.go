@@ -10,12 +10,26 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/project-svc/internal/domain"
 	"github.com/pmplatform/services/project-svc/internal/service"
 	"github.com/pmplatform/services/project-svc/internal/store"
 )
 
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the project-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (Project::"<id>", Task::"<id>", Sprint::"<id>" derived from chi.URLParam)
+// are a Plan #4 polish pass / Plan #6 ABAC follow-up — the ADR rows document
+// the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -26,33 +40,33 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Projects
 		r.Get("/projects", listProjects(svc))
-		r.Post("/projects", createProject(svc))
+		r.With(libauth.RequireAction(authz, "project.create", "*")).Post("/projects", createProject(svc))
 		r.Get("/projects/{id}", getProject(svc))
-		r.Patch("/projects/{id}", updateProject(svc))
-		r.Delete("/projects/{id}", deleteProject(svc))
+		r.With(libauth.RequireAction(authz, "project.update", "*")).Patch("/projects/{id}", updateProject(svc))
+		r.With(libauth.RequireAction(authz, "project.delete", "*")).Delete("/projects/{id}", deleteProject(svc))
 
 		// Tasks under project
 		r.Get("/projects/{id}/tasks", listTasks(svc))
-		r.Post("/projects/{id}/tasks", createTask(svc))
+		r.With(libauth.RequireAction(authz, "project.task.create", "*")).Post("/projects/{id}/tasks", createTask(svc))
 
 		// Tasks standalone
 		r.Get("/tasks", listAllTasks(svc))
 		r.Get("/tasks/{id}", getTask(svc))
-		r.Patch("/tasks/{id}", updateTask(svc))
-		r.Delete("/tasks/{id}", deleteTask(svc))
-		r.Post("/tasks/{id}/dependencies", addDependency(svc))
+		r.With(libauth.RequireAction(authz, "project.task.update", "*")).Patch("/tasks/{id}", updateTask(svc))
+		r.With(libauth.RequireAction(authz, "project.task.delete", "*")).Delete("/tasks/{id}", deleteTask(svc))
+		r.With(libauth.RequireAction(authz, "project.task.add_dependency", "*")).Post("/tasks/{id}/dependencies", addDependency(svc))
 
 		// Dependencies
-		r.Delete("/dependencies/{id}", removeDependency(svc))
+		r.With(libauth.RequireAction(authz, "project.task.remove_dependency", "*")).Delete("/dependencies/{id}", removeDependency(svc))
 
 		// Sprints
 		r.Get("/projects/{id}/sprints", listSprints(svc))
-		r.Post("/projects/{id}/sprints", createSprint(svc))
+		r.With(libauth.RequireAction(authz, "project.sprint.create", "*")).Post("/projects/{id}/sprints", createSprint(svc))
 		r.Get("/sprints/{id}", getSprint(svc))
-		r.Patch("/sprints/{id}", updateSprint(svc))
+		r.With(libauth.RequireAction(authz, "project.sprint.update", "*")).Patch("/sprints/{id}", updateSprint(svc))
 		r.Get("/sprints/{id}/tasks", listSprintTasks(svc))
-		r.Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
-		r.Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
+		r.With(libauth.RequireAction(authz, "project.sprint.assign_task", "*")).Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
+		r.With(libauth.RequireAction(authz, "project.sprint.unassign_task", "*")).Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
 	})
 
 	return r

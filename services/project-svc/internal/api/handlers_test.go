@@ -49,7 +49,10 @@ func seedTestTenant(t *testing.T, p *pgxpool.Pool) uuid.UUID {
 func newTestServer(t *testing.T, p *pgxpool.Pool) http.Handler {
 	t.Helper()
 	svc := service.New(store.NewProjects(p), store.NewTasks(p), store.NewSprints(p))
-	return api.NewRouter(svc)
+	// Pass nil authz so RequireAction becomes a no-op (libs/go/auth contract)
+	// and legacy tests keep working without minting JWT claims. The real
+	// Cedar allow/deny grid is exercised in cedar_create_test.go.
+	return api.NewRouter(svc, nil)
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {
