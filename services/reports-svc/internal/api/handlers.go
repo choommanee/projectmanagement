@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +18,10 @@ import (
 	"github.com/pmplatform/services/reports-svc/internal/store"
 )
 
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the reports-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -25,10 +30,21 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Dashboard::"<id>" derived from chi.URLParam) are a Plan #4 polish pass /
-// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): dashboard.update /
+// dashboard.delete now resolve `Dashboard::{:id}` and consult CedarLoader
+// for tenant_id + owner_user attrs.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires reports-svc with an optional Cedar loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -39,10 +55,11 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Dashboards
 		r.Get("/dashboards", listDashboards(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "report.dashboard.create", "*")).Post("/dashboards", createDashboard(svc))
 		r.Get("/dashboards/{id}", getDashboard(svc))
-		r.With(libauth.RequireAction(authz, "report.dashboard.update", "*")).Patch("/dashboards/{id}", updateDashboard(svc))
-		r.With(libauth.RequireAction(authz, "report.dashboard.delete", "*")).Delete("/dashboards/{id}", deleteDashboard(svc))
+		r.With(libauth.RequireActionScoped(authz, "report.dashboard.update", "Dashboard::{:id}", loaderOpts...)).Patch("/dashboards/{id}", updateDashboard(svc))
+		r.With(libauth.RequireActionScoped(authz, "report.dashboard.delete", "Dashboard::{:id}", loaderOpts...)).Delete("/dashboards/{id}", deleteDashboard(svc))
 
 		// Metrics
 		r.Get("/metrics/summary", getSummary(svc))

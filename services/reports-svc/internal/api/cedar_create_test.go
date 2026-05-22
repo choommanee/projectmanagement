@@ -72,6 +72,11 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	return api.NewRouter(svc, authz)
 }
 
+func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
+	svc := service.New(store.NewDashboards(p), store.NewMetrics(p))
+	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
+}
+
 func TestCedarGatesDashboardCreate_AllowsBIAuthor(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
@@ -102,6 +107,60 @@ func TestCedarGatesDashboardCreate_AllowsBIAuthor(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("want 201 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarPerInstanceDashboardUpdate_AllowsSameTenant exercises the
+// Plan #6 Task 6 per-instance scope: updating a dashboard owned by the
+// caller's tenant should not be 403'd at the authz layer.
+func TestCedarPerInstanceDashboardUpdate_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-rpt-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"bi-author"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	dID := uuid.New()
+	tx, err := p.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO dashboard(id,tenant_id,name) VALUES ($1,$2,$3)`,
+		dID, tid, "ABAC Dash "+uuid.NewString()[:6]); e != nil {
+		t.Fatalf("seed dashboard: %v", e)
+	}
+	if e := tx.Commit(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM dashboard WHERE id=$1", dID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed", "version": 1})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/dashboards/"+dID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant dashboard update: %s", rec.Body.String())
 	}
 }
 
