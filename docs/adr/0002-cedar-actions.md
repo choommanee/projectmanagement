@@ -352,3 +352,19 @@ Documented here for completeness; identity-svc already uses Cedar for
 - Plan #6 (read-side ABAC) will revisit the `READ_ONLY` rows; until then
   reads rely on `auth.Require` JWT validation plus tenant-scoped RLS in
   Postgres.
+
+## Update — Plan #6 Task 6 (2026-05-22)
+
+Per-instance ABAC landed via `RequireActionScoped` (see ADR-0003). The `Guard` column in the matrices above is now effectively superseded for write endpoints with id params — the live `<Entity>::{:id}` template at the middleware level passes the resource through to Cedar, which evaluates ABAC rules in `libs/policy/bundle.cedar`. Create endpoints (no id in URL) continue to use `RequireAction(..., "*")`; ABAC for create gates by `context.tenant_id` only.
+
+The authoritative resource template per service is in:
+
+- `services/tenant-svc/internal/api/handlers.go`
+- `services/project-svc/internal/api/handlers.go`
+- `services/document-svc/internal/api/handlers.go`
+- `services/mfg-svc/internal/api/handlers.go`
+- `services/quality-svc/internal/api/handlers.go`
+- `services/workflow-svc/internal/api/handlers.go`
+- `services/reports-svc/internal/api/handlers.go`
+
+Read endpoints are governed by the same ABAC `forbid` rules even though they only use `auth.Require` at the middleware level — Cedar evaluates resource attributes loaded by the per-service `cedar_loader.go`.

@@ -41,6 +41,34 @@
 #   USER_TOKEN               if set, bypass `/v1/login` for the user role
 #   RUN_POLICY_RELOAD        1 to additionally exercise POST /v1/admin/policy/reload
 #
+# === ABAC (Plan #6 Task 6) ====================================================
+#
+# In addition to the Cedar allow/deny grid above, this script can exercise the
+# resource.tenant_id boundary added in Plan #6 Task 6. ABAC cases require two
+# seeded tenants in the same Postgres instance, each with at least one of:
+# project, document, work_order, dashboard, ncr. The script picks UIDs from
+# tenant B's tables directly via psql (RLS bypassed by SUPERUSER), then mints
+# an admin token for tenant A and asserts every cross-tenant access returns
+# 403 (Cedar `forbid` triggered by `resource.tenant_id != context.tenant_id`).
+#
+# Seeding two tenants:
+#
+#   TENANT_SLUG=acme  tools/scripts/seed-demo.sh   # tenant A + admin
+#   TENANT_SLUG=bravo tools/scripts/seed-demo.sh   # tenant B + resources
+#   # then create one project / document / work_order / dashboard / ncr per tenant
+#
+# Required env for ABAC cases:
+#
+#   TEST_TENANT_A_SLUG       acme   (caller tenant; admin token minted here)
+#   TEST_TENANT_B_SLUG       bravo  (foreign tenant; resources fetched here)
+#   ADMIN_A_TOKEN / ADMIN_A_EMAIL+ADMIN_A_PASSWORD   tenant-A admin credentials
+#                            (defaults: re-use ADMIN_TOKEN/ADMIN_EMAIL if unset)
+#
+# If TEST_TENANT_B_SLUG is unresolvable (slug missing, no rows seeded for any
+# entity type, or PG_DSN unreachable) the ABAC block prints a clear SKIP and
+# the script continues. ABAC failures are reported alongside the grid failures
+# in the final summary.
+#
 # === Known limitations ========================================================
 #
 # 1. The running services must be the post–Plan-#4-Task-3 binaries
@@ -157,6 +185,68 @@ require_cmd() {
 }
 
 require_cmd curl psql
+
+# psql_safe — run a query against PG_DSN, return the trimmed scalar on stdout,
+# or an empty string if psql errors. Never causes the script to exit (we run
+# under `set -e`, so we tolerate failure explicitly).
+psql_safe() {
+  local q="$1"
+  psql -t -A "${PG_DSN}" -c "$q" 2>/dev/null | tr -d '[:space:]' || true
+}
+
+# abac_case — issue a cross-tenant call with the tenant-A admin token and
+# assert the response is 403 (Cedar `forbid` triggered by resource.tenant_id
+# != context.tenant_id). Increments the same PASS/FAIL counters as the grid.
+#
+# Usage: abac_case <action_label> <url> <method>
+abac_case() {
+  local action="$1"
+  local url="$2"
+  local method="$3"
+
+  STEP_NUM=$((STEP_NUM + 1))
+  printf "\n%s[abac]%s %s %s\n" "$C_BOLD" "$C_RESET" "$method" "$url"
+
+  local body="{}"
+  if [ "$method" = "GET" ] || [ "$method" = "DELETE" ]; then
+    body=""
+  fi
+
+  local curl_repr="curl -sS -o /tmp/smoke-authz.abac.body -w '%{http_code}' --max-time 5 -X ${method} '${url}' -H 'authorization: Bearer <ADMIN_A>' -H 'X-Tenant-Id: ${TENANT_ID}'"
+  local code
+  if [ -n "$body" ]; then
+    code="$(curl -sS -o /tmp/smoke-authz.abac.body -w '%{http_code}' --max-time 5 \
+      -X "$method" "$url" \
+      -H "authorization: Bearer ${ADMIN_A_JWT}" \
+      -H "X-Tenant-Id: ${TENANT_ID}" \
+      -H 'content-type: application/json' \
+      -d "$body" 2>/dev/null || true)"
+  else
+    code="$(curl -sS -o /tmp/smoke-authz.abac.body -w '%{http_code}' --max-time 5 \
+      -X "$method" "$url" \
+      -H "authorization: Bearer ${ADMIN_A_JWT}" \
+      -H "X-Tenant-Id: ${TENANT_ID}" 2>/dev/null || true)"
+  fi
+  local resp_body
+  resp_body="$(cat /tmp/smoke-authz.abac.body 2>/dev/null || true)"
+
+  if [ "$code" = "000" ]; then
+    printf "  %sSKIP%s abac: %s — service unreachable at %s\n" \
+      "$C_YELLOW" "$C_RESET" "$action" "${url%%/v1*}"
+    SKIP_COUNT=$((SKIP_COUNT + 1))
+    return 0
+  fi
+
+  if [ "$code" = "403" ]; then
+    pass "abac: ${action} → 403 (cross-tenant denied)"
+  else
+    fail "abac: ${action} expected 403, got ${code} (cross-tenant should be denied)" "$curl_repr" "$resp_body"
+  fi
+}
+
+yellow() {
+  printf "  %s%s%s\n" "$C_YELLOW" "$1" "$C_RESET"
+}
 
 # Tiny JSON-string extractor for simple shapes (no jq dependency).
 # Usage: json_field <key> <json>
@@ -354,6 +444,90 @@ if [ "$RUN_POLICY_RELOAD" = "1" ]; then
   step_header "policy.reload (identity-svc)"
   run_row "POST" "${IDENTITY_URL}/v1/admin/policy/reload" "{}" "policy.reload (identity-svc)"
 fi
+
+# ── 6b. ABAC: cross-tenant resource access (Plan #6 Task 6) ──────────────────
+#
+# Mint a tenant-A admin token (re-using ADMIN_JWT if no separate ADMIN_A_* env
+# is supplied; this matches the common case where TEST_TENANT_SLUG=A) and try
+# to mutate / read each entity type belonging to tenant B. Every call must be
+# rejected by Cedar with 403 because `resource.tenant_id != context.tenant_id`.
+
+echo
+printf "%s── ABAC: cross-tenant resource access ──%s\n" "$C_BOLD" "$C_RESET"
+
+TEST_TENANT_A_SLUG="${TEST_TENANT_A_SLUG:-${TEST_TENANT_SLUG}}"
+TEST_TENANT_B_SLUG="${TEST_TENANT_B_SLUG:-bravo}"
+
+# Resolve admin token for tenant A. Prefer dedicated ADMIN_A_* env, else reuse
+# the ADMIN_JWT minted above (which is already a tenant-A admin token when
+# TEST_TENANT_SLUG == TEST_TENANT_A_SLUG, the default case).
+if [ -n "${ADMIN_A_TOKEN:-}" ]; then
+  ADMIN_A_JWT="$ADMIN_A_TOKEN"
+elif [ -n "${ADMIN_A_EMAIL:-}" ] && [ -n "${ADMIN_A_PASSWORD:-}" ]; then
+  ADMIN_A_JWT="$(login "$ADMIN_A_EMAIL" "$ADMIN_A_PASSWORD")"
+  if [ -z "$ADMIN_A_JWT" ]; then
+    yellow "[skip] ABAC tests: login failed for ADMIN_A_EMAIL=${ADMIN_A_EMAIL}"
+    ADMIN_A_JWT=""
+  fi
+else
+  ADMIN_A_JWT="$ADMIN_JWT"
+fi
+
+# Resolve tenant_b_id from PG. If absent, SKIP the whole block.
+tenant_b_id=""
+if [ -n "$ADMIN_A_JWT" ]; then
+  tenant_b_id="$(psql_safe "SELECT id FROM tenant WHERE slug='${TEST_TENANT_B_SLUG}' LIMIT 1")"
+fi
+
+if [ -z "$ADMIN_A_JWT" ]; then
+  : # already warned above
+elif [ -z "$tenant_b_id" ]; then
+  yellow "[skip] ABAC tests: tenant '${TEST_TENANT_B_SLUG}' not seeded (PG_DSN=${PG_DSN})"
+else
+  printf "%stenant_b_id=%s%s\n" "$C_DIM" "$tenant_b_id" "$C_RESET"
+
+  # Pick one resource id per entity type from tenant B. Missing rows just skip
+  # that one case rather than failing the whole block.
+  project_b="$(psql_safe "SELECT id FROM project WHERE tenant_id='${tenant_b_id}' LIMIT 1")"
+  doc_b="$(psql_safe "SELECT id FROM document WHERE tenant_id='${tenant_b_id}' LIMIT 1")"
+  wo_b="$(psql_safe "SELECT id FROM work_order WHERE tenant_id='${tenant_b_id}' LIMIT 1")"
+  dash_b="$(psql_safe "SELECT id FROM dashboard WHERE tenant_id='${tenant_b_id}' LIMIT 1")"
+  ncr_b="$(psql_safe "SELECT id FROM nonconformance WHERE tenant_id='${tenant_b_id}' LIMIT 1")"
+
+  # Each case: hit tenant B's resource with tenant A's admin token, assert 403.
+  if [ -n "$project_b" ]; then
+    abac_case "project.read"   "${PROJECT_URL}/v1/projects/${project_b}" "GET"
+    abac_case "project.update" "${PROJECT_URL}/v1/projects/${project_b}" "PATCH"
+  else
+    yellow "[skip] abac: project.* — no project rows in tenant B"
+  fi
+
+  if [ -n "$doc_b" ]; then
+    abac_case "document.update" "${DOCUMENT_URL}/v1/documents/${doc_b}" "PATCH"
+  else
+    yellow "[skip] abac: document.update — no document rows in tenant B"
+  fi
+
+  if [ -n "$wo_b" ]; then
+    abac_case "mfg.work_order.release" "${MFG_URL}/v1/work-orders/${wo_b}/release" "POST"
+  else
+    yellow "[skip] abac: mfg.work_order.release — no work_order rows in tenant B"
+  fi
+
+  if [ -n "$dash_b" ]; then
+    abac_case "report.dashboard.update" "${REPORTS_URL}/v1/dashboards/${dash_b}" "PATCH"
+  else
+    yellow "[skip] abac: report.dashboard.update — no dashboard rows in tenant B"
+  fi
+
+  if [ -n "$ncr_b" ]; then
+    abac_case "quality.ncr.update" "${QUALITY_URL}/v1/ncrs/${ncr_b}" "PATCH"
+  else
+    yellow "[skip] abac: quality.ncr.update — no nonconformance rows in tenant B"
+  fi
+fi
+
+rm -f /tmp/smoke-authz.abac.body
 
 # ── 7. summary ───────────────────────────────────────────────────────────────
 # Each row contributes 2 assertions (admin allow + user deny). Skipped rows
