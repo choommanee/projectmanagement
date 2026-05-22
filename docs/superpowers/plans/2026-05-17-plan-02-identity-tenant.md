@@ -2669,3 +2669,4 @@ git tag plan-02-identity-tenant-complete
 - Cedar wrapper kept thin (engine, request, decision) — extend in service plans that need richer entity stores.
 - SAML federation NOT implemented; OIDC federation also deferred to a later sub-plan that adds external IdP support. Login path supports only local password in Phase 1.
 - Open items captured for later: refresh-token rotation endpoint, MFA enrollment, password reset, OIDC IdP federation, key rotation cron.
+- Cedar action × resource registry: see [ADR 0002](../../adr/0002-cedar-actions.md). All product-service action names referenced in `bundle.cedar` (and added by Plan #4) MUST appear in that table.
