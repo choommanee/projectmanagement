@@ -8,3 +8,7 @@ export * from "./primitives/EmptyState";
 export * from "./primitives/LoadingState";
 export * from "./primitives/SectionHeader";
 export * from "./primitives/InstrumentTile";
+export * from "./primitives/Select";
+export * from "./primitives/DropdownMenu";
+export * from "./primitives/Tabs";
+export * from "./primitives/Tooltip";
