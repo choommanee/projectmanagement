@@ -73,6 +73,39 @@ func (s *Users) RolesForUser(ctx context.Context, tid, userID uuid.UUID) ([]stri
 	return out, nil
 }
 
+// FindTenantIDBySlug resolves a tenant slug to its UUID. Used by the
+// password-reset request flow where the caller knows the slug but not
+// the UUID. Returns domain.ErrNotFound on miss so callers can collapse
+// to the anti-enumeration 200 response without leaking which input
+// (slug vs email) was unknown.
+func (s *Users) FindTenantIDBySlug(ctx context.Context, slug string) (uuid.UUID, error) {
+	var tid uuid.UUID
+	err := s.p.QueryRow(ctx, `
+        SELECT id FROM tenant
+         WHERE slug = $1 AND deleted_at IS NULL`, slug).Scan(&tid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return tid, nil
+}
+
+// UpdatePassword rewrites password_hash for the user and bumps version +
+// updated_at. RLS scopes by tenant via SET LOCAL.
+func (s *Users) UpdatePassword(ctx context.Context, tid, uid uuid.UUID, hash string) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+            UPDATE app_user
+               SET password_hash = $1,
+                   updated_at    = now(),
+                   version       = version + 1
+             WHERE id = $2 AND deleted_at IS NULL`, hash, uid)
+		return err
+	})
+}
+
 func (s *Users) FindByEmail(ctx context.Context, tid uuid.UUID, email string) (*domain.User, error) {
 	var u domain.User
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {

@@ -49,9 +49,30 @@ func NewRouterWithRefresh(
 	dynAuthz *libpolicy.DynamicAdapter,
 	pool *pgxpool.Pool,
 ) http.Handler {
+	return NewRouterWithRefreshAndReset(auth, refresh, nil, kp, store, issuer, authz, dynAuthz, pool)
+}
+
+// NewRouterWithRefreshAndReset is the fullest variant: layers the
+// password-reset endpoints on top of the refresh-aware router. A nil
+// reset omits the reset endpoints (mirrors the refresh nil-skip).
+func NewRouterWithRefreshAndReset(
+	auth *service.Auth,
+	refresh *service.Refresh,
+	reset *service.PasswordReset,
+	kp *sjwt.KeyPair,
+	store *sjwt.Store,
+	issuer string,
+	authz libauth.Authorizer,
+	dynAuthz *libpolicy.DynamicAdapter,
+	pool *pgxpool.Pool,
+) http.Handler {
 	h := NewRouterWithPolicy(auth, kp, store, issuer, authz, dynAuthz, pool).(*chi.Mux)
 	if refresh != nil {
 		h.Post("/v1/auth/refresh", refreshHandler(refresh))
+	}
+	if reset != nil {
+		h.Post("/v1/auth/password/request-reset", requestPasswordReset(reset))
+		h.Post("/v1/auth/password/reset", consumePasswordReset(reset))
 	}
 	return h
 }
@@ -280,6 +301,68 @@ func rotateKeys(store *sjwt.Store) http.HandlerFunc {
 			RotatedAt:  time.Now().UTC(),
 			ActiveKids: kids,
 		})
+	}
+}
+
+type passwordResetRequestReq struct {
+	TenantSlug string `json:"tenant_slug"`
+	Email      string `json:"email"`
+}
+
+// requestPasswordReset is anonymous and ALWAYS returns 200 with the same
+// body regardless of whether (tenant, email) resolved to an account.
+// Anti-enumeration: attackers can't probe for valid emails.
+func requestPasswordReset(svc *service.PasswordReset) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in passwordResetRequestReq
+		// Even a malformed body returns 200 with the canonical message so
+		// scanners can't differentiate "bad request" from "unknown user".
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		if in.TenantSlug != "" && in.Email != "" {
+			// Best-effort dispatch; service swallows errors internally.
+			_ = svc.RequestReset(r.Context(), in.TenantSlug, in.Email)
+		}
+		writeJSON(w, http.StatusOK, map[string]string{
+			"message": "if the account exists, an email has been sent",
+		})
+	}
+}
+
+type passwordResetConsumeReq struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// consumePasswordReset is anonymous (the token IS the credential). All
+// validation failures collapse to 400 with a generic message — same
+// anti-enumeration logic as request-reset.
+func consumePasswordReset(svc *service.PasswordReset) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in passwordResetConsumeReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad request"))
+			return
+		}
+		if in.Token == "" || in.NewPassword == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("token and new_password required"))
+			return
+		}
+		if err := svc.ConsumeReset(r.Context(), in.Token, in.NewPassword); err != nil {
+			if errors.Is(err, domain.ErrPasswordResetInvalid) ||
+				errors.Is(err, domain.ErrPasswordResetExpired) ||
+				errors.Is(err, domain.ErrPasswordResetConsumed) ||
+				errors.Is(err, domain.ErrPasswordResetMalformed) {
+				writeErr(w, http.StatusBadRequest, errors.New("invalid or expired token"))
+				return
+			}
+			if errors.Is(err, domain.ErrPasswordWeak) {
+				writeErr(w, http.StatusBadRequest, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
 	}
 }
 

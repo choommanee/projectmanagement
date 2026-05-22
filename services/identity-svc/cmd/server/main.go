@@ -87,12 +87,17 @@ func main() {
 
 	users := store.NewUsers(p)
 	tokens := store.NewRefreshTokens(p)
+	resets := store.NewPasswordResets(p)
 	refreshTTL := parseDurEnv("REFRESH_TOKEN_TTL", 720*time.Hour)
+	resetTTL := parseDurEnv("PASSWORD_RESET_TTL", time.Hour)
+	resetLinkURL := envOr("PASSWORD_RESET_LINK_URL", "http://localhost:3000/reset-password?token=")
 	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
 		WithRefreshTokens(tokens, refreshTTL)
 	refresh := service.NewRefresh(users, tokens, signer, pub)
+	mailer := service.NewLogMailer()
+	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL)
 	var _ libauth.Authorizer = authz // compile-time interface check
-	h := api.NewRouterWithRefresh(auth, refresh, kp, keyStore, issuer, authz, authz, p)
+	h := api.NewRouterWithRefreshAndReset(auth, refresh, passwordReset, kp, keyStore, issuer, authz, authz, p)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).

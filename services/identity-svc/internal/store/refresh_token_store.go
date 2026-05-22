@@ -95,6 +95,27 @@ func (s *RefreshTokens) MarkRevoked(ctx context.Context, tid, id uuid.UUID) erro
 	})
 }
 
+// RevokeAllForUser marks every live refresh_token row for (tenant, user)
+// as revoked. Used by password-reset to invalidate every session the user
+// might have open after they've changed credentials.
+func (s *RefreshTokens) RevokeAllForUser(ctx context.Context, tid, uid uuid.UUID) (int64, error) {
+	var n int64
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `
+            UPDATE refresh_token
+               SET revoked_at = COALESCE(revoked_at, now())
+             WHERE tenant_id = $1
+               AND user_id   = $2
+               AND revoked_at IS NULL`, tid, uid)
+		if err != nil {
+			return err
+		}
+		n = ct.RowsAffected()
+		return nil
+	})
+	return n, err
+}
+
 // RevokeFamily marks every row sharing family_id as revoked. Called on
 // reuse-detection: once any descendant is presented after being rotated,
 // the whole lineage is compromised.
