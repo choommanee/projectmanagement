@@ -70,14 +70,29 @@ func RequireActionWithMapper(authz Authorizer, mapper PrincipalMapper, action, r
 				http.Error(w, "missing claims", http.StatusUnauthorized)
 				return
 			}
+			ctx := map[string]any{
+				"tenant_id": c.TenantID,
+				"roles":     append([]string(nil), c.Roles...),
+			}
+			// Propagate the destructive-confirmation header into Cedar
+			// context so policies guarding destructive actions (DELETE on
+			// tenants/projects/workflows/work-orders, etc.) can require an
+			// explicit opt-in. Header value is case-insensitive "true".
+			if v := r.Header.Get("X-Confirm-Destructive"); v != "" {
+				switch v {
+				case "true", "TRUE", "True", "1":
+					ctx["confirm_destructive"] = true
+				default:
+					ctx["confirm_destructive"] = false
+				}
+			} else {
+				ctx["confirm_destructive"] = false
+			}
 			req := AuthzRequest{
 				Principal: mapper(c),
 				Action:    wrapUID("Action", action),
 				Resource:  wrapResource(resource),
-				Context: map[string]any{
-					"tenant_id": c.TenantID,
-					"roles":     append([]string(nil), c.Roles...),
-				},
+				Context:   ctx,
 			}
 			ok2, err := authz.IsAllowed(req)
 			if err != nil {

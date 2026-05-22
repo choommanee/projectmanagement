@@ -13,6 +13,15 @@ permit (
 )
 when { context.roles.contains("platform-admin") };
 
+// Allow runtime policy bundle reload only to platform-admin members.
+// (Reserved for the policy.reload admin endpoint added in Plan #4 Task 6.)
+permit (
+  principal,
+  action == Action::"policy.reload",
+  resource
+)
+when { context.roles.contains("platform-admin") };
+
 // --- Sample CRUD policies (placeholders; not yet enforced elsewhere) -------
 
 // Tenants: only platform-admin may create/delete tenants; tenant-admin may update.
@@ -33,10 +42,27 @@ when {
   context.roles.contains("tenant-admin")
 };
 
-// Projects: project-manager and tenant-admin may write; anyone authenticated may read.
+// Projects: project-manager and tenant-admin may write across the project
+// surface (projects, tasks, dependencies, sprints, sprint-task assignment).
+// Per-instance scoping (Project::"<id>", Task::"<id>", Sprint::"<id>") is a
+// Plan #4 polish / Plan #6 ABAC follow-up; for now the action grid uses
+// resource "*". Actions enumerated from ADR-0002 §project-svc WRITE_GUARD rows.
 permit (
   principal,
-  action in [Action::"project.create", Action::"project.update", Action::"project.delete"],
+  action in [
+    Action::"project.create",
+    Action::"project.update",
+    Action::"project.delete",
+    Action::"project.task.create",
+    Action::"project.task.update",
+    Action::"project.task.delete",
+    Action::"project.task.add_dependency",
+    Action::"project.task.remove_dependency",
+    Action::"project.sprint.create",
+    Action::"project.sprint.update",
+    Action::"project.sprint.assign_task",
+    Action::"project.sprint.unassign_task"
+  ],
   resource
 )
 when {
@@ -222,4 +248,78 @@ permit (
 when {
   context.roles.contains("tenant-admin") ||
   context.roles.contains("bi-author")
+};
+
+// --- Platform-admin overlay for destructive actions ------------------------
+//
+// Without this overlay the destructive permits would resolve only via the
+// service-role blocks above (tenant-admin / project-manager / workflow-author /
+// mfg-operator). The forbid block immediately below rejects every role except
+// platform-admin, so platform-admin must be explicitly named as a permit
+// principal for the destructive actions to ever resolve to Allow.
+permit (
+  principal,
+  action in [
+    Action::"tenant.delete",
+    Action::"project.delete",
+    Action::"workflow.delete",
+    Action::"mfg.work_order.delete"
+  ],
+  resource
+)
+when { context.roles.contains("platform-admin") };
+
+// --- Destructive-action guards ---------------------------------------------
+//
+// Cedar evaluates `forbid` after `permit`; a matching forbid overrides any
+// permit. The destructive-DELETE actions below require BOTH platform-admin
+// role AND an explicit `X-Confirm-Destructive: true` header, which the
+// authz middleware (libs/go/auth/authz.go) folds into the Cedar context as
+// `confirm_destructive`. Without both, the request is denied even if the
+// matching permit block would otherwise allow it (e.g. tenant-admin trying
+// to delete a project).
+//
+// Actions guarded: tenant.delete, project.delete, workflow.delete,
+// mfg.work_order.delete (closest lot-recall / production-destroy action in
+// the current bundle; `mfg.lot.delete` is not yet defined). `audit.purge`
+// is not yet defined either — audit-svc is read-only by design.
+
+forbid (
+  principal,
+  action == Action::"tenant.delete",
+  resource
+)
+unless {
+  context.roles.contains("platform-admin") &&
+  context.confirm_destructive == true
+};
+
+forbid (
+  principal,
+  action == Action::"project.delete",
+  resource
+)
+unless {
+  context.roles.contains("platform-admin") &&
+  context.confirm_destructive == true
+};
+
+forbid (
+  principal,
+  action == Action::"workflow.delete",
+  resource
+)
+unless {
+  context.roles.contains("platform-admin") &&
+  context.confirm_destructive == true
+};
+
+forbid (
+  principal,
+  action == Action::"mfg.work_order.delete",
+  resource
+)
+unless {
+  context.roles.contains("platform-admin") &&
+  context.confirm_destructive == true
 };
