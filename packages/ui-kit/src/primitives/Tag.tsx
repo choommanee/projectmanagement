@@ -22,10 +22,17 @@ const toneDot: Record<Tone, string> = {
   signal:  "bg-signal",
 };
 
-export function Tag({ children, tone = "neutral", dot = false }:
-  { children: ReactNode; tone?: Tone; dot?: boolean }) {
+type Size = "sm" | "md";
+
+const sizeClass: Record<Size, string> = {
+  sm: "h-4 px-1 text-[10px]",
+  md: "h-5 px-1.5 text-[11px]",
+};
+
+export function Tag({ children, tone = "neutral", size = "md", dot = false }:
+  { children: ReactNode; tone?: Tone; size?: Size; dot?: boolean }) {
   return (
-    <span className={`inline-flex h-5 items-center gap-1.5 rounded-xs px-1.5 text-[11px] font-medium tracking-wide ${toneClass[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-xs font-medium tracking-wide ${sizeClass[size]} ${toneClass[tone]}`}>
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${toneDot[tone]}`} aria-hidden />}
       {children}
     </span>
