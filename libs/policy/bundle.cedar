@@ -50,6 +50,30 @@ permit (
   resource
 );
 
+// Documents: project-manager and tenant-admin may write across the document
+// surface (workspaces, documents, versions, comments, templates). Per-instance
+// scoping (Document::"<id>" / Comment::"<id>") is a Plan #4 polish / Plan #6
+// ABAC follow-up; for now the action grid uses resource "*".
+permit (
+  principal,
+  action in [
+    Action::"document.workspace.ensure",
+    Action::"document.create",
+    Action::"document.update",
+    Action::"document.delete",
+    Action::"document.restore",
+    Action::"document.comment.create",
+    Action::"document.comment.resolve",
+    Action::"document.comment.delete",
+    Action::"document.template.create"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("project-manager")
+};
+
 // Dashboards: viewer can read, editor can write.
 permit (
   principal,

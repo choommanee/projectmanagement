@@ -64,7 +64,10 @@ func newTestHandler(p *pgxpool.Pool) http.Handler {
 		store.NewComments(p),
 		store.NewTemplates(p),
 	)
-	return api.NewRouter(svc)
+	// Pass nil authz so libauth.RequireAction becomes a no-op; these legacy
+	// tests don't mint JWTs / inject claims, and Cedar coverage lives in
+	// cedar_create_test.go.
+	return api.NewRouter(svc, nil)
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {

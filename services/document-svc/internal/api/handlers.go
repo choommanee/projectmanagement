@@ -10,13 +10,26 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/document-svc/internal/domain"
 	"github.com/pmplatform/services/document-svc/internal/service"
 	"github.com/pmplatform/services/document-svc/internal/store"
 )
 
-// NewRouter builds and returns the chi router with all routes mounted.
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the document-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (Document::"<id>", Comment::"<id>", Template::"<id>" derived from
+// chi.URLParam) are a Plan #4 polish pass / Plan #6 ABAC follow-up — the
+// ADR rows document the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -27,31 +40,31 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Workspaces
 		r.Get("/workspaces", listWorkspaces(svc))
-		r.Post("/workspaces", ensureWorkspace(svc))
+		r.With(libauth.RequireAction(authz, "document.workspace.ensure", "*")).Post("/workspaces", ensureWorkspace(svc))
 
 		// Documents
 		r.Get("/documents", listDocuments(svc))
-		r.Post("/documents", createDocument(svc))
+		r.With(libauth.RequireAction(authz, "document.create", "*")).Post("/documents", createDocument(svc))
 		r.Get("/documents/{id}", getDocument(svc))
-		r.Patch("/documents/{id}", patchDocument(svc))
-		r.Delete("/documents/{id}", deleteDocument(svc))
+		r.With(libauth.RequireAction(authz, "document.update", "*")).Patch("/documents/{id}", patchDocument(svc))
+		r.With(libauth.RequireAction(authz, "document.delete", "*")).Delete("/documents/{id}", deleteDocument(svc))
 
 		// Versions
 		r.Get("/documents/{id}/versions", listVersions(svc))
 		r.Get("/documents/{id}/versions/{rev}", getVersion(svc))
-		r.Post("/documents/{id}/restore", restoreDocument(svc))
+		r.With(libauth.RequireAction(authz, "document.restore", "*")).Post("/documents/{id}/restore", restoreDocument(svc))
 
 		// Comments under document
 		r.Get("/documents/{id}/comments", listComments(svc))
-		r.Post("/documents/{id}/comments", createComment(svc))
+		r.With(libauth.RequireAction(authz, "document.comment.create", "*")).Post("/documents/{id}/comments", createComment(svc))
 
 		// Comments standalone (resolve/delete)
-		r.Patch("/comments/{id}/resolve", resolveComment(svc))
-		r.Delete("/comments/{id}", deleteComment(svc))
+		r.With(libauth.RequireAction(authz, "document.comment.resolve", "*")).Patch("/comments/{id}/resolve", resolveComment(svc))
+		r.With(libauth.RequireAction(authz, "document.comment.delete", "*")).Delete("/comments/{id}", deleteComment(svc))
 
 		// Templates
 		r.Get("/templates", listTemplates(svc))
-		r.Post("/templates", createTemplate(svc))
+		r.With(libauth.RequireAction(authz, "document.template.create", "*")).Post("/templates", createTemplate(svc))
 		r.Get("/templates/{id}", getTemplate(svc))
 	})
 
