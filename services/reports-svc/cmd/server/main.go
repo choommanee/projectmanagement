@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	libpolicy "github.com/pmplatform/libs/policy"
+
 	"github.com/pmplatform/services/reports-svc/internal/api"
 	"github.com/pmplatform/services/reports-svc/internal/service"
 	"github.com/pmplatform/services/reports-svc/internal/store"
@@ -27,7 +29,14 @@ func main() {
 	defer p.Close()
 
 	svc := service.New(store.NewDashboards(p), store.NewMetrics(p))
-	h := api.NewRouter(svc)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		log.Fatal().Err(err).Msg("load cedar policy bundle")
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+
+	h := api.NewRouter(svc, authz)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

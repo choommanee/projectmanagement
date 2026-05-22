@@ -179,7 +179,11 @@ when {
   context.roles.contains("workflow-author")
 };
 
-// Dashboards: viewer can read, editor can write.
+// Dashboards (legacy): viewer can read, editor can write.
+// NOTE: ADR-0002 renamed these to `report.dashboard.*` (see permit block
+// below). The legacy `dashboard.*` actions are kept here for backwards
+// compatibility with any callers still using the old action names; do not
+// rely on them for new code.
 permit (
   principal,
   action == Action::"dashboard.read",
@@ -199,4 +203,23 @@ permit (
 when {
   context.roles.contains("dashboard-editor") ||
   context.roles.contains("tenant-admin")
+};
+
+// Reports / Dashboards: tenant-admin and bi-author may write across the
+// reports-svc dashboard surface (create / update / delete). Per-instance
+// scoping (Dashboard::"<id>") is a Plan #4 polish / Plan #6 ABAC follow-up;
+// for now the action grid uses resource "*". Action names match ADR-0002
+// §reports-svc (service-prefixed: report.dashboard.*).
+permit (
+  principal,
+  action in [
+    Action::"report.dashboard.create",
+    Action::"report.dashboard.update",
+    Action::"report.dashboard.delete"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("bi-author")
 };

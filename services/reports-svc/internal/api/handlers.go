@@ -10,12 +10,25 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/reports-svc/internal/domain"
 	"github.com/pmplatform/services/reports-svc/internal/service"
 	"github.com/pmplatform/services/reports-svc/internal/store"
 )
 
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the reports-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (Dashboard::"<id>" derived from chi.URLParam) are a Plan #4 polish pass /
+// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -26,10 +39,10 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Dashboards
 		r.Get("/dashboards", listDashboards(svc))
-		r.Post("/dashboards", createDashboard(svc))
+		r.With(libauth.RequireAction(authz, "report.dashboard.create", "*")).Post("/dashboards", createDashboard(svc))
 		r.Get("/dashboards/{id}", getDashboard(svc))
-		r.Patch("/dashboards/{id}", updateDashboard(svc))
-		r.Delete("/dashboards/{id}", deleteDashboard(svc))
+		r.With(libauth.RequireAction(authz, "report.dashboard.update", "*")).Patch("/dashboards/{id}", updateDashboard(svc))
+		r.With(libauth.RequireAction(authz, "report.dashboard.delete", "*")).Delete("/dashboards/{id}", deleteDashboard(svc))
 
 		// Metrics
 		r.Get("/metrics/summary", getSummary(svc))

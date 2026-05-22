@@ -11,9 +11,11 @@ import (
 	"github.com/pmplatform/services/reports-svc/internal/store"
 )
 
-// We use a nil pool for handler tests (no DB calls on health check / missing tenant header paths)
+// We use a nil pool for handler tests (no DB calls on health check / missing tenant header paths).
+// authz is nil here, which makes RequireAction a no-op (libs/go/auth contract); the dedicated
+// cedar_create_test.go covers the Cedar allow/deny grid against the shared bundle.
 func newTestRouter() http.Handler {
-	return api.NewRouter(service.New(store.NewDashboards(nil), store.NewMetrics(nil)))
+	return api.NewRouter(service.New(store.NewDashboards(nil), store.NewMetrics(nil)), nil)
 }
 
 func TestHealthz(t *testing.T) {
