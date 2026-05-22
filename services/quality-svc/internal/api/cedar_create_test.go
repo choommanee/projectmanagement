@@ -79,6 +79,20 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	return api.NewRouter(svc, authz)
 }
 
+// newCedarHandlerWithLoader wires the CedarLoader for per-instance ABAC
+// tests so the loader path is exercised end-to-end.
+func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
+	svc := service.New(
+		store.NewAPQP(p),
+		store.NewPPAP(p),
+		store.NewFMEA(p),
+		store.NewControlPlan(p),
+		store.NewInspection(p),
+		store.NewNCR(p),
+	)
+	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
+}
+
 func TestCedarGatesAPQPCreate_AllowsQualityEngineer(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
@@ -109,6 +123,60 @@ func TestCedarGatesAPQPCreate_AllowsQualityEngineer(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("want 201 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarPerInstanceAPQPUpdate_AllowsSameTenant exercises the Plan #6
+// Task 6 per-instance ABAC scope on a same-tenant APQP update.
+func TestCedarPerInstanceAPQPUpdate_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-q-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"tenant-admin"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	// Seed an apqp row directly.
+	apqpID := uuid.New()
+	tx, err := p.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO apqp_project(id,tenant_id,name,version) VALUES ($1,$2,$3,1)`,
+		apqpID, tid, "ABAC APQP"); e != nil {
+		t.Fatalf("seed apqp: %v", e)
+	}
+	if e := tx.Commit(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM apqp_project WHERE id=$1", apqpID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed", "version": 1})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/apqp/"+apqpID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant APQP update: %s", rec.Body.String())
 	}
 }
 

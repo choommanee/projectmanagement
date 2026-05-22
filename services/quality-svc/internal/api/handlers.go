@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +19,10 @@ import (
 	"github.com/pmplatform/services/quality-svc/internal/store"
 )
 
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the quality-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -26,11 +31,22 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (APQP::"<id>", PPAP::"<id>", FMEA::"<id>", ControlPlan::"<id>", NCR::"<id>",
-// CAPA::"<id>", etc. derived from chi.URLParam) are a Plan #4 polish pass /
-// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): every write route with
+// an id in the path now uses RequireActionScoped against the matching Cedar
+// entity (APQP/PPAP/PPAPElement/FMEA/FMEAMode/ControlPlan/ControlChar/NCR/
+// CAPA). Resource attrs come from quality-svc's CedarLoader.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires quality-svc with an optional Cedar loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -41,54 +57,60 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// APQP
 		r.Get("/apqp", listAPQP(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.apqp.create", "*")).Post("/apqp", createAPQP(svc))
 		r.Get("/apqp/{id}", getAPQP(svc))
-		r.With(libauth.RequireAction(authz, "quality.apqp.update", "*")).Patch("/apqp/{id}", updateAPQP(svc))
-		r.With(libauth.RequireAction(authz, "quality.apqp.delete", "*")).Delete("/apqp/{id}", deleteAPQP(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.apqp.update", "APQP::{:id}", loaderOpts...)).Patch("/apqp/{id}", updateAPQP(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.apqp.delete", "APQP::{:id}", loaderOpts...)).Delete("/apqp/{id}", deleteAPQP(svc))
 
 		// PPAP
 		r.Get("/ppap", listPPAP(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.ppap.create", "*")).Post("/ppap", createPPAP(svc))
 		r.Get("/ppap/{id}", getPPAP(svc))
-		r.With(libauth.RequireAction(authz, "quality.ppap.update", "*")).Patch("/ppap/{id}", updatePPAP(svc))
-		r.With(libauth.RequireAction(authz, "quality.ppap.delete", "*")).Delete("/ppap/{id}", deletePPAP(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.ppap.update", "PPAP::{:id}", loaderOpts...)).Patch("/ppap/{id}", updatePPAP(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.ppap.delete", "PPAP::{:id}", loaderOpts...)).Delete("/ppap/{id}", deletePPAP(svc))
 		r.Get("/ppap/{id}/elements", listPPAPElements(svc))
-		r.With(libauth.RequireAction(authz, "quality.ppap.update_element", "*")).Patch("/ppap-elements/{id}", updatePPAPElement(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.ppap.update_element", "PPAPElement::{:id}", loaderOpts...)).Patch("/ppap-elements/{id}", updatePPAPElement(svc))
 
 		// FMEA
 		r.Get("/fmea", listFMEA(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.fmea.create", "*")).Post("/fmea", createFMEA(svc))
 		r.Get("/fmea/{id}", getFMEA(svc))
-		r.With(libauth.RequireAction(authz, "quality.fmea.update", "*")).Patch("/fmea/{id}", updateFMEA(svc))
-		r.With(libauth.RequireAction(authz, "quality.fmea.delete", "*")).Delete("/fmea/{id}", deleteFMEA(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.fmea.update", "FMEA::{:id}", loaderOpts...)).Patch("/fmea/{id}", updateFMEA(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.fmea.delete", "FMEA::{:id}", loaderOpts...)).Delete("/fmea/{id}", deleteFMEA(svc))
 		r.Get("/fmea/{id}/modes", listFMEAModes(svc))
-		r.With(libauth.RequireAction(authz, "quality.fmea.add_mode", "*")).Post("/fmea/{id}/modes", addFMEAMode(svc))
-		r.With(libauth.RequireAction(authz, "quality.fmea.update_mode", "*")).Patch("/fmea-modes/{id}", updateFMEAMode(svc))
-		r.With(libauth.RequireAction(authz, "quality.fmea.delete_mode", "*")).Delete("/fmea-modes/{id}", deleteFMEAMode(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.fmea.add_mode", "FMEA::{:id}", loaderOpts...)).Post("/fmea/{id}/modes", addFMEAMode(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.fmea.update_mode", "FMEAMode::{:id}", loaderOpts...)).Patch("/fmea-modes/{id}", updateFMEAMode(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.fmea.delete_mode", "FMEAMode::{:id}", loaderOpts...)).Delete("/fmea-modes/{id}", deleteFMEAMode(svc))
 
 		// Control Plans
 		r.Get("/control-plans", listControlPlans(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.control_plan.create", "*")).Post("/control-plans", createControlPlan(svc))
 		r.Get("/control-plans/{id}", getControlPlan(svc))
-		r.With(libauth.RequireAction(authz, "quality.control_plan.update", "*")).Patch("/control-plans/{id}", updateControlPlan(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.control_plan.update", "ControlPlan::{:id}", loaderOpts...)).Patch("/control-plans/{id}", updateControlPlan(svc))
 		r.Get("/control-plans/{id}/characteristics", listCharacteristics(svc))
-		r.With(libauth.RequireAction(authz, "quality.control_plan.add_characteristic", "*")).Post("/control-plans/{id}/characteristics", addCharacteristic(svc))
-		r.With(libauth.RequireAction(authz, "quality.control_plan.update_characteristic", "*")).Patch("/control-plan-chars/{id}", updateCharacteristic(svc))
-		r.With(libauth.RequireAction(authz, "quality.control_plan.delete_characteristic", "*")).Delete("/control-plan-chars/{id}", deleteCharacteristic(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.control_plan.add_characteristic", "ControlPlan::{:id}", loaderOpts...)).Post("/control-plans/{id}/characteristics", addCharacteristic(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.control_plan.update_characteristic", "ControlChar::{:id}", loaderOpts...)).Patch("/control-plan-chars/{id}", updateCharacteristic(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.control_plan.delete_characteristic", "ControlChar::{:id}", loaderOpts...)).Delete("/control-plan-chars/{id}", deleteCharacteristic(svc))
 
 		// Inspections
 		r.Get("/inspections", listInspections(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.inspection.create", "*")).Post("/inspections", createInspection(svc))
 		r.Get("/inspections/{id}", getInspection(svc))
 
 		// NCRs
 		r.Get("/ncrs", listNCRs(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "quality.ncr.create", "*")).Post("/ncrs", createNCR(svc))
 		r.Get("/ncrs/{id}", getNCR(svc))
-		r.With(libauth.RequireAction(authz, "quality.ncr.update", "*")).Patch("/ncrs/{id}", updateNCR(svc))
-		r.With(libauth.RequireAction(authz, "quality.ncr.create_capa", "*")).Post("/ncrs/{id}/capa", createCAPA(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.ncr.update", "NCR::{:id}", loaderOpts...)).Patch("/ncrs/{id}", updateNCR(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.ncr.create_capa", "NCR::{:id}", loaderOpts...)).Post("/ncrs/{id}/capa", createCAPA(svc))
 		r.Get("/ncrs/{id}/capa", listCAPA(svc))
-		r.With(libauth.RequireAction(authz, "quality.capa.update", "*")).Patch("/capa/{id}", updateCAPA(svc))
+		r.With(libauth.RequireActionScoped(authz, "quality.capa.update", "CAPA::{:id}", loaderOpts...)).Patch("/capa/{id}", updateCAPA(svc))
 	})
 
 	return r
