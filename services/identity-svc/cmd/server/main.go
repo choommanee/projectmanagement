@@ -55,12 +55,16 @@ func main() {
 
 	// Cedar policy bundle: required at boot so authz decisions are explicit
 	// rather than implicitly deny-all on a misconfiguration. The shared
-	// bundle lives in libs/policy; POLICY_BUNDLE_PATH overrides the embed.
+	// bundle lives in libs/policy; POLICY_BUNDLE_PATH overrides the embed,
+	// and POLICY_SOURCE=db delegates to the policy_bundle table.
 	ps, err := libpolicy.LoadShared()
 	if err != nil {
 		log.Fatal().Err(err).Msg("load policy bundle")
 	}
-	authz := &libpolicy.Adapter{Policies: ps}
+	// DynamicAdapter holds the live Adapter behind an atomic pointer so
+	// /v1/admin/policy/reload can swap it without restarting the service
+	// (mirrors the DynamicSigner JWT-rotation pattern).
+	authz := libpolicy.NewDynamicAdapter(&libpolicy.Adapter{Policies: ps})
 
 	// PG publisher always works — direct Postgres write, no NATS dependency.
 	pgPub := audit.NewPgPublisher(p, "identity-svc")
@@ -83,7 +87,7 @@ func main() {
 
 	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
 	var _ libauth.Authorizer = authz // compile-time interface check
-	h := api.NewRouter(auth, kp, keyStore, issuer, authz)
+	h := api.NewRouterWithPolicy(auth, kp, keyStore, issuer, authz, authz, p)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).

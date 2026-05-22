@@ -10,13 +10,19 @@
 //	authz := &policy.Adapter{Policies: ps}
 //	h := api.NewRouter(..., authz)
 //
-// The bundle is embedded by default; setting POLICY_BUNDLE_PATH=/some/file
-// swaps in a disk-loaded source so operators can iterate on policies without
-// rebuilding the binary. Plan #4 Task 6 will add DB-backed loading on top of
-// this same Adapter.
+// Source resolution (Plan #4 Task 6):
+//
+//   - Default: the bundle is embedded at compile time from bundle.cedar.
+//   - POLICY_BUNDLE_PATH=/some/file swaps in a disk-loaded source so operators
+//     can iterate on policies without rebuilding the binary.
+//   - POLICY_SOURCE=db delegates LoadShared to LoadFromDB, which selects the
+//     active row from the policy_bundle table over a pool built from
+//     DATABASE_URL. POLICY_BUNDLE_PATH takes precedence over POLICY_SOURCE so
+//     local override stays trivial.
 package policy
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"os"
@@ -24,6 +30,7 @@ import (
 
 	cedar "github.com/cedar-policy/cedar-go"
 	cedartypes "github.com/cedar-policy/cedar-go/types"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	libauth "github.com/pmplatform/libs/go/auth"
 )
@@ -39,14 +46,33 @@ var embeddedBundle string
 // Policy.UnmarshalCedar parses one statement at a time) and each is added to
 // the PolicySet under a unique generated ID.
 func LoadShared() (*cedar.PolicySet, error) {
-	src := embeddedBundle
+	// POLICY_BUNDLE_PATH wins: it's the explicit local override and historically
+	// has been the test/dev iteration knob.
 	if path := os.Getenv("POLICY_BUNDLE_PATH"); path != "" {
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read policy bundle %q: %w", path, err)
-		}
-		src = string(b)
+		return LoadSharedFromPath(path)
 	}
+	// POLICY_SOURCE=db swaps the embed for a DB-backed read using the
+	// DATABASE_URL pool. Any other value (including "embed" or unset) keeps
+	// the existing embed behavior.
+	if strings.EqualFold(os.Getenv("POLICY_SOURCE"), "db") {
+		dsn := os.Getenv("DATABASE_URL")
+		if dsn == "" {
+			return nil, fmt.Errorf("POLICY_SOURCE=db requires DATABASE_URL")
+		}
+		ctx := context.Background()
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return nil, fmt.Errorf("policy db pool: %w", err)
+		}
+		defer pool.Close()
+		ps, _, err := LoadFromDB(ctx, pool)
+		return ps, err
+	}
+	return parseBundle(embeddedBundle)
+}
+
+// parseBundle is the shared splitter+parser used by every loader path.
+func parseBundle(src string) (*cedar.PolicySet, error) {
 	if strings.TrimSpace(stripComments(src)) == "" {
 		return nil, fmt.Errorf("policy bundle is empty")
 	}
@@ -65,6 +91,27 @@ func LoadShared() (*cedar.PolicySet, error) {
 	return ps, nil
 }
 
+// LoadFromDB reads the active row from the policy_bundle table and parses its
+// body into a PolicySet. Returns the PolicySet plus the version int from the
+// row (handy for /v1/admin/policy/reload responses). If no active row exists,
+// it returns an error so the caller can decide whether to fall back to embed.
+func LoadFromDB(ctx context.Context, pool *pgxpool.Pool) (*cedar.PolicySet, int, error) {
+	if pool == nil {
+		return nil, 0, fmt.Errorf("policy db pool is nil")
+	}
+	var body string
+	var version int
+	row := pool.QueryRow(ctx, `SELECT body, version FROM policy_bundle WHERE active LIMIT 1`)
+	if err := row.Scan(&body, &version); err != nil {
+		return nil, 0, fmt.Errorf("policy_bundle active row: %w", err)
+	}
+	ps, err := parseBundle(body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return ps, version, nil
+}
+
 // LoadSharedFromPath ignores POLICY_BUNDLE_PATH and loads from the given file.
 // Pass "" to force the embedded bundle. Useful in tests.
 func LoadSharedFromPath(path string) (*cedar.PolicySet, error) {
@@ -76,22 +123,7 @@ func LoadSharedFromPath(path string) (*cedar.PolicySet, error) {
 		}
 		src = string(b)
 	}
-	if strings.TrimSpace(stripComments(src)) == "" {
-		return nil, fmt.Errorf("policy bundle is empty")
-	}
-	stmts := splitPolicies(src)
-	if len(stmts) == 0 {
-		return nil, fmt.Errorf("policy bundle has no permit/forbid statements")
-	}
-	ps := cedar.NewPolicySet()
-	for i, s := range stmts {
-		var cp cedar.Policy
-		if err := cp.UnmarshalCedar([]byte(s)); err != nil {
-			return nil, fmt.Errorf("policy p%d: %w", i, err)
-		}
-		ps.Add(cedartypes.PolicyID(fmt.Sprintf("p%d", i)), &cp)
-	}
-	return ps, nil
+	return parseBundle(src)
 }
 
 // Adapter wraps a *cedar.PolicySet so it satisfies libauth.Authorizer

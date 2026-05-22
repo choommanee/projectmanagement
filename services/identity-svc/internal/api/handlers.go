@@ -9,8 +9,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	sjwt "github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -31,6 +33,25 @@ import (
 // nil the admin routes are still mounted (auth required) but the action
 // check becomes a no-op — only the test setup does that intentionally.
 func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer string, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithPolicy(auth, kp, store, issuer, authz, nil, nil)
+}
+
+// NewRouterWithPolicy is the variant used by the live server: it threads the
+// DynamicAdapter holder and Postgres pool needed for /v1/admin/policy/reload.
+// When either is nil the reload endpoint is omitted (so tests that don't
+// exercise reload can keep using NewRouter).
+//
+// authz should typically BE the dynAuthz holder so the same instance gates
+// every admin route AND is the swap target for reload.
+func NewRouterWithPolicy(
+	auth *service.Auth,
+	kp *sjwt.KeyPair,
+	store *sjwt.Store,
+	issuer string,
+	authz libauth.Authorizer,
+	dynAuthz *libpolicy.DynamicAdapter,
+	pool *pgxpool.Pool,
+) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
@@ -48,6 +69,13 @@ func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer s
 			pr.Use(libauth.RequireAction(authz, "jwt.rotate", "*"))
 			pr.Post("/v1/admin/keys/rotate", rotateKeys(store))
 		})
+		if dynAuthz != nil && pool != nil {
+			r.Group(func(pr chi.Router) {
+				pr.Use(requireBearerDynamic(store, issuer))
+				pr.Use(libauth.RequireAction(authz, "policy.reload", "*"))
+				pr.Post("/v1/admin/policy/reload", reloadPolicy(pool, dynAuthz))
+			})
+		}
 	}
 	return r
 }
@@ -204,6 +232,30 @@ func rotateKeys(store *sjwt.Store) http.HandlerFunc {
 			Kid:        kid,
 			RotatedAt:  time.Now().UTC(),
 			ActiveKids: kids,
+		})
+	}
+}
+
+type policyReloadResp struct {
+	ReloadedAt time.Time `json:"reloaded_at"`
+	Version    int       `json:"version"`
+}
+
+// reloadPolicy re-reads the active policy_bundle row, parses it, and atomically
+// swaps the live DynamicAdapter to point at the new PolicySet. The swap is a
+// single atomic.Pointer write so in-flight requests either see the old or new
+// adapter, never a torn intermediate.
+func reloadPolicy(pool *pgxpool.Pool, dynAuthz *libpolicy.DynamicAdapter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ps, version, err := libpolicy.LoadFromDB(r.Context(), pool)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		dynAuthz.Swap(&libpolicy.Adapter{Policies: ps})
+		writeJSON(w, http.StatusOK, policyReloadResp{
+			ReloadedAt: time.Now().UTC(),
+			Version:    version,
 		})
 	}
 }
