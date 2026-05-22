@@ -21,14 +21,21 @@ type AuditPublisher interface {
 	Publish(ctx context.Context, action string, ev audit.Event) error
 }
 
+// TokenSigner is the minimal interface Auth needs. Both *libauth.Signer
+// (bootstrap, tests) and *jwt.DynamicSigner (production — refreshes the active
+// key on every call so rotation takes effect without restart) satisfy it.
+type TokenSigner interface {
+	Sign(libauth.Claims) (string, error)
+}
+
 type Auth struct {
 	users    *store.Users
 	sessions *store.Sessions
-	signer   *libauth.Signer
+	signer   TokenSigner
 	aud      AuditPublisher
 }
 
-func NewAuth(u *store.Users, s *store.Sessions, signer *libauth.Signer, aud AuditPublisher) *Auth {
+func NewAuth(u *store.Users, s *store.Sessions, signer TokenSigner, aud AuditPublisher) *Auth {
 	return &Auth{users: u, sessions: s, signer: signer, aud: aud}
 }
 

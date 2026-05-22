@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
-	libauth "github.com/pmplatform/libs/go/auth"
 	"github.com/pmplatform/libs/go/audit"
 	natsx "github.com/pmplatform/libs/go/nats"
 
@@ -38,7 +37,17 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
-	signer := libauth.NewSigner(kp.Priv, issuer)
+	keyStore := jwt.NewStore(p, 0) // 0 -> default 24h JWKS grace window
+	// Seed the in-memory active key so the dynamic signer is ready before
+	// the first request, then prefer the DB-backed view if a more recent
+	// active key exists (e.g. another replica rotated while we were down).
+	keyStore.Bind(kp, kid)
+	if err := keyStore.Refresh(context.Background()); err != nil {
+		log.Warn().Err(err).Msg("keyStore refresh failed; using bootstrap key")
+	}
+	// DynamicSigner re-resolves the active key on each Sign call so a
+	// rotation via POST /v1/admin/keys/rotate takes effect immediately.
+	signer := jwt.NewDynamicSigner(keyStore, issuer)
 
 	// PG publisher always works — direct Postgres write, no NATS dependency.
 	pgPub := audit.NewPgPublisher(p, "identity-svc")
@@ -60,7 +69,7 @@ func main() {
 	pub := audit.NewFallback(natsFn, pgPub.Publish)
 
 	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
-	h := api.NewRouter(auth, kp)
+	h := api.NewRouter(auth, kp, keyStore, issuer)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

@@ -11,7 +11,7 @@ import (
 func newPool(t *testing.T) *pgxpool.Pool {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://app:app@localhost:5433/platform?sslmode=disable"
+		dsn = "postgres://app:app@localhost:5432/platform?sslmode=disable"
 	}
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {

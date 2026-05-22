@@ -24,7 +24,7 @@ import (
 func setup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, func()) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://app:app@localhost:5433/platform?sslmode=disable"
+		dsn = "postgres://app:app@localhost:5432/platform?sslmode=disable"
 	}
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -65,7 +65,10 @@ func setup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, func()) {
 	pub := audit.NewPgPublisher(p, "test")
 	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
 
-	h := NewRouter(auth, kp)
+	// nil Store -> JWKS handler falls back to the in-memory keypair so tests
+	// remain insulated from the DB-backed signing_key row. Empty issuer
+	// disables the admin rotate endpoint (covered by rotation integration tests).
+	h := NewRouter(auth, kp, nil, "")
 	cleanup := func() {
 		p.Exec(context.Background(), "DELETE FROM tenant WHERE id=$1", tid)
 		p.Close()
