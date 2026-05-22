@@ -39,7 +39,11 @@ func main() {
 	authz := &libpolicy.Adapter{Policies: ps}
 	var _ libauth.Authorizer = authz // compile-time interface check
 
-	h := api.NewRouter(service.New(store.New(p)), authz)
+	// Plan #6 Task 6 — pass the Cedar resource loader so the scoped authz
+	// middleware can attach per-instance attrs (tenant_id, owner_user) to
+	// each request envelope.
+	loader := api.NewCedarLoader(p)
+	h := api.NewRouterWithLoader(service.New(store.New(p)), authz, loader)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

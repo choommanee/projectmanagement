@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -15,6 +16,13 @@ import (
 	"github.com/pmplatform/services/tenant-svc/internal/service"
 )
 
+// initURLParam wires libauth.URLParam to chi.URLParam exactly once so the
+// scoped authz middleware can resolve `{:id}` placeholders without forcing
+// libs/go/auth to import chi.
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the tenant-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -23,21 +31,38 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Tenant::"<id>" derived from chi.URLParam) are a Plan #4 polish pass /
-// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): write routes with an
+// `{id}` path param now use RequireActionScoped(`Tenant::{:id}`) so Cedar
+// receives a typed resource UID and the optional ResourceLoader can attach
+// `tenant_id` / `owner_user` attributes from the service store.
+//
+// NewRouter keeps its legacy two-argument signature for backward compat
+// (cedar_create_test.go calls it that way). NewRouterWithLoader is the
+// preferred entrypoint for production wiring.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires the tenant-svc router with an optional Cedar
+// resource loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 	r.Route("/v1/tenants", func(r chi.Router) {
 		r.Get("/", list(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "tenant.create", "*")).Post("/", create(svc))
 		r.Get("/by-slug/{slug}", getBySlug(svc))
 		r.Get("/{id}", get(svc))
-		r.With(libauth.RequireAction(authz, "tenant.update", "*")).Patch("/{id}", update(svc))
-		r.With(libauth.RequireAction(authz, "tenant.delete", "*")).Delete("/{id}", del(svc))
+		r.With(libauth.RequireActionScoped(authz, "tenant.update", "Tenant::{:id}", loaderOpts...)).Patch("/{id}", update(svc))
+		r.With(libauth.RequireActionScoped(authz, "tenant.delete", "Tenant::{:id}", loaderOpts...)).Delete("/{id}", del(svc))
 	})
 	return r
 }

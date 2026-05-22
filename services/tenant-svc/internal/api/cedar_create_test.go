@@ -85,6 +85,64 @@ func TestCedarGatesCreate_AllowsPlatformAdmin(t *testing.T) {
 	}
 }
 
+// TestCedarPerInstanceUpdate_AllowsSameTenant exercises the Plan #6 Task 6
+// per-instance ABAC scope: a tenant-admin updating their own tenant must
+// be allowed when the loader returns matching tenant_id.
+func TestCedarPerInstanceUpdate_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	loader := NewCedarLoader(p)
+
+	// Seed two tenants — the one we will update + a second one so the
+	// cross-tenant case below has a foreign row to point at.
+	tid := uuid.New()
+	otherTid := uuid.New()
+	for _, row := range []struct {
+		id   uuid.UUID
+		slug string
+	}{
+		{tid, "cedar-abac-" + uuid.NewString()[:6]},
+		{otherTid, "cedar-other-" + uuid.NewString()[:6]},
+	} {
+		_, err := p.Exec(context.Background(),
+			"INSERT INTO tenant(id, slug, name, tier, status, region) VALUES ($1,$2,$3,'shared','active','us')",
+			row.id, row.slug, "Cedar ABAC")
+		if err != nil {
+			t.Fatalf("seed tenant: %v", err)
+		}
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM tenant WHERE id = ANY($1)", []uuid.UUID{tid, otherTid})
+	})
+
+	router := NewRouterWithLoader(service.New(store.New(p)), authz, loader)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"tenant-admin"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed", "version": 1})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/tenants/"+tid.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	// 200 (allow + applied) or 409 (allow + version mismatch) both prove the
+	// authz gate let the request through. 403 would mean the scoped middleware
+	// blocked us.
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant update: %s", rec.Body.String())
+	}
+}
+
 func TestCedarGatesCreate_Denies403WithoutAdminRole(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
