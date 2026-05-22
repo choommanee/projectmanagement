@@ -36,6 +36,26 @@ func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer s
 	return NewRouterWithPolicy(auth, kp, store, issuer, authz, nil, nil)
 }
 
+// NewRouterWithRefresh is the variant the live server uses when a Refresh
+// service is wired. When refresh is nil the /v1/auth/refresh endpoint is
+// omitted so tests / minimal deployments don't accidentally expose it.
+func NewRouterWithRefresh(
+	auth *service.Auth,
+	refresh *service.Refresh,
+	kp *sjwt.KeyPair,
+	store *sjwt.Store,
+	issuer string,
+	authz libauth.Authorizer,
+	dynAuthz *libpolicy.DynamicAdapter,
+	pool *pgxpool.Pool,
+) http.Handler {
+	h := NewRouterWithPolicy(auth, kp, store, issuer, authz, dynAuthz, pool).(*chi.Mux)
+	if refresh != nil {
+		h.Post("/v1/auth/refresh", refreshHandler(refresh))
+	}
+	return h
+}
+
 // NewRouterWithPolicy is the variant used by the live server: it threads the
 // DynamicAdapter holder and Postgres pool needed for /v1/admin/policy/reload.
 // When either is nil the reload endpoint is omitted (so tests that don't
@@ -140,6 +160,33 @@ func login(auth *service.Auth) http.HandlerFunc {
 		tp, err := auth.Login(r.Context(), service.LoginInput{TenantID: tid, Email: in.Email, Password: in.Password})
 		if err != nil {
 			if errors.Is(err, domain.ErrInvalidCreds) {
+				writeErr(w, 401, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, tp)
+	}
+}
+
+type refreshReq struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// refreshHandler is anonymous — the refresh token itself is the credential.
+// Failure modes are deliberately collapsed to a single 401 to avoid leaking
+// rotation state to an attacker.
+func refreshHandler(r *service.Refresh) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		var in refreshReq
+		if err := json.NewDecoder(req.Body).Decode(&in); err != nil || in.RefreshToken == "" {
+			writeErr(w, 400, errors.New("bad refresh_token"))
+			return
+		}
+		tp, err := r.Rotate(req.Context(), in.RefreshToken)
+		if err != nil {
+			if errors.Is(err, domain.ErrRefreshTokenInvalid) {
 				writeErr(w, 401, err)
 				return
 			}

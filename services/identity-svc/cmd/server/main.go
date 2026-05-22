@@ -85,9 +85,14 @@ func main() {
 	// Composite: try NATS first, PG as fallback.
 	pub := audit.NewFallback(natsFn, pgPub.Publish)
 
-	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
+	users := store.NewUsers(p)
+	tokens := store.NewRefreshTokens(p)
+	refreshTTL := parseDurEnv("REFRESH_TOKEN_TTL", 720*time.Hour)
+	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
+		WithRefreshTokens(tokens, refreshTTL)
+	refresh := service.NewRefresh(users, tokens, signer, pub)
 	var _ libauth.Authorizer = authz // compile-time interface check
-	h := api.NewRouterWithPolicy(auth, kp, keyStore, issuer, authz, authz, p)
+	h := api.NewRouterWithRefresh(auth, refresh, kp, keyStore, issuer, authz, authz, p)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).
