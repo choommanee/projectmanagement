@@ -22,6 +22,16 @@ permit (
 )
 when { context.roles.contains("platform-admin") };
 
+// Allow OIDC SSO config CRUD only to tenant-admin members. Per-instance
+// ABAC for sso_config rows is Plan #6 Task 6 territory; for now this uses
+// resource "*" which the middleware wraps as Resource::"*".
+permit (
+  principal,
+  action == Action::"tenant.sso.configure",
+  resource
+)
+when { context.roles.contains("tenant-admin") };
+
 // --- Sample CRUD policies (placeholders; not yet enforced elsewhere) -------
 
 // Tenants: only platform-admin may create/delete tenants; tenant-admin may update.

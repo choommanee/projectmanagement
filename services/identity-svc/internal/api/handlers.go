@@ -93,6 +93,28 @@ func NewRouterFull(
 	dynAuthz *libpolicy.DynamicAdapter,
 	pool *pgxpool.Pool,
 ) http.Handler {
+	return NewRouterFullWithOIDC(auth, refresh, reset, mfa, nil, kp, store, issuer, authz, dynAuthz, pool)
+}
+
+// NewRouterFullWithOIDC is the fullest router variant. A nil oidc skips the
+// OIDC federation endpoints (mirrors the mfa / refresh / reset nil-skip).
+//
+// OIDC endpoints split two ways:
+//   * /v1/auth/oidc/{tenant_slug}/{start,callback} — anonymous
+//   * /v1/admin/sso/configs                        — tenant-admin (Cedar guarded)
+func NewRouterFullWithOIDC(
+	auth *service.Auth,
+	refresh *service.Refresh,
+	reset *service.PasswordReset,
+	mfa *service.MFA,
+	oidc *service.OIDC,
+	kp *sjwt.KeyPair,
+	store *sjwt.Store,
+	issuer string,
+	authz libauth.Authorizer,
+	dynAuthz *libpolicy.DynamicAdapter,
+	pool *pgxpool.Pool,
+) http.Handler {
 	h := NewRouterWithPolicy(auth, kp, store, issuer, authz, dynAuthz, pool).(*chi.Mux)
 	if refresh != nil {
 		h.Post("/v1/auth/refresh", refreshHandler(refresh))
@@ -126,6 +148,34 @@ func NewRouterFull(
 				pr.Post("/v1/auth/mfa/enroll", mfaEnroll(mfa, auth))
 				pr.Post("/v1/auth/mfa/verify", mfaVerify(mfa))
 				pr.Post("/v1/auth/mfa/disable", mfaDisable(mfa, auth))
+			})
+		}
+	}
+	if oidc != nil {
+		// Public OIDC start/callback. These are anonymous: the credential is
+		// the IdP-issued ID token (callback) or the signed-state JWT (start).
+		h.Get("/v1/auth/oidc/{tenant_slug}/start", oidcStart(oidc))
+		h.Get("/v1/auth/oidc/{tenant_slug}/callback", oidcCallback(oidc))
+
+		// Admin SSO config CRUD. Gated by Cedar tenant.sso.configure for
+		// tenant-admin (see bundle.cedar). Mounted when a verifier path is
+		// available — production via Store+issuer, tests via the static kp.
+		mountSSOAdmin := func(pr chi.Router) {
+			pr.Use(libauth.RequireAction(authz, "tenant.sso.configure", "*"))
+			pr.Post("/v1/admin/sso/configs", ssoCreate(oidc))
+			pr.Get("/v1/admin/sso/configs", ssoList(oidc))
+			pr.Patch("/v1/admin/sso/configs/{id}", ssoUpdate(oidc))
+			pr.Delete("/v1/admin/sso/configs/{id}", ssoDelete(oidc))
+		}
+		if store != nil && issuer != "" {
+			h.Group(func(pr chi.Router) {
+				pr.Use(requireBearerDynamic(store, issuer))
+				mountSSOAdmin(pr)
+			})
+		} else if kp != nil {
+			h.Group(func(pr chi.Router) {
+				pr.Use(requireBearerStatic(kp, issuer))
+				mountSSOAdmin(pr)
 			})
 		}
 	}

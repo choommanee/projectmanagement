@@ -328,11 +328,17 @@ Documented here for completeness; identity-svc already uses Cedar for
 `jwt.rotate` via `policy.Decide` (Plan #2). Plan #4 may add a
 `tenant.user.invite` endpoint; if so it gets a new row.
 
-| Method | Path                            | Action          | Resource         | Guard       |
-| ------ | ------------------------------- | --------------- | ---------------- | ----------- |
-| POST   | `/v1/login`                     | `auth.login`    | `Tenant::"*"`    | unguarded (public) |
-| POST   | `/v1/admin/keys/rotate`         | `jwt.rotate`    | `Tenant::"*"`    | WRITE_GUARD (already enforced) |
-| GET    | `/.well-known/jwks.json`        | n/a             | n/a              | unguarded (public) |
+| Method | Path                                          | Action                   | Resource         | Guard       |
+| ------ | --------------------------------------------- | ------------------------ | ---------------- | ----------- |
+| POST   | `/v1/login`                                   | `auth.login`             | `Tenant::"*"`    | unguarded (public) |
+| POST   | `/v1/admin/keys/rotate`                       | `jwt.rotate`             | `Tenant::"*"`    | WRITE_GUARD (already enforced) |
+| GET    | `/.well-known/jwks.json`                      | n/a                      | n/a              | unguarded (public) |
+| POST   | `/v1/admin/sso/configs`                       | `tenant.sso.configure`   | `Tenant::"*"`    | WRITE_GUARD (Plan #6 Task 5) |
+| PATCH  | `/v1/admin/sso/configs/{id}`                  | `tenant.sso.configure`   | `Tenant::"*"`    | WRITE_GUARD (Plan #6 Task 5) |
+| DELETE | `/v1/admin/sso/configs/{id}`                  | `tenant.sso.configure`   | `Tenant::"*"`    | WRITE_GUARD (Plan #6 Task 5) |
+| GET    | `/v1/admin/sso/configs`                       | `tenant.sso.configure`   | `Tenant::"*"`    | WRITE_GUARD (Plan #6 Task 5) |
+| GET    | `/v1/auth/oidc/{tenant_slug}/start`           | n/a                      | n/a              | unguarded (public; signed-state JWT is the credential) |
+| GET    | `/v1/auth/oidc/{tenant_slug}/callback`        | n/a                      | n/a              | unguarded (public; IdP ID-token is the credential) |
 
 ## Notes
 

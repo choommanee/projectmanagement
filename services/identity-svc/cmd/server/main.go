@@ -93,12 +93,15 @@ func main() {
 	resetTTL := parseDurEnv("PASSWORD_RESET_TTL", time.Hour)
 	resetLinkURL := envOr("PASSWORD_RESET_LINK_URL", "http://localhost:3000/reset-password?token=")
 	mfaMasterKey := os.Getenv("MFA_MASTER_KEY")
+	ssoMasterKey := os.Getenv("SSO_MASTER_KEY")
+	webURL := envOr("WEB_URL", "http://localhost:3000")
 	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
 		WithRefreshTokens(tokens, refreshTTL).
 		WithMFA(mfaEnrollments)
 	refresh := service.NewRefresh(users, tokens, signer, pub)
 	mailer := service.NewLogMailer()
 	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL)
+	ssoConfigs := store.NewSSOConfigs(p)
 
 	// MFA service is OPTIONAL at boot: an empty MFA_MASTER_KEY skips the
 	// endpoints entirely so dev environments without an externally-supplied
@@ -117,8 +120,22 @@ func main() {
 		log.Warn().Msg("MFA_MASTER_KEY not set — /v1/auth/mfa/* endpoints disabled")
 	}
 
+	// OIDC service is OPTIONAL at boot: an empty SSO_MASTER_KEY skips the
+	// federation endpoints entirely so dev environments without an externally
+	// supplied key still come up. Production MUST set the key.
+	var oidcSvc *service.OIDC
+	if ssoMasterKey != "" {
+		o, err := service.NewOIDC(ssoConfigs, users, auth, p, ssoMasterKey, webURL, pub)
+		if err != nil {
+			log.Fatal().Err(err).Msg("oidc init failed")
+		}
+		oidcSvc = o
+	} else {
+		log.Warn().Msg("SSO_MASTER_KEY not set — /v1/auth/oidc/* and /v1/admin/sso/* endpoints disabled")
+	}
+
 	var _ libauth.Authorizer = authz // compile-time interface check
-	h := api.NewRouterFull(auth, refresh, passwordReset, mfaSvc, kp, keyStore, issuer, authz, authz, p)
+	h := api.NewRouterFullWithOIDC(auth, refresh, passwordReset, mfaSvc, oidcSvc, kp, keyStore, issuer, authz, authz, p)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).
