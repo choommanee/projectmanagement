@@ -95,7 +95,8 @@ func parseEntityUID(s string) (cedartypes.EntityUID, error) {
 }
 
 // buildContext converts a map[string]any into a Cedar Record.
-// Only string values are supported for now; other types are ignored.
+// Supports strings, booleans, integers, and []string (mapped to Cedar Set
+// of strings so policies can write `context.roles.contains("platform-admin")`).
 func buildContext(m map[string]any) (cedartypes.Record, error) {
 	rm := make(cedartypes.RecordMap, len(m))
 	for k, v := range m {
@@ -108,6 +109,12 @@ func buildContext(m map[string]any) (cedartypes.Record, error) {
 			rm[cedartypes.String(k)] = cedartypes.Long(val)
 		case int64:
 			rm[cedartypes.String(k)] = cedartypes.Long(val)
+		case []string:
+			items := make([]cedartypes.Value, 0, len(val))
+			for _, s := range val {
+				items = append(items, cedartypes.String(s))
+			}
+			rm[cedartypes.String(k)] = cedartypes.NewSet(items...)
 		default:
 			// Skip unsupported types rather than failing.
 		}

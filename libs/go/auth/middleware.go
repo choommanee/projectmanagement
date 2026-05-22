@@ -49,3 +49,11 @@ func FromCtx(ctx context.Context) (*ParsedClaims, bool) {
     c, ok := ctx.Value(claimsKey).(*ParsedClaims)
     return c, ok
 }
+
+// WithClaims returns a copy of ctx with the given parsed claims attached
+// under the same context key Require uses. Callers that need to verify a
+// token outside the Require middleware (e.g. dynamic-JWKS verification)
+// should use this helper so downstream FromCtx / MustFromCtx still work.
+func WithClaims(ctx context.Context, c *ParsedClaims) context.Context {
+    return context.WithValue(ctx, claimsKey, c)
+}

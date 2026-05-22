@@ -17,12 +17,6 @@ import (
 	"github.com/pmplatform/services/identity-svc/internal/service"
 )
 
-// AdminRotateRole is the role required to call POST /v1/admin/keys/rotate.
-// TODO(cedar): replace the hardcoded role check with a Cedar policy lookup
-// (see internal/policy) once the Cedar policy set for platform admin actions
-// is wired into identity-svc startup.
-const AdminRotateRole = "platform-admin"
-
 // NewRouter wires the identity-svc HTTP surface.
 //
 // store is used to publish the JWKS, including any rotated-out keys still
@@ -32,7 +26,11 @@ const AdminRotateRole = "platform-admin"
 // issuer is the JWT iss claim used to build per-request verifiers for the
 // admin endpoint. When issuer is empty or store is nil, the admin endpoint
 // is omitted so it can never be reached unauthenticated.
-func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer string) http.Handler {
+//
+// authz is the Cedar-backed authorizer used to gate admin endpoints. When
+// nil the admin routes are still mounted (auth required) but the action
+// check becomes a no-op — only the test setup does that intentionally.
+func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer string, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
@@ -46,7 +44,8 @@ func NewRouter(auth *service.Auth, kp *sjwt.KeyPair, store *sjwt.Store, issuer s
 			// so admin tokens signed by the freshly-rotated key still verify
 			// without restarting the service.
 			pr.Use(requireBearerDynamic(store, issuer))
-			pr.Use(requireRole(AdminRotateRole))
+			// Cedar replaces the previous hardcoded role check.
+			pr.Use(libauth.RequireAction(authz, "jwt.rotate", "*"))
 			pr.Post("/v1/admin/keys/rotate", rotateKeys(store))
 		})
 	}
@@ -157,31 +156,6 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 
 func writeErr(w http.ResponseWriter, code int, err error) {
 	writeJSON(w, code, map[string]string{"error": err.Error()})
-}
-
-// requireRole rejects requests whose JWT claims do not include the given
-// role. Must be mounted AFTER libauth.Require so claims are present in ctx.
-//
-// This is the interim gate for admin endpoints; replace with Cedar policy
-// evaluation (see internal/policy) when the platform-admin policy set is
-// loaded at startup.
-func requireRole(role string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c, ok := libauth.FromCtx(r.Context())
-			if !ok || c == nil {
-				http.Error(w, "missing claims", http.StatusUnauthorized)
-				return
-			}
-			for _, have := range c.Roles {
-				if have == role {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-			http.Error(w, "forbidden", http.StatusForbidden)
-		})
-	}
 }
 
 type rotateReq struct {

@@ -68,7 +68,7 @@ func setup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, func()) {
 	// nil Store -> JWKS handler falls back to the in-memory keypair so tests
 	// remain insulated from the DB-backed signing_key row. Empty issuer
 	// disables the admin rotate endpoint (covered by rotation integration tests).
-	h := NewRouter(auth, kp, nil, "")
+	h := NewRouter(auth, kp, nil, "", nil)
 	cleanup := func() {
 		p.Exec(context.Background(), "DELETE FROM tenant WHERE id=$1", tid)
 		p.Close()

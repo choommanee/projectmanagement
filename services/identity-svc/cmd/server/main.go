@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,10 +13,12 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/pmplatform/libs/go/audit"
+	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
 
 	"github.com/pmplatform/services/identity-svc/internal/api"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
+	"github.com/pmplatform/services/identity-svc/internal/policy"
 	"github.com/pmplatform/services/identity-svc/internal/service"
 	"github.com/pmplatform/services/identity-svc/internal/store"
 )
@@ -26,6 +29,8 @@ func main() {
 	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
 	kid := envOr("JWT_KID", "kid-dev-1")
 	natsURL := envOr("NATS_URL", "nats://localhost:4222")
+	policyPath := os.Getenv("POLICY_BUNDLE_PATH") // empty -> embedded bundle
+	rotationInterval := parseDurEnv("JWT_ROTATION_INTERVAL", 0)
 
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -49,6 +54,14 @@ func main() {
 	// rotation via POST /v1/admin/keys/rotate takes effect immediately.
 	signer := jwt.NewDynamicSigner(keyStore, issuer)
 
+	// Cedar policy bundle: required at boot so authz decisions are explicit
+	// rather than implicitly deny-all on a misconfiguration.
+	eng, err := policy.LoadBundle(policyPath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("load policy bundle")
+	}
+	authz := policy.Adapter{E: eng}
+
 	// PG publisher always works — direct Postgres write, no NATS dependency.
 	pgPub := audit.NewPgPublisher(p, "identity-svc")
 
@@ -69,8 +82,23 @@ func main() {
 	pub := audit.NewFallback(natsFn, pgPub.Publish)
 
 	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
-	h := api.NewRouter(auth, kp, keyStore, issuer)
+	var _ libauth.Authorizer = authz // compile-time interface check
+	h := api.NewRouter(auth, kp, keyStore, issuer, authz)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+
+	// Top-level cancellable context for background workers (rotation scheduler).
+	rootCtx, cancelRoot := context.WithCancel(context.Background())
+	defer cancelRoot()
+
+	// JWT auto-rotation scheduler: optional. When the interval is 0 we
+	// skip starting the goroutine entirely so dev environments don't
+	// silently mint keys behind your back.
+	if rotationInterval > 0 {
+		go runRotationScheduler(rootCtx, keyStore, rotationInterval)
+		log.Info().Dur("interval", rotationInterval).Msg("jwt rotation scheduler enabled")
+	} else {
+		log.Info().Msg("jwt rotation scheduler disabled (JWT_ROTATION_INTERVAL=0)")
+	}
 
 	go func() {
 		log.Info().Str("addr", srv.Addr).Msg("identity-svc listening")
@@ -82,9 +110,35 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
+	cancelRoot()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(ctx)
+}
+
+// runRotationScheduler ticks every interval and rotates the active JWT
+// signing key. The ticker honors ctx so SIGTERM stops it cleanly.
+//
+// Auto-rotation uses a deterministic kid pattern "auto-<UTC-timestamp>"
+// so operators can grep audit logs / signing_key for which rotations
+// happened on a schedule vs. via the admin endpoint.
+func runRotationScheduler(ctx context.Context, ks *jwt.Store, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			_, prev := ks.CurrentKey()
+			newKid := fmt.Sprintf("auto-%s", time.Now().UTC().Format("20060102T150405"))
+			if _, err := ks.Rotate(ctx, newKid); err != nil {
+				log.Error().Err(err).Str("new_kid", newKid).Str("prev_kid", prev).Msg("auto rotation failed")
+				continue
+			}
+			log.Info().Str("new_kid", newKid).Str("prev_kid", prev).Msg("auto rotated jwt signing key")
+		}
+	}
 }
 
 func envOr(k, def string) string {
@@ -92,4 +146,20 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// parseDurEnv reads a Go duration string from env (e.g. "24h", "30m").
+// "" or "0" -> 0 (scheduler disabled). On parse error we return 0 and log
+// a warning rather than refusing to boot.
+func parseDurEnv(k string, def time.Duration) time.Duration {
+	v := os.Getenv(k)
+	if v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		log.Warn().Err(err).Str("env", k).Str("value", v).Msg("invalid duration; using default")
+		return def
+	}
+	return d
 }
