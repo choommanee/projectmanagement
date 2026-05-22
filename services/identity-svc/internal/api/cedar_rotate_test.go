@@ -11,9 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	libpolicy "github.com/pmplatform/libs/policy"
 
 	sjwt "github.com/pmplatform/services/identity-svc/internal/jwt"
-	"github.com/pmplatform/services/identity-svc/internal/policy"
 )
 
 // rotatePool prefers the project-native dev DB but honors TEST_DATABASE_URL.
@@ -75,12 +75,12 @@ func TestCedarGatesRotate_AllowsPlatformAdmin(t *testing.T) {
 		t.Fatalf("refresh: %v", err)
 	}
 
-	eng, err := policy.LoadBundle("")
+	ps, err := libpolicy.LoadShared()
 	if err != nil {
 		t.Fatal(err)
 	}
 	issuer := "http://test/" + kid
-	h := NewRouter(nil, kp, ks, issuer, policy.Adapter{E: eng})
+	h := NewRouter(nil, kp, ks, issuer, &libpolicy.Adapter{Policies: ps})
 
 	tok := newSignedToken(t, ks, issuer, []string{"platform-admin"})
 
@@ -113,12 +113,12 @@ func TestCedarGatesRotate_Denies403WithoutAdminRole(t *testing.T) {
 		t.Fatalf("refresh: %v", err)
 	}
 
-	eng, err := policy.LoadBundle("")
+	ps, err := libpolicy.LoadShared()
 	if err != nil {
 		t.Fatal(err)
 	}
 	issuer := "http://test/" + kid
-	h := NewRouter(nil, kp, ks, issuer, policy.Adapter{E: eng})
+	h := NewRouter(nil, kp, ks, issuer, &libpolicy.Adapter{Policies: ps})
 
 	// User has roles, but none of them are platform-admin.
 	tok := newSignedToken(t, ks, issuer, []string{"project-manager", "dashboard-viewer"})

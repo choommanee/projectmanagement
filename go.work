@@ -9,6 +9,7 @@ use (
 	./libs/go/logger
 	./libs/go/nats
 	./libs/go/otel
+	./libs/policy
 	./services/_template
 	./services/audit-svc
 	./services/audit-worker

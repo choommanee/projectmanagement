@@ -15,10 +15,10 @@ import (
 	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
+	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/identity-svc/internal/api"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
-	"github.com/pmplatform/services/identity-svc/internal/policy"
 	"github.com/pmplatform/services/identity-svc/internal/service"
 	"github.com/pmplatform/services/identity-svc/internal/store"
 )
@@ -29,7 +29,6 @@ func main() {
 	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
 	kid := envOr("JWT_KID", "kid-dev-1")
 	natsURL := envOr("NATS_URL", "nats://localhost:4222")
-	policyPath := os.Getenv("POLICY_BUNDLE_PATH") // empty -> embedded bundle
 	rotationInterval := parseDurEnv("JWT_ROTATION_INTERVAL", 0)
 
 	p, err := pgxpool.New(context.Background(), dsn)
@@ -55,12 +54,13 @@ func main() {
 	signer := jwt.NewDynamicSigner(keyStore, issuer)
 
 	// Cedar policy bundle: required at boot so authz decisions are explicit
-	// rather than implicitly deny-all on a misconfiguration.
-	eng, err := policy.LoadBundle(policyPath)
+	// rather than implicitly deny-all on a misconfiguration. The shared
+	// bundle lives in libs/policy; POLICY_BUNDLE_PATH overrides the embed.
+	ps, err := libpolicy.LoadShared()
 	if err != nil {
 		log.Fatal().Err(err).Msg("load policy bundle")
 	}
-	authz := policy.Adapter{E: eng}
+	authz := &libpolicy.Adapter{Policies: ps}
 
 	// PG publisher always works — direct Postgres write, no NATS dependency.
 	pgPub := audit.NewPgPublisher(p, "identity-svc")

@@ -11,6 +11,7 @@ require (
 	github.com/pmplatform/libs/go/audit v0.0.0
 	github.com/pmplatform/libs/go/auth v0.0.0
 	github.com/pmplatform/libs/go/nats v0.0.0
+	github.com/pmplatform/libs/policy v0.0.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/crypto v0.51.0
 )
@@ -43,4 +44,5 @@ replace (
 	github.com/pmplatform/libs/go/audit => ../../libs/go/audit
 	github.com/pmplatform/libs/go/auth => ../../libs/go/auth
 	github.com/pmplatform/libs/go/nats => ../../libs/go/nats
+	github.com/pmplatform/libs/policy => ../../libs/policy
 )
