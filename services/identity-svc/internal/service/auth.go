@@ -85,10 +85,15 @@ func (a *Auth) Login(ctx context.Context, in LoginInput) (*TokenPair, error) {
 		return nil, err
 	}
 
+	roles, err := a.users.RolesForUser(ctx, u.TenantID, u.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	access, err := a.signer.Sign(libauth.Claims{
 		Subject:  u.ID.String(),
 		TenantID: u.TenantID.String(),
-		Roles:    []string{},
+		Roles:    roles,
 		TTL:      15 * time.Minute,
 	})
 	if err != nil {

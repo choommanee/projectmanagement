@@ -61,6 +61,67 @@ func TestCreateAndFindUser(t *testing.T) {
 	}
 }
 
+func TestRolesForUser(t *testing.T) {
+	p := pool(t)
+	defer p.Close()
+	ctx := context.Background()
+	tid := makeTenant(t, p)
+	defer p.Exec(ctx, "DELETE FROM tenant WHERE id=$1", tid)
+
+	s := NewUsers(p)
+	pw, _ := domain.HashPassword("StrongPass1!")
+	uid := uuid.New()
+	u := &domain.User{
+		ID: uid, TenantID: tid,
+		Email:       "r-" + uuid.NewString()[:6] + "@test.com",
+		DisplayName: "R", Status: domain.StatusActive, PasswordHash: pw, Version: 1,
+	}
+	if err := s.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+
+	// User with no assignments → empty slice (not nil).
+	got, err := s.RolesForUser(ctx, tid, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Fatalf("expected empty slice, got %#v", got)
+	}
+
+	// Seed role + role_assignment under tenant RLS, then re-query.
+	roleID := uuid.New()
+	tx, err := p.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, "SET LOCAL app.current_tenant = '"+tid.String()+"'"); err != nil {
+		tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO role(id, tenant_id, name) VALUES ($1,$2,'platform-admin')`, roleID, tid); err != nil {
+		tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO role_assignment(tenant_id, user_id, role_id) VALUES ($1,$2,$3)`, tid, uid, roleID); err != nil {
+		tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err = s.RolesForUser(ctx, tid, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "platform-admin" {
+		t.Fatalf("expected [platform-admin], got %#v", got)
+	}
+}
+
 func TestFindMissing(t *testing.T) {
 	p := pool(t)
 	defer p.Close()

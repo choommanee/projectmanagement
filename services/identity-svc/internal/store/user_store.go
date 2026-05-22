@@ -42,6 +42,37 @@ func (s *Users) Create(ctx context.Context, u *domain.User) error {
 	})
 }
 
+// RolesForUser returns the role names assigned to userID inside tenantID.
+// RLS is set via SET LOCAL app.current_tenant so policies on role_assignment /
+// role apply. Returns an empty slice (not nil) when the user has no
+// assignments, so JWT claims always serialize a JSON array.
+func (s *Users) RolesForUser(ctx context.Context, tid, userID uuid.UUID) ([]string, error) {
+	out := []string{}
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+            SELECT r.name
+              FROM role_assignment ra
+              JOIN role r ON r.id = ra.role_id
+             WHERE ra.tenant_id = $1 AND ra.user_id = $2`, tid, userID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				return err
+			}
+			out = append(out, name)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (s *Users) FindByEmail(ctx context.Context, tid uuid.UUID, email string) (*domain.User, error) {
 	var u domain.User
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {

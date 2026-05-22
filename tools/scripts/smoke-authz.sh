@@ -37,27 +37,24 @@
 #   PG_DSN                   postgres://app:app@localhost:5432/platform?sslmode=disable
 #   TEST_TENANT_SLUG         acme         (used to resolve tenant_id via tenant-svc)
 #   ADMIN_TOKEN              if set, bypass `/v1/login` for the admin role
+#                            (useful when using a dev signer with custom claims)
 #   USER_TOKEN               if set, bypass `/v1/login` for the user role
 #   RUN_POLICY_RELOAD        1 to additionally exercise POST /v1/admin/policy/reload
 #
 # === Known limitations ========================================================
 #
-# 1. As of commit `ad40235` identity-svc's `service.Auth.Login` mints JWTs with
-#    `roles: []` — it does NOT yet load role assignments from the
-#    `role_assignment` table. Until that gap closes (tracked for Plan #6
-#    Login-roles), tokens minted via /v1/login will fail the admin-pass
-#    assertion: Cedar denies because no permit matches an empty
-#    `context.roles`. For end-to-end validation today, export ADMIN_TOKEN /
-#    USER_TOKEN obtained from a dev signer that injects the desired roles
-#    claim. The non-admin (deny) side of the matrix is exercised correctly
-#    either way.
-#
-# 2. The running services must be the post–Plan-#4-Task-3 binaries
+# 1. The running services must be the post–Plan-#4-Task-3 binaries
 #    (`feat(*): wire Cedar RequireAction on write endpoints`). If you started
 #    a service before those commits, the route handlers run without the
 #    authz middleware and every user request will pass — meaning every deny
 #    assertion will FAIL with a non-403 status. Rebuild + restart each
 #    service before running this smoke (e.g. `go run ./services/mfg-svc/cmd/server`).
+#
+# 2. /v1/login now loads roles from `role_assignment` (Plan #6 Task 1), so
+#    minting tokens via ADMIN_EMAIL/ADMIN_PASSWORD requires that the admin
+#    user has a `platform-admin` role assignment seeded (see
+#    `tools/scripts/seed-demo.sh`). Without an assignment Cedar will deny the
+#    allow-side assertions even though authentication succeeds.
 
 set -euo pipefail
 
@@ -75,7 +72,7 @@ else
 fi
 
 usage() {
-  sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
