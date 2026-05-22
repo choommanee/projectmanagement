@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +19,10 @@ import (
 	"github.com/pmplatform/services/mfg-svc/internal/store"
 )
 
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the mfg-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -26,11 +31,23 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Item::"<id>", BOM::"<id>", WorkOrder::"<id>", etc. derived from
-// chi.URLParam) are a Plan #4 polish pass / Plan #6 ABAC follow-up — the
-// ADR rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): every write route with
+// an id in the path now uses RequireActionScoped against the matching
+// Cedar entity (Item::{:id}, BOM::{:id}, BOMLine::{:id}, Routing::{:id},
+// RoutingOp::{:id}, WorkCenter::{:id}, WorkOrder::{:id}, Lot::{:id}). The
+// CedarLoader resolves each id to {tenant_id} from the matching table.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires mfg-svc with an optional Cedar loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -41,70 +58,76 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// UOMs
 		r.Get("/uoms", listUOMs(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.uom.create", "*")).Post("/uoms", createUOM(svc))
 		r.Get("/uoms/{id}", getUOM(svc))
 
 		// Items
 		r.Get("/items", listItems(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.item.create", "*")).Post("/items", createItem(svc))
 		r.Get("/items/{id}", getItem(svc))
-		r.With(libauth.RequireAction(authz, "mfg.item.update", "*")).Patch("/items/{id}", updateItem(svc))
-		r.With(libauth.RequireAction(authz, "mfg.item.delete", "*")).Delete("/items/{id}", deleteItem(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.item.update", "Item::{:id}", loaderOpts...)).Patch("/items/{id}", updateItem(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.item.delete", "Item::{:id}", loaderOpts...)).Delete("/items/{id}", deleteItem(svc))
 
-		// BOM nested under item
+		// BOM nested under item — resource is the parent Item.
 		r.Get("/items/{id}/boms", listBOMs(svc))
-		r.With(libauth.RequireAction(authz, "mfg.bom.create", "*")).Post("/items/{id}/boms", createBOM(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.create", "Item::{:id}", loaderOpts...)).Post("/items/{id}/boms", createBOM(svc))
 		r.Get("/items/{id}/bom/explode", explodeBOM(svc))
 
 		// Lots nested under item
 		r.Get("/items/{id}/lots", listLots(svc))
 
-		// Routings nested under item
+		// Routings nested under item — resource is the parent Item.
 		r.Get("/items/{id}/routings", listRoutings(svc))
-		r.With(libauth.RequireAction(authz, "mfg.routing.create", "*")).Post("/items/{id}/routings", createRouting(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.routing.create", "Item::{:id}", loaderOpts...)).Post("/items/{id}/routings", createRouting(svc))
 
 		// Work Centers
 		r.Get("/work-centers", listWorkCenters(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.work_center.create", "*")).Post("/work-centers", createWorkCenter(svc))
 		r.Get("/work-centers/{id}", getWorkCenter(svc))
-		r.With(libauth.RequireAction(authz, "mfg.work_center.update", "*")).Patch("/work-centers/{id}", updateWorkCenter(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.work_center.update", "WorkCenter::{:id}", loaderOpts...)).Patch("/work-centers/{id}", updateWorkCenter(svc))
 
 		// BOM standalone
 		r.Get("/boms/{id}", getBOM(svc))
-		r.With(libauth.RequireAction(authz, "mfg.bom.update", "*")).Patch("/boms/{id}", updateBOM(svc))
-		r.With(libauth.RequireAction(authz, "mfg.bom.add_line", "*")).Post("/boms/{id}/lines", addBOMLine(svc))
-		r.With(libauth.RequireAction(authz, "mfg.bom.activate", "*")).Post("/boms/{id}/activate", activateBOM(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.update", "BOM::{:id}", loaderOpts...)).Patch("/boms/{id}", updateBOM(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.add_line", "BOM::{:id}", loaderOpts...)).Post("/boms/{id}/lines", addBOMLine(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.activate", "BOM::{:id}", loaderOpts...)).Post("/boms/{id}/activate", activateBOM(svc))
 
 		// BOM lines standalone
-		r.With(libauth.RequireAction(authz, "mfg.bom.update_line", "*")).Patch("/bom-lines/{id}", updateBOMLine(svc))
-		r.With(libauth.RequireAction(authz, "mfg.bom.delete_line", "*")).Delete("/bom-lines/{id}", deleteBOMLine(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.update_line", "BOMLine::{:id}", loaderOpts...)).Patch("/bom-lines/{id}", updateBOMLine(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.bom.delete_line", "BOMLine::{:id}", loaderOpts...)).Delete("/bom-lines/{id}", deleteBOMLine(svc))
 
 		// Routings standalone
 		r.Get("/routings/{id}", getRouting(svc))
-		r.With(libauth.RequireAction(authz, "mfg.routing.update", "*")).Patch("/routings/{id}", updateRouting(svc))
-		r.With(libauth.RequireAction(authz, "mfg.routing.add_operation", "*")).Post("/routings/{id}/operations", addRoutingOp(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.routing.update", "Routing::{:id}", loaderOpts...)).Patch("/routings/{id}", updateRouting(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.routing.add_operation", "Routing::{:id}", loaderOpts...)).Post("/routings/{id}/operations", addRoutingOp(svc))
 
 		// Routing operations standalone
-		r.With(libauth.RequireAction(authz, "mfg.routing.update_operation", "*")).Patch("/routing-operations/{id}", updateRoutingOp(svc))
-		r.With(libauth.RequireAction(authz, "mfg.routing.delete_operation", "*")).Delete("/routing-operations/{id}", deleteRoutingOp(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.routing.update_operation", "RoutingOp::{:id}", loaderOpts...)).Patch("/routing-operations/{id}", updateRoutingOp(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.routing.delete_operation", "RoutingOp::{:id}", loaderOpts...)).Delete("/routing-operations/{id}", deleteRoutingOp(svc))
 
 		// Work Orders
 		r.Get("/work-orders", listWorkOrders(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.work_order.create", "*")).Post("/work-orders", createWorkOrder(svc))
 		r.Get("/work-orders/{id}", getWorkOrder(svc))
-		r.With(libauth.RequireAction(authz, "mfg.work_order.update", "*")).Patch("/work-orders/{id}", updateWorkOrder(svc))
-		r.With(libauth.RequireAction(authz, "mfg.work_order.delete", "*")).Delete("/work-orders/{id}", deleteWorkOrder(svc))
-		r.With(libauth.RequireAction(authz, "mfg.work_order.release", "*")).Post("/work-orders/{id}/release", releaseWorkOrder(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.work_order.update", "WorkOrder::{:id}", loaderOpts...)).Patch("/work-orders/{id}", updateWorkOrder(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.work_order.delete", "WorkOrder::{:id}", loaderOpts...)).Delete("/work-orders/{id}", deleteWorkOrder(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.work_order.release", "WorkOrder::{:id}", loaderOpts...)).Post("/work-orders/{id}/release", releaseWorkOrder(svc))
 		r.Get("/work-orders/{id}/operations", listWOOperations(svc))
 		r.Get("/work-orders/{id}/materials", listWOMaterials(svc))
 
 		// Lots standalone
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.lot.create", "*")).Post("/lots", createLot(svc))
-		r.With(libauth.RequireAction(authz, "mfg.lot.update_status", "*")).Patch("/lots/{id}/status", updateLotStatus(svc))
-		r.With(libauth.RequireAction(authz, "mfg.lot.add_genealogy", "*")).Post("/lots/{id}/genealogy", addLotGenealogy(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.lot.update_status", "Lot::{:id}", loaderOpts...)).Patch("/lots/{id}/status", updateLotStatus(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.lot.add_genealogy", "Lot::{:id}", loaderOpts...)).Post("/lots/{id}/genealogy", addLotGenealogy(svc))
 		r.Get("/lots/{id}/trace", traceLot(svc))
 
 		// MRP
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.mrp.run", "*")).Post("/mrp/runs", createMRPRun(svc))
 		r.Get("/mrp/runs", listMRPRuns(svc))
 		r.Get("/mrp/runs/{id}", getMRPRun(svc))

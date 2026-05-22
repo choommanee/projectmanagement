@@ -97,6 +97,20 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	return api.NewRouter(svc, authz)
 }
 
+// newCedarHandlerWithLoader wires the production CedarLoader so per-instance
+// scoping tests evaluate the real ABAC envelope.
+func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
+	items := store.NewItems(p)
+	wcs := store.NewWorkCenters(p)
+	boms := store.NewBOMs(p)
+	routings := store.NewRoutings(p)
+	workOrders := store.NewWorkOrders(p, boms)
+	mrp := store.NewMRP(p)
+	genealogy := store.NewGenealogy(p)
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, "http://localhost:19999", "http://localhost:19998")
+	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
+}
+
 func TestCedarGatesItemCreate_AllowsMfgOperator(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
@@ -131,6 +145,62 @@ func TestCedarGatesItemCreate_AllowsMfgOperator(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("want 201 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarPerInstanceItemUpdate_AllowsSameTenant exercises the Plan #6
+// Task 6 per-instance ABAC scope: a tenant-admin updating an item that
+// belongs to their tenant must not be 403'd by the scoped middleware.
+func TestCedarPerInstanceItemUpdate_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+	uomID := seedCedarUOM(t, p, tid)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-mfg-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"tenant-admin"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	// Seed an item.
+	itemID := uuid.New()
+	tx, err := p.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO item(id,tenant_id,code,name,type,uom_id,version) VALUES ($1,$2,$3,$4,'finished',$5,1)`,
+		itemID, tid, "ABAC-IT-"+uuid.NewString()[:6], "ABAC Item", uomID); e != nil {
+		t.Fatalf("seed item: %v", e)
+	}
+	if e := tx.Commit(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM item WHERE id=$1", itemID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed", "version": 1})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/items/"+itemID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant update: %s", rec.Body.String())
 	}
 }
 
