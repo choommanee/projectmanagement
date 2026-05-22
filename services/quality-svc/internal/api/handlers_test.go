@@ -75,7 +75,7 @@ func seedTestItem(t *testing.T, p *pgxpool.Pool, tid uuid.UUID) uuid.UUID {
 
 func TestHandler_Healthz(t *testing.T) {
 	svc, _ := setupSvc(t)
-	h := api.NewRouter(svc)
+	h := api.NewRouter(svc, nil)
 
 	req := httptest.NewRequest("GET", "/healthz", nil)
 	w := httptest.NewRecorder()
@@ -95,7 +95,7 @@ func TestHandler_Healthz(t *testing.T) {
 
 func TestHandler_MissingTenant(t *testing.T) {
 	svc, _ := setupSvc(t)
-	h := api.NewRouter(svc)
+	h := api.NewRouter(svc, nil)
 
 	req := httptest.NewRequest("GET", "/v1/apqp", nil)
 	w := httptest.NewRecorder()
@@ -108,7 +108,7 @@ func TestHandler_MissingTenant(t *testing.T) {
 
 func TestHandler_PPAPCreateAndListElements(t *testing.T) {
 	svc, p := setupSvc(t)
-	h := api.NewRouter(svc)
+	h := api.NewRouter(svc, nil)
 	tid := seedTestTenant(t, p)
 	itemID := seedTestItem(t, p, tid)
 

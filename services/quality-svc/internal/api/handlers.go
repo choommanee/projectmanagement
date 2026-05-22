@@ -11,12 +11,26 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/quality-svc/internal/domain"
 	"github.com/pmplatform/services/quality-svc/internal/service"
 	"github.com/pmplatform/services/quality-svc/internal/store"
 )
 
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the quality-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (APQP::"<id>", PPAP::"<id>", FMEA::"<id>", ControlPlan::"<id>", NCR::"<id>",
+// CAPA::"<id>", etc. derived from chi.URLParam) are a Plan #4 polish pass /
+// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -27,54 +41,54 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// APQP
 		r.Get("/apqp", listAPQP(svc))
-		r.Post("/apqp", createAPQP(svc))
+		r.With(libauth.RequireAction(authz, "quality.apqp.create", "*")).Post("/apqp", createAPQP(svc))
 		r.Get("/apqp/{id}", getAPQP(svc))
-		r.Patch("/apqp/{id}", updateAPQP(svc))
-		r.Delete("/apqp/{id}", deleteAPQP(svc))
+		r.With(libauth.RequireAction(authz, "quality.apqp.update", "*")).Patch("/apqp/{id}", updateAPQP(svc))
+		r.With(libauth.RequireAction(authz, "quality.apqp.delete", "*")).Delete("/apqp/{id}", deleteAPQP(svc))
 
 		// PPAP
 		r.Get("/ppap", listPPAP(svc))
-		r.Post("/ppap", createPPAP(svc))
+		r.With(libauth.RequireAction(authz, "quality.ppap.create", "*")).Post("/ppap", createPPAP(svc))
 		r.Get("/ppap/{id}", getPPAP(svc))
-		r.Patch("/ppap/{id}", updatePPAP(svc))
-		r.Delete("/ppap/{id}", deletePPAP(svc))
+		r.With(libauth.RequireAction(authz, "quality.ppap.update", "*")).Patch("/ppap/{id}", updatePPAP(svc))
+		r.With(libauth.RequireAction(authz, "quality.ppap.delete", "*")).Delete("/ppap/{id}", deletePPAP(svc))
 		r.Get("/ppap/{id}/elements", listPPAPElements(svc))
-		r.Patch("/ppap-elements/{id}", updatePPAPElement(svc))
+		r.With(libauth.RequireAction(authz, "quality.ppap.update_element", "*")).Patch("/ppap-elements/{id}", updatePPAPElement(svc))
 
 		// FMEA
 		r.Get("/fmea", listFMEA(svc))
-		r.Post("/fmea", createFMEA(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.create", "*")).Post("/fmea", createFMEA(svc))
 		r.Get("/fmea/{id}", getFMEA(svc))
-		r.Patch("/fmea/{id}", updateFMEA(svc))
-		r.Delete("/fmea/{id}", deleteFMEA(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.update", "*")).Patch("/fmea/{id}", updateFMEA(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.delete", "*")).Delete("/fmea/{id}", deleteFMEA(svc))
 		r.Get("/fmea/{id}/modes", listFMEAModes(svc))
-		r.Post("/fmea/{id}/modes", addFMEAMode(svc))
-		r.Patch("/fmea-modes/{id}", updateFMEAMode(svc))
-		r.Delete("/fmea-modes/{id}", deleteFMEAMode(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.add_mode", "*")).Post("/fmea/{id}/modes", addFMEAMode(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.update_mode", "*")).Patch("/fmea-modes/{id}", updateFMEAMode(svc))
+		r.With(libauth.RequireAction(authz, "quality.fmea.delete_mode", "*")).Delete("/fmea-modes/{id}", deleteFMEAMode(svc))
 
 		// Control Plans
 		r.Get("/control-plans", listControlPlans(svc))
-		r.Post("/control-plans", createControlPlan(svc))
+		r.With(libauth.RequireAction(authz, "quality.control_plan.create", "*")).Post("/control-plans", createControlPlan(svc))
 		r.Get("/control-plans/{id}", getControlPlan(svc))
-		r.Patch("/control-plans/{id}", updateControlPlan(svc))
+		r.With(libauth.RequireAction(authz, "quality.control_plan.update", "*")).Patch("/control-plans/{id}", updateControlPlan(svc))
 		r.Get("/control-plans/{id}/characteristics", listCharacteristics(svc))
-		r.Post("/control-plans/{id}/characteristics", addCharacteristic(svc))
-		r.Patch("/control-plan-chars/{id}", updateCharacteristic(svc))
-		r.Delete("/control-plan-chars/{id}", deleteCharacteristic(svc))
+		r.With(libauth.RequireAction(authz, "quality.control_plan.add_characteristic", "*")).Post("/control-plans/{id}/characteristics", addCharacteristic(svc))
+		r.With(libauth.RequireAction(authz, "quality.control_plan.update_characteristic", "*")).Patch("/control-plan-chars/{id}", updateCharacteristic(svc))
+		r.With(libauth.RequireAction(authz, "quality.control_plan.delete_characteristic", "*")).Delete("/control-plan-chars/{id}", deleteCharacteristic(svc))
 
 		// Inspections
 		r.Get("/inspections", listInspections(svc))
-		r.Post("/inspections", createInspection(svc))
+		r.With(libauth.RequireAction(authz, "quality.inspection.create", "*")).Post("/inspections", createInspection(svc))
 		r.Get("/inspections/{id}", getInspection(svc))
 
 		// NCRs
 		r.Get("/ncrs", listNCRs(svc))
-		r.Post("/ncrs", createNCR(svc))
+		r.With(libauth.RequireAction(authz, "quality.ncr.create", "*")).Post("/ncrs", createNCR(svc))
 		r.Get("/ncrs/{id}", getNCR(svc))
-		r.Patch("/ncrs/{id}", updateNCR(svc))
-		r.Post("/ncrs/{id}/capa", createCAPA(svc))
+		r.With(libauth.RequireAction(authz, "quality.ncr.update", "*")).Patch("/ncrs/{id}", updateNCR(svc))
+		r.With(libauth.RequireAction(authz, "quality.ncr.create_capa", "*")).Post("/ncrs/{id}/capa", createCAPA(svc))
 		r.Get("/ncrs/{id}/capa", listCAPA(svc))
-		r.Patch("/capa/{id}", updateCAPA(svc))
+		r.With(libauth.RequireAction(authz, "quality.capa.update", "*")).Patch("/capa/{id}", updateCAPA(svc))
 	})
 
 	return r

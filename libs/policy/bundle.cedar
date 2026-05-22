@@ -115,6 +115,45 @@ when {
   context.roles.contains("mfg-operator")
 };
 
+// Quality: tenant-admin and quality-engineer may write across the quality
+// surface (APQP, PPAP, FMEA, control plans, inspections, NCRs, CAPA).
+// Per-instance scoping (APQP::"<id>", PPAP::"<id>", FMEA::"<id>",
+// ControlPlan::"<id>", NCR::"<id>", CAPA::"<id>", etc.) is a Plan #4 polish /
+// Plan #6 ABAC follow-up; for now the action grid uses resource "*".
+permit (
+  principal,
+  action in [
+    Action::"quality.apqp.create",
+    Action::"quality.apqp.update",
+    Action::"quality.apqp.delete",
+    Action::"quality.ppap.create",
+    Action::"quality.ppap.update",
+    Action::"quality.ppap.delete",
+    Action::"quality.ppap.update_element",
+    Action::"quality.fmea.create",
+    Action::"quality.fmea.update",
+    Action::"quality.fmea.delete",
+    Action::"quality.fmea.add_mode",
+    Action::"quality.fmea.update_mode",
+    Action::"quality.fmea.delete_mode",
+    Action::"quality.control_plan.create",
+    Action::"quality.control_plan.update",
+    Action::"quality.control_plan.add_characteristic",
+    Action::"quality.control_plan.update_characteristic",
+    Action::"quality.control_plan.delete_characteristic",
+    Action::"quality.inspection.create",
+    Action::"quality.ncr.create",
+    Action::"quality.ncr.update",
+    Action::"quality.ncr.create_capa",
+    Action::"quality.capa.update"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("quality-engineer")
+};
+
 // Dashboards: viewer can read, editor can write.
 permit (
   principal,
