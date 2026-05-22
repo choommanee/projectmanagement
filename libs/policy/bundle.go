@@ -163,8 +163,46 @@ func (a *Adapter) IsAllowed(r libauth.AuthzRequest) (bool, error) {
 		Context:   ctx,
 	}
 	entities := cedartypes.EntityMap{}
+	// Register the resource as an entity carrying its loaded attributes so
+	// policies can express ABAC predicates like
+	// `when { resource.tenant_id == context.tenant_id }`. The principal entity
+	// is registered too so policies can read `principal.id` etc.
+	if len(r.ResourceAttrs) > 0 {
+		attrs, attrErr := buildRecord(r.ResourceAttrs)
+		if attrErr != nil {
+			return false, fmt.Errorf("resource attrs: %w", attrErr)
+		}
+		entities[resource] = cedartypes.Entity{UID: resource, Attributes: attrs}
+	}
 	decision, _ := a.Policies.IsAuthorized(entities, req)
 	return decision == cedar.Allow, nil
+}
+
+// buildRecord converts a map[string]any into a Cedar Record suitable for use
+// as an Entity.Attributes value. Same value-kind coverage as buildContext.
+func buildRecord(m map[string]any) (cedartypes.Record, error) {
+	rm := make(cedartypes.RecordMap, len(m))
+	for k, v := range m {
+		switch val := v.(type) {
+		case string:
+			rm[cedartypes.String(k)] = cedartypes.String(val)
+		case bool:
+			rm[cedartypes.String(k)] = cedartypes.Boolean(val)
+		case int:
+			rm[cedartypes.String(k)] = cedartypes.Long(val)
+		case int64:
+			rm[cedartypes.String(k)] = cedartypes.Long(val)
+		case []string:
+			items := make([]cedartypes.Value, 0, len(val))
+			for _, s := range val {
+				items = append(items, cedartypes.String(s))
+			}
+			rm[cedartypes.String(k)] = cedartypes.NewSet(items...)
+		default:
+			// Skip unsupported types rather than failing.
+		}
+	}
+	return cedar.NewRecord(rm), nil
 }
 
 // stripComments removes Cedar `//` line comments so splitPolicies can scan
