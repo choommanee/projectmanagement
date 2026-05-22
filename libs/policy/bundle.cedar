@@ -154,6 +154,31 @@ when {
   context.roles.contains("quality-engineer")
 };
 
+// Workflow: tenant-admin and workflow-author may write across the workflow
+// surface (definitions, versions, publish, instances, human-task completion).
+// Per-instance scoping (Workflow::"<id>", WorkflowVersion::"<id>",
+// Instance::"<id>", HumanTask::"<id>") is a Plan #4 polish / Plan #6 ABAC
+// follow-up; for now the action grid uses resource "*".
+permit (
+  principal,
+  action in [
+    Action::"workflow.create",
+    Action::"workflow.update",
+    Action::"workflow.delete",
+    Action::"workflow.version.create",
+    Action::"workflow.publish",
+    Action::"workflow.instance.start",
+    Action::"workflow.instance.resume",
+    Action::"workflow.instance.cancel",
+    Action::"workflow.human_task.complete"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("workflow-author")
+};
+
 // Dashboards: viewer can read, editor can write.
 permit (
   principal,

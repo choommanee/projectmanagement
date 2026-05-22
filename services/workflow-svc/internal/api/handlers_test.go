@@ -64,11 +64,11 @@ func newTestApp(t *testing.T, pool *pgxpool.Pool, runtimeURL string) http.Handle
 		store.NewHumanTasks(pool),
 		runtimeURL,
 	)
-	return api.NewRouter(svc)
+	return api.NewRouter(svc, nil)
 }
 
 func TestHealthz(t *testing.T) {
-	app := api.NewRouter(nil)
+	app := api.NewRouter(nil, nil)
 	r := httptest.NewRequest("GET", "/healthz", nil)
 	w := httptest.NewRecorder()
 	app.ServeHTTP(w, r)
