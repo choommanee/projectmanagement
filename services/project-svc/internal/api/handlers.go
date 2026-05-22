@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +18,12 @@ import (
 	"github.com/pmplatform/services/project-svc/internal/store"
 )
 
+// initURLParam wires libauth.URLParam to chi.URLParam exactly once so the
+// scoped authz middleware can resolve `{:id}` placeholders.
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the project-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -25,11 +32,27 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Project::"<id>", Task::"<id>", Sprint::"<id>" derived from chi.URLParam)
-// are a Plan #4 polish pass / Plan #6 ABAC follow-up — the ADR rows document
-// the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): every write route with
+// an id in the path now uses RequireActionScoped against the matching
+// Cedar entity (`Project::{:id}`, `Task::{:id}`, `Sprint::{:id}`), and the
+// resource loader supplies tenant_id / owner_user from the project-svc
+// store. Create endpoints (no id at request time) keep RequireAction with
+// resource `*` and rely on the role-based permit + RLS for cross-tenant
+// protection.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires project-svc with an optional Cedar resource
+// loader. main.go wires NewCedarLoader; tests can pass nil to keep the
+// scoped middleware at the literal-template level.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -40,33 +63,38 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Projects
 		r.Get("/projects", listProjects(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "project.create", "*")).Post("/projects", createProject(svc))
 		r.Get("/projects/{id}", getProject(svc))
-		r.With(libauth.RequireAction(authz, "project.update", "*")).Patch("/projects/{id}", updateProject(svc))
-		r.With(libauth.RequireAction(authz, "project.delete", "*")).Delete("/projects/{id}", deleteProject(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.update", "Project::{:id}", loaderOpts...)).Patch("/projects/{id}", updateProject(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.delete", "Project::{:id}", loaderOpts...)).Delete("/projects/{id}", deleteProject(svc))
 
-		// Tasks under project
+		// Tasks under project — resource is the parent project so the
+		// loader returns the project's tenant_id (the new task will inherit it).
 		r.Get("/projects/{id}/tasks", listTasks(svc))
-		r.With(libauth.RequireAction(authz, "project.task.create", "*")).Post("/projects/{id}/tasks", createTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.create", "Project::{:id}", loaderOpts...)).Post("/projects/{id}/tasks", createTask(svc))
 
 		// Tasks standalone
 		r.Get("/tasks", listAllTasks(svc))
 		r.Get("/tasks/{id}", getTask(svc))
-		r.With(libauth.RequireAction(authz, "project.task.update", "*")).Patch("/tasks/{id}", updateTask(svc))
-		r.With(libauth.RequireAction(authz, "project.task.delete", "*")).Delete("/tasks/{id}", deleteTask(svc))
-		r.With(libauth.RequireAction(authz, "project.task.add_dependency", "*")).Post("/tasks/{id}/dependencies", addDependency(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).Patch("/tasks/{id}", updateTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.delete", "Task::{:id}", loaderOpts...)).Delete("/tasks/{id}", deleteTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.add_dependency", "Task::{:id}", loaderOpts...)).Post("/tasks/{id}/dependencies", addDependency(svc))
 
-		// Dependencies
+		// Dependencies — the row is keyed on the dependency id, which the
+		// loader doesn't model; keep RequireAction with "*" until a
+		// TaskDependency entity is added.
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "project.task.remove_dependency", "*")).Delete("/dependencies/{id}", removeDependency(svc))
 
 		// Sprints
 		r.Get("/projects/{id}/sprints", listSprints(svc))
-		r.With(libauth.RequireAction(authz, "project.sprint.create", "*")).Post("/projects/{id}/sprints", createSprint(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.sprint.create", "Project::{:id}", loaderOpts...)).Post("/projects/{id}/sprints", createSprint(svc))
 		r.Get("/sprints/{id}", getSprint(svc))
-		r.With(libauth.RequireAction(authz, "project.sprint.update", "*")).Patch("/sprints/{id}", updateSprint(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.sprint.update", "Sprint::{:id}", loaderOpts...)).Patch("/sprints/{id}", updateSprint(svc))
 		r.Get("/sprints/{id}/tasks", listSprintTasks(svc))
-		r.With(libauth.RequireAction(authz, "project.sprint.assign_task", "*")).Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
-		r.With(libauth.RequireAction(authz, "project.sprint.unassign_task", "*")).Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.sprint.assign_task", "Sprint::{:id}", loaderOpts...)).Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.sprint.unassign_task", "Sprint::{:id}", loaderOpts...)).Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
 	})
 
 	return r
