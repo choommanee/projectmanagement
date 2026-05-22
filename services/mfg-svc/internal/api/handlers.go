@@ -11,12 +11,26 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/mfg-svc/internal/domain"
 	"github.com/pmplatform/services/mfg-svc/internal/service"
 	"github.com/pmplatform/services/mfg-svc/internal/store"
 )
 
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the mfg-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (Item::"<id>", BOM::"<id>", WorkOrder::"<id>", etc. derived from
+// chi.URLParam) are a Plan #4 polish pass / Plan #6 ABAC follow-up — the
+// ADR rows document the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -27,19 +41,19 @@ func NewRouter(svc *service.Service) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// UOMs
 		r.Get("/uoms", listUOMs(svc))
-		r.Post("/uoms", createUOM(svc))
+		r.With(libauth.RequireAction(authz, "mfg.uom.create", "*")).Post("/uoms", createUOM(svc))
 		r.Get("/uoms/{id}", getUOM(svc))
 
 		// Items
 		r.Get("/items", listItems(svc))
-		r.Post("/items", createItem(svc))
+		r.With(libauth.RequireAction(authz, "mfg.item.create", "*")).Post("/items", createItem(svc))
 		r.Get("/items/{id}", getItem(svc))
-		r.Patch("/items/{id}", updateItem(svc))
-		r.Delete("/items/{id}", deleteItem(svc))
+		r.With(libauth.RequireAction(authz, "mfg.item.update", "*")).Patch("/items/{id}", updateItem(svc))
+		r.With(libauth.RequireAction(authz, "mfg.item.delete", "*")).Delete("/items/{id}", deleteItem(svc))
 
 		// BOM nested under item
 		r.Get("/items/{id}/boms", listBOMs(svc))
-		r.Post("/items/{id}/boms", createBOM(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.create", "*")).Post("/items/{id}/boms", createBOM(svc))
 		r.Get("/items/{id}/bom/explode", explodeBOM(svc))
 
 		// Lots nested under item
@@ -47,51 +61,51 @@ func NewRouter(svc *service.Service) http.Handler {
 
 		// Routings nested under item
 		r.Get("/items/{id}/routings", listRoutings(svc))
-		r.Post("/items/{id}/routings", createRouting(svc))
+		r.With(libauth.RequireAction(authz, "mfg.routing.create", "*")).Post("/items/{id}/routings", createRouting(svc))
 
 		// Work Centers
 		r.Get("/work-centers", listWorkCenters(svc))
-		r.Post("/work-centers", createWorkCenter(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_center.create", "*")).Post("/work-centers", createWorkCenter(svc))
 		r.Get("/work-centers/{id}", getWorkCenter(svc))
-		r.Patch("/work-centers/{id}", updateWorkCenter(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_center.update", "*")).Patch("/work-centers/{id}", updateWorkCenter(svc))
 
 		// BOM standalone
 		r.Get("/boms/{id}", getBOM(svc))
-		r.Patch("/boms/{id}", updateBOM(svc))
-		r.Post("/boms/{id}/lines", addBOMLine(svc))
-		r.Post("/boms/{id}/activate", activateBOM(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.update", "*")).Patch("/boms/{id}", updateBOM(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.add_line", "*")).Post("/boms/{id}/lines", addBOMLine(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.activate", "*")).Post("/boms/{id}/activate", activateBOM(svc))
 
 		// BOM lines standalone
-		r.Patch("/bom-lines/{id}", updateBOMLine(svc))
-		r.Delete("/bom-lines/{id}", deleteBOMLine(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.update_line", "*")).Patch("/bom-lines/{id}", updateBOMLine(svc))
+		r.With(libauth.RequireAction(authz, "mfg.bom.delete_line", "*")).Delete("/bom-lines/{id}", deleteBOMLine(svc))
 
 		// Routings standalone
 		r.Get("/routings/{id}", getRouting(svc))
-		r.Patch("/routings/{id}", updateRouting(svc))
-		r.Post("/routings/{id}/operations", addRoutingOp(svc))
+		r.With(libauth.RequireAction(authz, "mfg.routing.update", "*")).Patch("/routings/{id}", updateRouting(svc))
+		r.With(libauth.RequireAction(authz, "mfg.routing.add_operation", "*")).Post("/routings/{id}/operations", addRoutingOp(svc))
 
 		// Routing operations standalone
-		r.Patch("/routing-operations/{id}", updateRoutingOp(svc))
-		r.Delete("/routing-operations/{id}", deleteRoutingOp(svc))
+		r.With(libauth.RequireAction(authz, "mfg.routing.update_operation", "*")).Patch("/routing-operations/{id}", updateRoutingOp(svc))
+		r.With(libauth.RequireAction(authz, "mfg.routing.delete_operation", "*")).Delete("/routing-operations/{id}", deleteRoutingOp(svc))
 
 		// Work Orders
 		r.Get("/work-orders", listWorkOrders(svc))
-		r.Post("/work-orders", createWorkOrder(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_order.create", "*")).Post("/work-orders", createWorkOrder(svc))
 		r.Get("/work-orders/{id}", getWorkOrder(svc))
-		r.Patch("/work-orders/{id}", updateWorkOrder(svc))
-		r.Delete("/work-orders/{id}", deleteWorkOrder(svc))
-		r.Post("/work-orders/{id}/release", releaseWorkOrder(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_order.update", "*")).Patch("/work-orders/{id}", updateWorkOrder(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_order.delete", "*")).Delete("/work-orders/{id}", deleteWorkOrder(svc))
+		r.With(libauth.RequireAction(authz, "mfg.work_order.release", "*")).Post("/work-orders/{id}/release", releaseWorkOrder(svc))
 		r.Get("/work-orders/{id}/operations", listWOOperations(svc))
 		r.Get("/work-orders/{id}/materials", listWOMaterials(svc))
 
 		// Lots standalone
-		r.Post("/lots", createLot(svc))
-		r.Patch("/lots/{id}/status", updateLotStatus(svc))
-		r.Post("/lots/{id}/genealogy", addLotGenealogy(svc))
+		r.With(libauth.RequireAction(authz, "mfg.lot.create", "*")).Post("/lots", createLot(svc))
+		r.With(libauth.RequireAction(authz, "mfg.lot.update_status", "*")).Patch("/lots/{id}/status", updateLotStatus(svc))
+		r.With(libauth.RequireAction(authz, "mfg.lot.add_genealogy", "*")).Post("/lots/{id}/genealogy", addLotGenealogy(svc))
 		r.Get("/lots/{id}/trace", traceLot(svc))
 
 		// MRP
-		r.Post("/mrp/runs", createMRPRun(svc))
+		r.With(libauth.RequireAction(authz, "mfg.mrp.run", "*")).Post("/mrp/runs", createMRPRun(svc))
 		r.Get("/mrp/runs", listMRPRuns(svc))
 		r.Get("/mrp/runs/{id}", getMRPRun(svc))
 		r.Get("/mrp/runs/{id}/demands", listMRPDemands(svc))

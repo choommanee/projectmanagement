@@ -59,7 +59,7 @@ func newTestServer(t *testing.T, p *pgxpool.Pool) http.Handler {
 	genealogy := store.NewGenealogy(p)
 	// Use empty engine URLs — unreachable triggers graceful synthetic fallback.
 	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, "http://localhost:19999", "http://localhost:19998")
-	return api.NewRouter(svc)
+	return api.NewRouter(svc, nil)
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {
