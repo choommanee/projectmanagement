@@ -338,8 +338,8 @@ export default function ReportsPage() {
           {
             id: "new",
             label: "+ New Dashboard",
-            icon: Plus,
-            primary: true,
+            icon: <Plus />,
+            variant: "primary",
             onClick: () => router.push("/pm/reports/new"),
           },
         ]}

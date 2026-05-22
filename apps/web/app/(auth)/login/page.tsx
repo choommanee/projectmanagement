@@ -17,7 +17,7 @@ interface FieldError {
   form?: string;
 }
 
-function FieldInput({ label, onChange, ...rest }: { label: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
+function FieldInput({ label, onChange, ...rest }: { label: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "size">) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">{label}</span>

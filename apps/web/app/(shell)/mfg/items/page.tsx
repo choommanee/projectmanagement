@@ -1,11 +1,9 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { Tag } from "@pmplatform/ui-kit";
-import { Button } from "@pmplatform/ui-kit";
-import { Input } from "@pmplatform/ui-kit";
+import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { listItems, createItem, listUoms, type Item, type UOM, type ItemType, type ItemStatus } from "@/lib/api/mfg";
 
 const STATUS_TONES: Record<ItemStatus, "success" | "neutral" | "warning"> = {
@@ -40,13 +38,13 @@ const ITEM_TYPES: { value: string; label: string }[] = [
   { value: "service", label: "Service" },
 ];
 
-function NewItemDialog({ uoms, onClose, onCreated }: { uoms: UOM[]; onClose: () => void; onCreated: (item: Item) => void }) {
+function NewItemDialog({ open, uoms, onClose, onCreated }: { open: boolean; uoms: UOM[]; onClose: () => void; onCreated: (item: Item) => void }) {
   const [form, setForm] = useState({ code: "", name: "", type: "component" as ItemType, uom_id: uoms[0]?.id ?? "", lot_tracked: false, serial_tracked: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!form.code || !form.name || !form.uom_id) { setError("Code, Name, and UOM are required."); return; }
     setLoading(true);
     setError(null);
@@ -61,14 +59,20 @@ function NewItemDialog({ uoms, onClose, onCreated }: { uoms: UOM[]; onClose: () 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => onClose()}>
-      <div className="w-full max-w-md rounded-md border border-line bg-paper shadow-pop" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-ink">New Item</h2>
-          <button onClick={onClose} className="text-ink-3 hover:text-ink">✕</button>
-        </div>
-        <form onSubmit={submit} className="space-y-4 p-4">
-          {error && <p className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="New item"
+      description="Items can be raw materials, components, assemblies or finished goods"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={() => void submit()}>Create item</Button>
+        </>
+      }
+    >
+        <form onSubmit={submit} className="space-y-4">
+          {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-2">Code *</label>
@@ -110,8 +114,7 @@ function NewItemDialog({ uoms, onClose, onCreated }: { uoms: UOM[]; onClose: () 
             <Button type="submit" variant="primary" loading={loading}>Create Item</Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -236,8 +239,8 @@ export default function ItemsPage() {
         )}
       </div>
 
-      {showNew && uoms.length > 0 && (
-        <NewItemDialog uoms={uoms} onClose={() => setShowNew(false)} onCreated={(item) => { setShowNew(false); router.push(`/mfg/items/${item.id}`); }} />
+      {uoms.length > 0 && (
+        <NewItemDialog open={showNew} uoms={uoms} onClose={() => setShowNew(false)} onCreated={(item) => { setShowNew(false); router.push(`/mfg/items/${item.id}`); }} />
       )}
     </div>
   );

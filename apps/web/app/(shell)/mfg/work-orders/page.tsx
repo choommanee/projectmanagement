@@ -1,11 +1,9 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { Tag } from "@pmplatform/ui-kit";
-import { Button } from "@pmplatform/ui-kit";
-import { Input } from "@pmplatform/ui-kit";
+import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { listWorkOrders, createWorkOrder, listItems, listWorkCenters, listUoms, type WorkOrder, type WOStatus, type WOPriority, type Item, type WorkCenter } from "@/lib/api/mfg";
 
 const STATUS_TABS: { value: string; label: string }[] = [
@@ -36,8 +34,8 @@ function priorityTone(p: WOPriority): "neutral" | "info" | "warning" | "danger" 
   return "neutral";
 }
 
-function NewWODialog({ items, workCenters, onClose, onCreated }: {
-  items: Item[]; workCenters: WorkCenter[]; onClose: () => void; onCreated: (wo: WorkOrder) => void;
+function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
+  open: boolean; items: Item[]; workCenters: WorkCenter[]; onClose: () => void; onCreated: (wo: WorkOrder) => void;
 }) {
   const [form, setForm] = useState({
     code: "", item_id: items[0]?.id ?? "", qty: "1", due_date: "",
@@ -53,8 +51,8 @@ function NewWODialog({ items, workCenters, onClose, onCreated }: {
     try { const r = await listItems({ q, limit: 10 }); setItemResults(r.items); } catch { /* noop */ }
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!form.code || !form.item_id || Number(form.qty) <= 0) { setError("Code, Item, and Qty > 0 required"); return; }
     setLoading(true);
     setError(null);
@@ -73,14 +71,21 @@ function NewWODialog({ items, workCenters, onClose, onCreated }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-md border border-line bg-paper shadow-pop" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-ink">New Work Order</h2>
-          <button onClick={onClose} className="text-ink-3 hover:text-ink">✕</button>
-        </div>
-        <form onSubmit={submit} className="space-y-4 p-4">
-          {error && <p className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="New work order"
+      description="Released WOs deduct material reservations; planned WOs are scope-only"
+      size="lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={() => void submit()}>Create WO</Button>
+        </>
+      }
+    >
+        <form onSubmit={submit} className="space-y-4">
+          {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-2">WO Code *</label>
@@ -114,7 +119,7 @@ function NewWODialog({ items, workCenters, onClose, onCreated }: {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-2">Priority</label>
-              <select value={form.priority} onChange={(e) => setForm(f => ({ ...f, priority: e.target.value as WOPriority }))}
+              <select aria-label="Priority" value={form.priority} onChange={(e) => setForm(f => ({ ...f, priority: e.target.value as WOPriority }))}
                 className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm focus:border-accent focus:outline-none">
                 <option value="low">Low</option>
                 <option value="med">Medium</option>
@@ -126,20 +131,15 @@ function NewWODialog({ items, workCenters, onClose, onCreated }: {
           {workCenters.length > 0 && (
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-2">Work Center (optional)</label>
-              <select value={form.work_center_id} onChange={(e) => setForm(f => ({ ...f, work_center_id: e.target.value }))}
+              <select aria-label="Work center" value={form.work_center_id} onChange={(e) => setForm(f => ({ ...f, work_center_id: e.target.value }))}
                 className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm focus:border-accent focus:outline-none">
                 <option value="">— none —</option>
                 {workCenters.map(w => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
               </select>
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" loading={loading}>Create Work Order</Button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -197,6 +197,20 @@ export default function WorkOrdersPage() {
     a.click();
   }
 
+  // ── KPI strip ────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const by = { planned: 0, released: 0, in_progress: 0, completed: 0, closed: 0, cancelled: 0 } as Record<string, number>;
+    let critical = 0;
+    let due7 = 0;
+    const sevenDays = new Date(); sevenDays.setDate(sevenDays.getDate() + 7);
+    for (const w of wos) {
+      by[w.status] = (by[w.status] ?? 0) + 1;
+      if (w.priority === "critical") critical++;
+      if (w.dueDate && new Date(w.dueDate) <= sevenDays && w.status !== "completed" && w.status !== "closed" && w.status !== "cancelled") due7++;
+    }
+    return { by, critical, due7 };
+  }, [wos]);
+
   return (
     <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "Work Orders" }]} />
@@ -206,77 +220,138 @@ export default function WorkOrdersPage() {
         { id: "export", label: "Export CSV", variant: "ghost", onClick: exportCsv },
       ]} />
 
-      <div className="flex flex-wrap items-center gap-3 border-b border-line bg-paper px-4 py-2">
-        <div className="flex flex-wrap gap-1">
-          {STATUS_TABS.map(t => (
-            <button key={t.value} onClick={() => setStatusFilter(t.value)}
-              className={`rounded-xs px-3 py-1 text-xs font-medium transition-colors ${statusFilter === t.value ? "bg-accent text-white" : "text-ink-2 hover:bg-surface-2"}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search WOs…" className="max-w-48 h-8 text-xs" />
-        <span className="ml-auto text-xs text-ink-3">{total} orders</span>
-      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] space-y-6 px-6 py-6">
+          {/* Editorial header */}
+          <header className="reveal-up flex items-end justify-between gap-6 border-b border-line pb-5">
+            <div className="flex flex-col gap-1.5">
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-3">
+                ◢ shop floor · work orders
+              </div>
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
+                Work Orders
+              </h1>
+            </div>
+            <div className="hidden flex-col items-end gap-1 sm:flex">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">scope</div>
+              <div className="font-mono text-[11px] tabular-nums text-ink-2">
+                {wos.length}/{total} loaded
+              </div>
+            </div>
+          </header>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
-        {loading && !wos.length ? (
-          <div className="flex h-32 items-center justify-center text-sm text-ink-3">Loading…</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line bg-surface-2 text-left text-xs font-medium text-ink-3">
-                <th className="px-4 py-2">WO Code</th>
-                <th className="px-4 py-2">Item</th>
-                <th className="px-4 py-2">Qty</th>
-                <th className="px-4 py-2">Progress</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Priority</th>
-                <th className="px-4 py-2">Work Center</th>
-                <th className="px-4 py-2">Due</th>
-                <th className="px-4 py-2">v</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wos.map((wo) => {
-                const item = itemMap.get(wo.itemId);
-                const wc = wcMap.get(wo.workCenterId ?? "");
-                const pct = wo.qty > 0 ? Math.min(100, Math.round((wo.qtyCompleted / wo.qty) * 100)) : 0;
-                return (
-                  <tr key={wo.id} onClick={() => router.push(`/mfg/work-orders/${wo.id}`)}
-                    className="cursor-pointer border-b border-line hover:bg-surface-2">
-                    <td className="px-4 py-2 font-mono text-xs font-semibold text-ink">{wo.code}</td>
-                    <td className="px-4 py-2">
-                      <div className="font-mono text-xs text-ink">{item?.code ?? "—"}</div>
-                      <div className="text-xs text-ink-3">{item?.name ?? ""}</div>
-                    </td>
-                    <td className="px-4 py-2 font-mono text-sm">{wo.qty}</td>
-                    <td className="px-4 py-2">
-                      <div className="text-xs font-mono text-ink-2">{wo.qtyCompleted}/{wo.qty}</div>
-                      <div className="mt-1 h-1.5 w-20 rounded-full bg-surface-2">
-                        <div className="h-full rounded-full bg-success transition-all" data-pct={pct} style={{ width: `${pct}%` }} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-2"><Tag tone={statusTone(wo.status)} dot>{wo.status.replace("_", " ")}</Tag></td>
-                    <td className="px-4 py-2"><Tag tone={priorityTone(wo.priority)}>{wo.priority}</Tag></td>
-                    <td className="px-4 py-2 text-xs text-ink-2">{wc?.code ?? "—"}</td>
-                    <td className="px-4 py-2 text-xs text-ink-3">{wo.dueDate ? new Date(wo.dueDate).toLocaleDateString() : "—"}</td>
-                    <td className="px-4 py-2 text-xs text-ink-3">{wo.version}</td>
+          {/* KPI strip */}
+          <section className="reveal-up relative overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs" aria-label="Work order KPIs">
+            <div aria-hidden className="pointer-events-none absolute inset-0 blueprint-grid" />
+            <div className="relative grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-y divide-line lg:divide-y-0 lg:divide-x">
+              {[
+                { label: "total",        value: total,                tone: "accent" as const },
+                { label: "planned",      value: kpis.by.planned,      tone: "accent" as const },
+                { label: "released",     value: kpis.by.released,     tone: "accent" as const },
+                { label: "in_progress",  value: kpis.by.in_progress,  tone: "accent" as const },
+                { label: "completed",    value: kpis.by.completed,    tone: "accent" as const },
+                { label: "critical",     value: kpis.critical,        tone: "signal" as const },
+                { label: "due ≤7d",      value: kpis.due7,            tone: "signal" as const },
+              ].map((k) => (
+                <div key={k.label} className="flex flex-col gap-1 px-4 py-4">
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${k.tone === "signal" ? "bg-signal" : "bg-accent"}`} />
+                    {k.label}
+                  </div>
+                  <div className={`font-mono text-[22px] font-semibold leading-none tabular-nums ${k.tone === "signal" && Number(k.value) > 0 ? "text-signal" : "text-ink"}`}>
+                    {k.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Filter row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div role="tablist" aria-label="Filter by status" className="flex flex-wrap gap-1">
+              {STATUS_TABS.map(t => (
+                <button
+                  type="button"
+                  key={t.value}
+                  role="tab"
+                  aria-selected={statusFilter === t.value ? "true" : "false"}
+                  onClick={() => setStatusFilter(t.value)}
+                  className={`h-7 rounded-xs px-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.1em] transition-colors ${
+                    statusFilter === t.value
+                      ? "bg-ink text-paper"
+                      : "border border-line-strong bg-surface text-ink-3 hover:border-accent/40 hover:text-ink"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search WOs…" className="ml-auto max-w-48 h-8" aria-label="Search work orders" />
+          </div>
+
+          {error && <div role="alert" className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">{error}</div>}
+
+          {loading && !wos.length ? (
+            <LoadingState rows={5} ariaLabel="Loading work orders" />
+          ) : wos.length === 0 ? (
+            <EmptyState
+              code="◇ no work orders"
+              title="No work orders match these filters."
+              description="Create a new WO from an item, or adjust filters above."
+              action={<Button variant="primary" onClick={() => setShowNew(true)}>+ New WO</Button>}
+            />
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-paper text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <th className="px-4 py-2.5">WO Code</th>
+                    <th className="px-4 py-2.5">Item</th>
+                    <th className="px-4 py-2.5">Qty</th>
+                    <th className="px-4 py-2.5">Progress</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">Priority</th>
+                    <th className="px-4 py-2.5">Work Center</th>
+                    <th className="px-4 py-2.5">Due</th>
+                    <th className="px-4 py-2.5">v</th>
                   </tr>
-                );
-              })}
-              {!loading && wos.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-ink-3">No work orders found.</td></tr>
-              )}
-            </tbody>
-          </table>
-        )}
+                </thead>
+                <tbody>
+                  {wos.map((wo) => {
+                    const item = itemMap.get(wo.itemId);
+                    const wc = wcMap.get(wo.workCenterId ?? "");
+                    const pct = wo.qty > 0 ? Math.min(100, Math.round((wo.qtyCompleted / wo.qty) * 100)) : 0;
+                    return (
+                      <tr key={wo.id} onClick={() => router.push(`/mfg/work-orders/${wo.id}`)}
+                        className="cursor-pointer border-b border-line/60 last:border-0 hover:bg-paper">
+                        <td className="px-4 py-2 font-mono text-xs font-semibold text-ink">{wo.code}</td>
+                        <td className="px-4 py-2">
+                          <div className="font-mono text-xs text-ink">{item?.code ?? "—"}</div>
+                          <div className="text-xs text-ink-3">{item?.name ?? ""}</div>
+                        </td>
+                        <td className="px-4 py-2 font-mono text-sm tabular-nums">{wo.qty}</td>
+                        <td className="px-4 py-2">
+                          <div className="text-xs font-mono tabular-nums text-ink-2">{wo.qtyCompleted}/{wo.qty}</div>
+                          <div className="mt-1 h-1.5 w-20 rounded-full bg-surface-2">
+                            <div className="h-full rounded-full bg-success transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-2"><Tag tone={statusTone(wo.status)} dot>{wo.status.replace("_", " ")}</Tag></td>
+                        <td className="px-4 py-2"><Tag tone={priorityTone(wo.priority)}>{wo.priority}</Tag></td>
+                        <td className="px-4 py-2 font-mono text-xs text-ink-2">{wc?.code ?? "—"}</td>
+                        <td className="px-4 py-2 font-mono text-xs tabular-nums text-ink-3">{wo.dueDate ? new Date(wo.dueDate).toLocaleDateString() : "—"}</td>
+                        <td className="px-4 py-2 font-mono text-xs tabular-nums text-ink-3">v{wo.version}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {showNew && (
-        <NewWODialog items={items} workCenters={workCenters} onClose={() => setShowNew(false)} onCreated={(wo) => { setShowNew(false); router.push(`/mfg/work-orders/${wo.id}`); }} />
-      )}
+      <NewWODialog open={showNew} items={items} workCenters={workCenters} onClose={() => setShowNew(false)} onCreated={(wo) => { setShowNew(false); router.push(`/mfg/work-orders/${wo.id}`); }} />
     </div>
   );
 }

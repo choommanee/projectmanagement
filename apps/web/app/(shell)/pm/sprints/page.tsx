@@ -243,7 +243,7 @@ export default function SprintsPage() {
               ].map((k) => (
                 <div key={k.label} className="flex flex-col gap-1 px-4 py-4">
                   <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${k.tone === "signal" ? "bg-signal" : "bg-accent"}`} />
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${(k.tone as string) === "signal" ? "bg-signal" : "bg-accent"}`} />
                     {k.label}
                   </div>
                   <div className="font-mono text-[22px] font-semibold leading-none tabular-nums text-ink">{k.value}</div>
