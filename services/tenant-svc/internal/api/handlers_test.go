@@ -26,7 +26,10 @@ func newRouter(t *testing.T) (http.Handler, *pgxpool.Pool, func()) {
 	if err != nil {
 		t.Skip(err)
 	}
-	return NewRouter(service.New(store.New(p))), p, func() { p.Close() }
+	// nil authz -> libauth.RequireAction is a no-op for these legacy
+	// unit tests. cedar_create_test.go exercises the real Cedar adapter
+	// against the shared bundle.
+	return NewRouter(service.New(store.New(p)), nil), p, func() { p.Close() }
 }
 
 func TestCreateTenantHTTP(t *testing.T) {

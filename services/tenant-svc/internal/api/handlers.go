@@ -9,22 +9,35 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/tenant-svc/internal/domain"
 	"github.com/pmplatform/services/tenant-svc/internal/service"
 )
 
-func NewRouter(svc *service.Service) http.Handler {
+// NewRouter wires the tenant-svc HTTP surface.
+//
+// authz is the Cedar-backed authorizer used to gate write endpoints. When
+// nil the RequireAction middleware becomes a no-op (libs/go/auth contract),
+// which is how the legacy unit tests keep working without minting JWTs. The
+// dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
+// the allow/deny grid against the shared bundle.
+//
+// Resource strings use the wildcard "*" for now; per-instance resources
+// (Tenant::"<id>" derived from chi.URLParam) are a Plan #4 polish pass /
+// Plan #6 ABAC follow-up — the ADR rows document the target shape.
+func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 	r.Route("/v1/tenants", func(r chi.Router) {
 		r.Get("/", list(svc))
-		r.Post("/", create(svc))
+		r.With(libauth.RequireAction(authz, "tenant.create", "*")).Post("/", create(svc))
 		r.Get("/by-slug/{slug}", getBySlug(svc))
 		r.Get("/{id}", get(svc))
-		r.Patch("/{id}", update(svc))
-		r.Delete("/{id}", del(svc))
+		r.With(libauth.RequireAction(authz, "tenant.update", "*")).Patch("/{id}", update(svc))
+		r.With(libauth.RequireAction(authz, "tenant.delete", "*")).Delete("/{id}", del(svc))
 	})
 	return r
 }

@@ -11,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+	libpolicy "github.com/pmplatform/libs/policy"
+
 	"github.com/pmplatform/services/tenant-svc/internal/api"
 	"github.com/pmplatform/services/tenant-svc/internal/service"
 	"github.com/pmplatform/services/tenant-svc/internal/store"
@@ -26,7 +29,17 @@ func main() {
 	}
 	defer p.Close()
 
-	h := api.NewRouter(service.New(store.New(p)))
+	// Cedar policy bundle: required at boot so authz decisions are explicit
+	// rather than implicitly deny-all on a misconfiguration. The shared
+	// bundle lives in libs/policy; POLICY_BUNDLE_PATH overrides the embed.
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		log.Fatal().Err(err).Msg("load policy bundle")
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	var _ libauth.Authorizer = authz // compile-time interface check
+
+	h := api.NewRouter(service.New(store.New(p)), authz)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {
