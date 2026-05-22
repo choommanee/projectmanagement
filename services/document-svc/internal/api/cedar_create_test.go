@@ -92,6 +92,19 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	return api.NewRouter(svc, authz)
 }
 
+// newCedarHandlerWithLoader builds the router wired with the production
+// CedarLoader so the per-instance scoping tests run through the real ABAC
+// path.
+func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
+	svc := service.New(
+		store.NewWorkspaces(p),
+		store.NewDocuments(p),
+		store.NewComments(p),
+		store.NewTemplates(p),
+	)
+	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
+}
+
 func TestCedarGatesWorkspaceEnsure_AllowsTenantAdmin(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()
@@ -126,6 +139,71 @@ func TestCedarGatesWorkspaceEnsure_AllowsTenantAdmin(t *testing.T) {
 	// ensureWorkspace returns 200 (upsert semantics), not 201.
 	if rec.Code != http.StatusOK {
 		t.Fatalf("want 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarPerInstanceDocumentRestore_AllowsSameTenant exercises the Plan #6
+// Task 6 per-instance ABAC scope: document.restore on a same-tenant
+// document with the scoped loader must not 403 at the authz layer.
+func TestCedarPerInstanceDocumentRestore_AllowsSameTenant(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+	pid := seedCedarProject(t, p, tid)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-test-abac",
+		TenantID: tid.String(),
+		Roles:    []string{"tenant-admin"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	// Seed a workspace + document directly so we can target an id.
+	wsID := uuid.New()
+	docID := uuid.New()
+	tx, err := p.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(context.Background())
+	if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+		t.Fatalf("set local: %v", e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO workspace(id,tenant_id,project_id,kind,name) VALUES ($1,$2,$3,'ba','WS')`,
+		wsID, tid, pid); e != nil {
+		t.Fatalf("seed workspace: %v", e)
+	}
+	if _, e := tx.Exec(context.Background(),
+		`INSERT INTO document(id,tenant_id,workspace_id,project_id,type,title,body,version) VALUES ($1,$2,$3,$4,'project_charter','Doc','{}'::jsonb,1)`,
+		docID, tid, wsID, pid); e != nil {
+		t.Fatalf("seed document: %v", e)
+	}
+	if e := tx.Commit(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM document WHERE id=$1", docID)
+		_, _ = p.Exec(context.Background(), "DELETE FROM workspace WHERE id=$1", wsID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"rev": 0, "version": 1})
+	req := httptest.NewRequest(http.MethodPost, "/v1/documents/"+docID.String()+"/restore", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	// 403 from the authz layer would be a regression; any other status is a
+	// downstream concern (no rev 0 → 404 from the handler, e.g.).
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant restore: %s", rec.Body.String())
 	}
 }
 

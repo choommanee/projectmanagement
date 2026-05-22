@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +18,11 @@ import (
 	"github.com/pmplatform/services/document-svc/internal/store"
 )
 
+// initURLParam wires libauth.URLParam to chi.URLParam exactly once.
+var initURLParam = sync.OnceFunc(func() {
+	libauth.URLParam = chi.URLParam
+})
+
 // NewRouter wires the document-svc HTTP surface.
 //
 // authz is the Cedar-backed authorizer used to gate write endpoints. When
@@ -25,11 +31,23 @@ import (
 // dedicated cedar_*_test.go cases pass a real *libpolicy.Adapter to exercise
 // the allow/deny grid against the shared bundle.
 //
-// Resource strings use the wildcard "*" for now; per-instance resources
-// (Document::"<id>", Comment::"<id>", Template::"<id>" derived from
-// chi.URLParam) are a Plan #4 polish pass / Plan #6 ABAC follow-up — the
-// ADR rows document the target shape.
+// Per-instance ABAC scoping (Plan #6 Task 6 Step 3): write routes with
+// {id} use RequireActionScoped against the relevant Cedar entity. The
+// CedarLoader resolves Document/Workspace/Comment/Template ids to their
+// tenant_id + (where present) owner_user so the policy can express
+// per-instance predicates.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
+	return NewRouterWithLoader(svc, authz, nil)
+}
+
+// NewRouterWithLoader wires document-svc with an optional Cedar loader.
+func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader libauth.ResourceLoader) http.Handler {
+	initURLParam()
+	var loaderOpts []libauth.ScopedOption
+	if loader != nil {
+		loaderOpts = append(loaderOpts, libauth.WithLoader(loader))
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -40,30 +58,33 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Workspaces
 		r.Get("/workspaces", listWorkspaces(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.workspace.ensure", "*")).Post("/workspaces", ensureWorkspace(svc))
 
 		// Documents
 		r.Get("/documents", listDocuments(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.create", "*")).Post("/documents", createDocument(svc))
 		r.Get("/documents/{id}", getDocument(svc))
-		r.With(libauth.RequireAction(authz, "document.update", "*")).Patch("/documents/{id}", patchDocument(svc))
-		r.With(libauth.RequireAction(authz, "document.delete", "*")).Delete("/documents/{id}", deleteDocument(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.update", "Document::{:id}", loaderOpts...)).Patch("/documents/{id}", patchDocument(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.delete", "Document::{:id}", loaderOpts...)).Delete("/documents/{id}", deleteDocument(svc))
 
 		// Versions
 		r.Get("/documents/{id}/versions", listVersions(svc))
 		r.Get("/documents/{id}/versions/{rev}", getVersion(svc))
-		r.With(libauth.RequireAction(authz, "document.restore", "*")).Post("/documents/{id}/restore", restoreDocument(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.restore", "Document::{:id}", loaderOpts...)).Post("/documents/{id}/restore", restoreDocument(svc))
 
-		// Comments under document
+		// Comments under document — resource is the parent document.
 		r.Get("/documents/{id}/comments", listComments(svc))
-		r.With(libauth.RequireAction(authz, "document.comment.create", "*")).Post("/documents/{id}/comments", createComment(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.comment.create", "Document::{:id}", loaderOpts...)).Post("/documents/{id}/comments", createComment(svc))
 
-		// Comments standalone (resolve/delete)
-		r.With(libauth.RequireAction(authz, "document.comment.resolve", "*")).Patch("/comments/{id}/resolve", resolveComment(svc))
-		r.With(libauth.RequireAction(authz, "document.comment.delete", "*")).Delete("/comments/{id}", deleteComment(svc))
+		// Comments standalone (resolve/delete) — resource is the Comment.
+		r.With(libauth.RequireActionScoped(authz, "document.comment.resolve", "Comment::{:id}", loaderOpts...)).Patch("/comments/{id}/resolve", resolveComment(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.comment.delete", "Comment::{:id}", loaderOpts...)).Delete("/comments/{id}", deleteComment(svc))
 
 		// Templates
 		r.Get("/templates", listTemplates(svc))
+		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.template.create", "*")).Post("/templates", createTemplate(svc))
 		r.Get("/templates/{id}", getTemplate(svc))
 	})
