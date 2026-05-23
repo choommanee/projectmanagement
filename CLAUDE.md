@@ -129,6 +129,17 @@ When starting non-trivial work, first check whether an open plan covers it. If i
 
 Specialist subagents under `.claude/agents/` (`frontend-ui-engineer`, `go-service-engineer`, `rust-engine-engineer`, `db-migration-steward`, `integration-tester`, `devops-infra`, `qa-reviewer`, `plan-coordinator`) carry the project conventions inline so dispatch prompts can stay short.
 
+## Notifications
+
+Any service that needs to notify users must use `libs/go/notification.Publisher` — one call, no SMTP or webhook credentials in the calling service. Wire it in `cmd/server/main.go` via `notification.NewJetStreamPublisher(nc)` and inject the interface into the service layer.
+
+```go
+pub, _ := notiflib.NewJetStreamPublisher(nc)
+svc := service.New(...).WithNotifPublisher(pub)
+```
+
+notification-svc (port 8093) subscribes to the `NOTIF` JetStream stream and fans out to in-app (DB row), email (SMTP via `gomail.v2`), and chat webhook channels (Teams/Slack/LINE). Per-user channel preferences live in `notification_preference(tenant_id, user_id, kind, channels text[])`. The canonical event structure is `notiflib.Event{TenantID, UserID, Kind, Title, Body, Payload}` — see `libs/go/notification/event.go`.
+
 ## Migration discipline
 
 Goose format under `infra/migrations/<service>/NNNNN_name.sql`. Both `-- +goose Up` and `-- +goose Down` are required, and Down MUST cleanly reverse. Every tenant-scoped table additionally gets:
