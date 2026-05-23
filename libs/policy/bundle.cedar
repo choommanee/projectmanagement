@@ -467,6 +467,16 @@ when {
   resource.user_id == context.user_id
 };
 
+// Collection read — list endpoint uses Notification::"*" resource
+permit (
+  principal,
+  action == Action::"notif.read",
+  resource == Notification::"*"
+)
+when {
+  context.user_id != ""
+};
+
 // Mark one notification read — own only.
 permit (
   principal,
@@ -481,12 +491,12 @@ when {
 
 // Mark all read — tenant-scoped, any authenticated user for their own.
 // context.user_id is set by the JWT middleware for every authenticated request.
+// context.user_id is always present; non-empty check suffices
 permit (
   principal,
   action == Action::"notif.mark_all_read",
   resource
 )
 when {
-  context has user_id &&
   context.user_id != ""
 };

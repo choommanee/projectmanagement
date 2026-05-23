@@ -240,6 +240,9 @@ func TestBundleABACGrid(t *testing.T) {
 		{"notif.read no attrs deny", "notif.read", `Notification::"n1"`, nil, []string{"project-manager"}, "t-call", false, false},
 		{"notif.mark_read own notification allow", "notif.mark_read", `Notification::"n1"`, map[string]any{"user_id": "sub-1"}, []string{"project-manager"}, "t-call", false, true},
 		{"notif.mark_read cross-user deny", "notif.mark_read", `Notification::"n1"`, map[string]any{"user_id": "sub-other"}, []string{"mfg-operator"}, "t-call", false, false},
+
+		// notif.read collection — list endpoint passes Notification::"*" (no attrs)
+		{"notif.read collection allow authenticated", "notif.read", `Notification::"*"`, nil, []string{"project-manager"}, "t-call", false, true},
 	}
 
 	for _, r := range rows {
