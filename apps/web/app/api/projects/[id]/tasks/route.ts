@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { currentTenantId } from "@/lib/auth/serverTenant";
+import { proxyHeaders } from "@/lib/auth/serverTenant";
 
 const SVC = process.env.PROJECT_URL ?? "http://localhost:8083";
 
 async function makeHeaders(): Promise<Headers | NextResponse> {
-  const tid = await currentTenantId();
-  if (!tid) return NextResponse.json({ error: "not authenticated" }, { status: 401 });
-  const h = new Headers();
-  h.set("X-Tenant-Id", tid);
-  return h;
+  const h = await proxyHeaders();
+  if (h instanceof Headers) return h;
+  return NextResponse.json({ error: h.error }, { status: h.status });
 }
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
