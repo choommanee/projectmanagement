@@ -17,6 +17,7 @@ import { ProjectTasksTab } from "@/components/ProjectTasksTab";
 import { GanttChart } from "@/components/GanttChart";
 import { TaskSheet } from "@/components/TaskSheet";
 import { listTasksForProject, type Task } from "@/lib/api/tasks";
+import { UserPicker } from "@/components/UserPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -491,12 +492,11 @@ function OverviewTab({
               </span>
             </div>
           </Field>
-          <Field label="Owner ID">
-            <Input
-              value={form.ownerId}
-              onChange={(e) => patchForm({ ownerId: e.target.value })}
-              placeholder="UUID of owner (identity lookup in Phase 2)"
-              className="font-mono text-[12px]"
+          <Field label="Owner">
+            <UserPicker
+              value={form.ownerId ?? ""}
+              onChange={(id) => patchForm({ ownerId: id })}
+              placeholder="Search team members…"
             />
           </Field>
         </SectionCard>

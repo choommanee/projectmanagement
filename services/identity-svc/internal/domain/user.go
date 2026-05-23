@@ -16,6 +16,13 @@ const (
 	StatusSuspended Status = "suspended"
 )
 
+// UserSummary is a read-only view for pickers — no sensitive fields.
+type UserSummary struct {
+	ID          uuid.UUID `json:"id"`
+	DisplayName string    `json:"display_name"`
+	Email       string    `json:"email"`
+}
+
 type User struct {
 	ID           uuid.UUID
 	TenantID     uuid.UUID

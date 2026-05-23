@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	sjwt "github.com/pmplatform/services/identity-svc/internal/jwt"
 	"github.com/pmplatform/services/identity-svc/internal/service"
+	"github.com/pmplatform/services/identity-svc/internal/store"
 )
 
 // NewRouter wires the identity-svc HTTP surface.
@@ -346,6 +348,48 @@ func jwksHandler(kp *sjwt.KeyPair, store *sjwt.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(set)
 		_, _ = w.Write(b)
+	}
+}
+
+// WithUserList layers GET /v1/users (tenant member search) onto an existing
+// router without changing any constructor signatures. Called from main.go.
+func WithUserList(h http.Handler, jwtStore *sjwt.Store, issuer string, users *store.Users) http.Handler {
+	if jwtStore == nil || issuer == "" || users == nil {
+		return h
+	}
+	mux := h.(*chi.Mux)
+	mux.Group(func(pr chi.Router) {
+		pr.Use(requireBearerDynamic(jwtStore, issuer))
+		pr.Get("/v1/users", listUsers(users))
+	})
+	return mux
+}
+
+func listUsers(users *store.Users) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, 401, errors.New("unauthenticated"))
+			return
+		}
+		tid, err := uuid.Parse(claims.TenantID)
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		q := r.URL.Query().Get("q")
+		limit := 50
+		if lStr := r.URL.Query().Get("limit"); lStr != "" {
+			if n, err2 := strconv.Atoi(lStr); err2 == nil && n > 0 {
+				limit = n
+			}
+		}
+		list, err := users.List(r.Context(), tid, q, limit)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"users": list})
 	}
 }
 

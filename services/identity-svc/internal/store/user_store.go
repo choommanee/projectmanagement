@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -137,6 +138,43 @@ func (s *Users) FindByID(ctx context.Context, tid, id uuid.UUID) (*domain.User, 
 		return nil, err
 	}
 	return &u, nil
+}
+
+// List returns up to limit users in the tenant matching optional q filter
+// (case-insensitive substring on display_name or email). Max limit is 100.
+func (s *Users) List(ctx context.Context, tid uuid.UUID, q string, limit int) ([]domain.UserSummary, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	var rows pgx.Rows
+	var err error
+	if q == "" {
+		rows, err = s.p.Query(ctx,
+			`SELECT id, display_name, email FROM app_user
+			 WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY display_name LIMIT $2`,
+			tid, limit)
+	} else {
+		pattern := "%" + strings.ToLower(q) + "%"
+		rows, err = s.p.Query(ctx,
+			`SELECT id, display_name, email FROM app_user
+			 WHERE tenant_id=$1 AND deleted_at IS NULL
+			   AND (lower(display_name) LIKE $2 OR lower(email) LIKE $2)
+			 ORDER BY display_name LIMIT $3`,
+			tid, pattern, limit)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []domain.UserSummary{}
+	for rows.Next() {
+		var u domain.UserSummary
+		if err := rows.Scan(&u.ID, &u.DisplayName, &u.Email); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }
 
 func (s *Users) FindByEmail(ctx context.Context, tid uuid.UUID, email string) (*domain.User, error) {

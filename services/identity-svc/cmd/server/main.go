@@ -159,6 +159,7 @@ func main() {
 
 	var _ libauth.Authorizer = authz // compile-time interface check
 	h := api.NewRouterFullWithOIDC(auth, refresh, passwordReset, mfaSvc, oidcSvc, kp, keyStore, issuer, authz, authz, p)
+	h = api.WithUserList(h, keyStore, issuer, users)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).

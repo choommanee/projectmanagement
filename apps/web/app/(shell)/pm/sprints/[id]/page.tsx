@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BurndownChart } from "@/components/BurndownChart";
 import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
@@ -624,10 +625,11 @@ export default function SprintDetailPage() {
           </div>
         </div>
 
-        {/* Burndown placeholder */}
-        <div className="mt-2 rounded-xs border border-line bg-surface-2/40 px-3 py-2 text-[10px] text-ink-3 italic">
-          Burndown chart — phase 2
-        </div>
+        {sprint && (
+          <div className="mt-2">
+            <BurndownChart sprint={sprint} tasks={sprintTasks} />
+          </div>
+        )}
       </div>
 
       {/* Error banner */}

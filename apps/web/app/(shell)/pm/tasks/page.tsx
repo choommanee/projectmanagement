@@ -9,6 +9,7 @@ import { listAllTasks, createTask, listTasksForProject, type Task, type TaskStat
 import { listProjects, type Project } from "@/lib/api/projects";
 import { statusTone, priorityTone, statusLabel, priorityLabel } from "@/lib/api/taskTones";
 import { TaskSheet } from "@/components/TaskSheet";
+import { UserPicker } from "@/components/UserPicker";
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
@@ -374,6 +375,7 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [priority, setPriority] = useState<TaskPriority>("med");
   const [estimateMd, setEstimateMd] = useState("0");
+  const [assigneeId, setAssigneeId] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -398,6 +400,7 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
         status,
         priority,
         estimate_md: parseFloat(estimateMd) || 0,
+        assignee_id: assigneeId || undefined,
       });
       onCreated();
     } catch (e) {
@@ -491,6 +494,14 @@ function CreateTaskDialog({ open, onClose, onCreated }: { open: boolean; onClose
             <span className={fieldLabel}>Estimate (md)</span>
             <Input type="number" step="0.5" min="0" value={estimateMd} onChange={(e) => setEstimateMd(e.target.value)} className="font-mono" />
           </label>
+          <div>
+            <span className={fieldLabel}>Assignee</span>
+            <UserPicker
+              value={assigneeId}
+              onChange={(id) => setAssigneeId(id)}
+              placeholder="Assign to…"
+            />
+          </div>
           {err && (
             <div role="alert" className="rounded-sm border border-danger/40 bg-danger/10 p-2 text-xs text-danger">{err}</div>
           )}
