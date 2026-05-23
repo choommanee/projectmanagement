@@ -18,6 +18,7 @@ CREATE INDEX notification_tenant_user_unread_idx
     WHERE read_at IS NULL;
 
 ALTER TABLE notification ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification FORCE ROW LEVEL SECURITY;
 CREATE POLICY notification_tenant_isolation
     ON notification USING (tenant_id = current_tenant_uuid());
 
