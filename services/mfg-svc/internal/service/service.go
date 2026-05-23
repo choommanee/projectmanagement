@@ -12,21 +12,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
+	notiflib "github.com/pmplatform/libs/go/notification"
+
 	"github.com/pmplatform/services/mfg-svc/internal/domain"
 	"github.com/pmplatform/services/mfg-svc/internal/store"
 )
 
 // Service is the aggregate application service.
 type Service struct {
-	Items        *store.Items
-	WorkCenters  *store.WorkCenters
-	BOMs         *store.BOMs
-	Routings     *store.Routings
-	WorkOrders   *store.WorkOrders
-	MRP          *store.MRP
-	Genealogy    *store.Genealogy
-	MRPEngineURL  string
+	Items          *store.Items
+	WorkCenters    *store.WorkCenters
+	BOMs           *store.BOMs
+	Routings       *store.Routings
+	WorkOrders     *store.WorkOrders
+	MRP            *store.MRP
+	Genealogy      *store.Genealogy
+	MRPEngineURL   string
 	TraceEngineURL string
+	notif          notiflib.Publisher
 }
 
 func New(
@@ -50,7 +53,36 @@ func New(
 		Genealogy:      genealogy,
 		MRPEngineURL:   mrpEngineURL,
 		TraceEngineURL: traceEngineURL,
+		notif:          notiflib.NoopPublisher{},
 	}
+}
+
+// WithNotifPublisher attaches a notification publisher to the service.
+// Returns the receiver for fluent wiring.
+func (svc *Service) WithNotifPublisher(pub notiflib.Publisher) *Service {
+	svc.notif = pub
+	return svc
+}
+
+// ReleaseWorkOrder delegates to the store and publishes a notification event.
+func (svc *Service) ReleaseWorkOrder(ctx context.Context, tid, woID uuid.UUID, version int, actorID string) (*domain.WorkOrder, error) {
+	wo, err := svc.WorkOrders.ReleaseWorkOrder(ctx, tid, woID, version)
+	if err != nil {
+		return nil, err
+	}
+	userID := actorID
+	if userID == "" {
+		userID = tid.String()
+	}
+	if svc.notif != nil {
+		_ = svc.notif.Publish(ctx, notiflib.Event{
+			TenantID: tid.String(),
+			UserID:   userID,
+			Kind:     "mfg.work_order.released",
+			Title:    "Work order released",
+		})
+	}
+	return wo, nil
 }
 
 // --- UOM ---

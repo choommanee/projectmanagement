@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
+	notiflib "github.com/pmplatform/libs/go/notification"
+
 	"github.com/pmplatform/services/workflow-svc/internal/domain"
 	"github.com/pmplatform/services/workflow-svc/internal/store"
 )
@@ -22,6 +24,7 @@ type Service struct {
 	Instances  *store.Instances
 	HumanTasks *store.HumanTasks
 	RuntimeURL string
+	notif      notiflib.Publisher
 }
 
 func New(defs *store.Definitions, vers *store.Versions, instances *store.Instances, ht *store.HumanTasks, runtimeURL string) *Service {
@@ -31,7 +34,15 @@ func New(defs *store.Definitions, vers *store.Versions, instances *store.Instanc
 		Instances:  instances,
 		HumanTasks: ht,
 		RuntimeURL: runtimeURL,
+		notif:      notiflib.NoopPublisher{},
 	}
+}
+
+// WithNotifPublisher attaches a notification publisher to the service.
+// Returns the receiver for fluent wiring.
+func (s *Service) WithNotifPublisher(pub notiflib.Publisher) *Service {
+	s.notif = pub
+	return s
 }
 
 // ─── StartInstance ─────────────────────────────────────────────────────────────
@@ -282,6 +293,15 @@ func (s *Service) applyRuntimeResult(
 
 	if err := s.Instances.UpdateStateAndSteps(ctx, tid, inst, steps, humanTasks); err != nil {
 		return nil, fmt.Errorf("persist result: %w", err)
+	}
+
+	if inst.Status == domain.InstanceCompleted && s.notif != nil {
+		_ = s.notif.Publish(ctx, notiflib.Event{
+			TenantID: tid.String(),
+			UserID:   tid.String(), // best-effort: no actor in workflow runtime response
+			Kind:     "workflow.instance.completed",
+			Title:    "Workflow instance completed",
+		})
 	}
 
 	// Load persisted steps

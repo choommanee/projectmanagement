@@ -11,10 +11,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	notiflib "github.com/pmplatform/libs/go/notification"
+
 	"github.com/pmplatform/services/workflow-svc/internal/domain"
 	"github.com/pmplatform/services/workflow-svc/internal/service"
 	"github.com/pmplatform/services/workflow-svc/internal/store"
 )
+
+type fakePublisher struct {
+	events []notiflib.Event
+}
+
+func (f *fakePublisher) Publish(_ context.Context, ev notiflib.Event) error {
+	f.events = append(f.events, ev)
+	return nil
+}
 
 func openPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
@@ -165,5 +176,62 @@ func TestServiceStartInstance_RuntimeDown(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected error when runtime is down, got nil")
+	}
+}
+
+// TestStartInstance_PublishesCompletedNotif asserts that when the runtime
+// returns status=completed, a "workflow.instance.completed" event is
+// published to the injected notif publisher.
+func TestStartInstance_PublishesCompletedNotif(t *testing.T) {
+	pool := openPool(t)
+	defer pool.Close()
+	tid := seedTenant(t, pool)
+	d, _ := setupDefAndVersion(t, pool, tid)
+
+	mockRuntime := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"status":      "completed",
+			"variables":   map[string]any{},
+			"output":      "done",
+			"cursor":      nil,
+			"error":       nil,
+			"steps":       []any{},
+			"human_tasks": []any{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp) //nolint:errcheck
+	}))
+	defer mockRuntime.Close()
+
+	pub := &fakePublisher{}
+	svc := service.New(
+		store.NewDefinitions(pool),
+		store.NewVersions(pool),
+		store.NewInstances(pool),
+		store.NewHumanTasks(pool),
+		mockRuntime.URL,
+	).WithNotifPublisher(pub)
+
+	result, err := svc.StartInstance(context.Background(), service.StartInstanceInput{
+		TenantID:     tid,
+		DefinitionID: d.ID,
+		Input:        json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if result.Instance.Status != domain.InstanceCompleted {
+		t.Fatalf("expected completed, got %s", result.Instance.Status)
+	}
+
+	if len(pub.events) != 1 {
+		t.Fatalf("expected 1 notif event, got %d", len(pub.events))
+	}
+	ev := pub.events[0]
+	if ev.Kind != "workflow.instance.completed" {
+		t.Errorf("Kind: got %q, want %q", ev.Kind, "workflow.instance.completed")
+	}
+	if ev.TenantID != tid.String() {
+		t.Errorf("TenantID: got %q, want %q", ev.TenantID, tid.String())
 	}
 }

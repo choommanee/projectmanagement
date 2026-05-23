@@ -1284,7 +1284,11 @@ func releaseWorkOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		wo, err := svc.WorkOrders.ReleaseWorkOrder(r.Context(), tid, id, req.Version)
+		var actorID string
+		if c, ok := libauth.FromCtx(r.Context()); ok {
+			actorID = c.Subject
+		}
+		wo, err := svc.ReleaseWorkOrder(r.Context(), tid, id, req.Version, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrNotFound):

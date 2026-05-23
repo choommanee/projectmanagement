@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	natsx "github.com/pmplatform/libs/go/nats"
+	notiflib "github.com/pmplatform/libs/go/notification"
 	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/mfg-svc/internal/api"
@@ -39,7 +41,22 @@ func main() {
 	mrp := store.NewMRP(p)
 	genealogy := store.NewGenealogy(p)
 
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, mrpEngineURL, traceEngineURL)
+	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		if nc, err := natsx.Connect(natsURL); err != nil {
+			log.Warn().Err(err).Msg("nats unavailable — notif events disabled")
+		} else {
+			if pub, err := notiflib.NewJetStreamPublisher(nc); err != nil {
+				log.Warn().Err(err).Msg("notif publisher init failed")
+			} else {
+				notifPub = pub
+				defer nc.Close()
+			}
+		}
+	}
+
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, mrpEngineURL, traceEngineURL).
+		WithNotifPublisher(notifPub)
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {
