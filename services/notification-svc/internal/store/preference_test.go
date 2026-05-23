@@ -2,10 +2,12 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/pmplatform/services/notification-svc/internal/store"
@@ -18,16 +20,16 @@ func prefTestPool(t *testing.T) *pgxpool.Pool {
 	p := testPool(t) // defined in notification_test.go
 	// Probe the preference table so we skip gracefully if not yet migrated.
 	var dummy int
-	err := p.QueryRow(context.Background(),
+	probeErr := p.QueryRow(context.Background(),
 		"SELECT 1 FROM notification_preference LIMIT 1").Scan(&dummy)
-	if err != nil && !strings.Contains(err.Error(), "no rows in result set") &&
-		err.Error() != "no rows in result set" {
-		if strings.Contains(err.Error(), `relation "notification_preference" does not exist`) {
-			t.Skipf("notification_preference table not migrated: %v", err)
-		}
-		// pgx.ErrNoRows means table exists but empty — that is fine.
-		if !strings.Contains(err.Error(), "no rows") {
-			t.Skipf("unexpected probe error: %v", err)
+	if probeErr != nil {
+		// Table may simply be empty — only skip if connection itself fails.
+		if errors.Is(probeErr, pgx.ErrNoRows) {
+			// fine — table exists but is empty
+		} else if strings.Contains(probeErr.Error(), `relation "notification_preference" does not exist`) {
+			t.Skipf("notification_preference table not migrated: %v", probeErr)
+		} else {
+			t.Skipf("unexpected probe error: %v", probeErr)
 		}
 	}
 	return p
