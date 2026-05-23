@@ -21,9 +21,6 @@ const SubjectPrefix = "notif"
 //
 // Callers should pass an already-connected *natsx.Client.
 func Publish(ctx context.Context, c *natsx.Client, ev Event) error {
-	if c == nil {
-		return errors.New("notification: nil nats client")
-	}
 	if ev.TenantID == "" {
 		return errors.New("notification: tenant_id required")
 	}
@@ -35,6 +32,9 @@ func Publish(ctx context.Context, c *natsx.Client, ev Event) error {
 	}
 	if ev.Title == "" {
 		return errors.New("notification: title required")
+	}
+	if c == nil {
+		return errors.New("notification: nil nats client")
 	}
 	if ev.ID == "" {
 		ev.ID = uuid.NewString()

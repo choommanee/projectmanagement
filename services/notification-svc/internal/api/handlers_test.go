@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/notification-svc/internal/api"
 	"github.com/pmplatform/services/notification-svc/internal/service"
 	"github.com/pmplatform/services/notification-svc/internal/store"
@@ -49,6 +51,16 @@ func setupRouter(t *testing.T) (http.Handler, *store.Store, uuid.UUID, uuid.UUID
 	return api.NewRouter(service.New(st), nil), st, tid, uid
 }
 
+// withClaims injects a fake JWT principal into the request context so the
+// principalOr400 helper can extract tenant + user without a live JWKS server.
+func withClaims(r *http.Request, tid, uid uuid.UUID) *http.Request {
+	claims := &libauth.ParsedClaims{
+		TenantID: tid.String(),
+		Subject:  uid.String(),
+	}
+	return r.WithContext(libauth.WithClaims(r.Context(), claims))
+}
+
 func TestHealthz(t *testing.T) {
 	handler, _, _, _ := setupRouter(t)
 	req := httptest.NewRequest("GET", "/healthz", nil)
@@ -59,13 +71,14 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
-func TestMissingHeaders(t *testing.T) {
+func TestMissingClaims(t *testing.T) {
 	handler, _, _, _ := setupRouter(t)
+	// No claims in context — expect 401.
 	req := httptest.NewRequest("GET", "/v1/notifications", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
-	if w.Code != 400 {
-		t.Fatalf("expected 400 without headers, got %d: %s", w.Code, w.Body.String())
+	if w.Code != 401 {
+		t.Fatalf("expected 401 without claims, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -83,9 +96,7 @@ func TestListAndMarkRead(t *testing.T) {
 	})
 
 	// List
-	req := httptest.NewRequest("GET", "/v1/notifications?limit=10", nil)
-	req.Header.Set("X-Tenant-Id", tid.String())
-	req.Header.Set("X-User-Id", uid.String())
+	req := withClaims(httptest.NewRequest("GET", "/v1/notifications?limit=10", nil), tid, uid)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != 200 {
@@ -102,9 +113,7 @@ func TestListAndMarkRead(t *testing.T) {
 	}
 
 	// Mark one read
-	req2 := httptest.NewRequest("POST", "/v1/notifications/"+id1+"/read", nil)
-	req2.Header.Set("X-Tenant-Id", tid.String())
-	req2.Header.Set("X-User-Id", uid.String())
+	req2 := withClaims(httptest.NewRequest("POST", "/v1/notifications/"+id1+"/read", nil), tid, uid)
 	w2 := httptest.NewRecorder()
 	handler.ServeHTTP(w2, req2)
 	if w2.Code != 200 {
@@ -112,9 +121,7 @@ func TestListAndMarkRead(t *testing.T) {
 	}
 
 	// Unread filter should now return 1.
-	req3 := httptest.NewRequest("GET", "/v1/notifications?unread=true", nil)
-	req3.Header.Set("X-Tenant-Id", tid.String())
-	req3.Header.Set("X-User-Id", uid.String())
+	req3 := withClaims(httptest.NewRequest("GET", "/v1/notifications?unread=true", nil), tid, uid)
 	w3 := httptest.NewRecorder()
 	handler.ServeHTTP(w3, req3)
 	if w3.Code != 200 {
@@ -137,9 +144,7 @@ func TestMarkAllRead(t *testing.T) {
 			TenantID: tid, UserID: uid, Kind: "k", Title: fmt.Sprintf("n%d", i),
 		})
 	}
-	req := httptest.NewRequest("POST", "/v1/notifications/read-all", nil)
-	req.Header.Set("X-Tenant-Id", tid.String())
-	req.Header.Set("X-User-Id", uid.String())
+	req := withClaims(httptest.NewRequest("POST", "/v1/notifications/read-all", nil), tid, uid)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != 200 {
@@ -156,9 +161,7 @@ func TestMarkAllRead(t *testing.T) {
 
 func TestMarkRead_InvalidID(t *testing.T) {
 	handler, _, tid, uid := setupRouter(t)
-	req := httptest.NewRequest("POST", "/v1/notifications/not-a-uuid/read", nil)
-	req.Header.Set("X-Tenant-Id", tid.String())
-	req.Header.Set("X-User-Id", uid.String())
+	req := withClaims(httptest.NewRequest("POST", "/v1/notifications/not-a-uuid/read", nil), tid, uid)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != 400 {

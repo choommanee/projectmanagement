@@ -38,16 +38,24 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	return r
 }
 
-// principalOr400 extracts X-Tenant-Id + X-User-Id headers.
+// principalOr400 extracts tenant and user identity from the JWT claims placed
+// in context by the AttachClaims middleware. Returns HTTP 401 if claims are
+// absent (unauthenticated) or 400 if the claim values are not valid UUIDs.
 func principalOr400(w http.ResponseWriter, r *http.Request) (tid, uid uuid.UUID, ok bool) {
-	tid, err := uuid.Parse(r.Header.Get("X-Tenant-Id"))
-	if err != nil {
-		writeErr(w, 400, errors.New("X-Tenant-Id header required (UUID)"))
+	claims, hasClaims := libauth.FromCtx(r.Context())
+	if !hasClaims || claims == nil {
+		writeErr(w, 401, errors.New("authentication required"))
 		return
 	}
-	uid, err = uuid.Parse(r.Header.Get("X-User-Id"))
+	var err error
+	tid, err = uuid.Parse(claims.TenantID)
 	if err != nil {
-		writeErr(w, 400, errors.New("X-User-Id header required (UUID)"))
+		writeErr(w, 400, errors.New("tenant_id in token is not a valid UUID"))
+		return
+	}
+	uid, err = uuid.Parse(claims.Subject)
+	if err != nil {
+		writeErr(w, 400, errors.New("subject in token is not a valid UUID"))
 		return
 	}
 	ok = true

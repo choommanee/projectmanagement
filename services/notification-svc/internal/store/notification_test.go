@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -29,27 +30,17 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	if err := p.QueryRow(context.Background(), "SELECT 1 FROM notification LIMIT 1").Scan(&dummy); err != nil {
 		// Table may simply be empty — only skip if connection itself fails.
 		if err.Error() == "no rows in result set" || errors.Is(err, pgx.ErrNoRows) {
-			// fine
-		} else if err.Error() != "" && contains(err.Error(), `relation "notification" does not exist`) {
+			// fine — table exists but is empty
+		} else if strings.Contains(err.Error(), `relation "notification" does not exist`) {
 			t.Skipf("notification table not migrated: %v", err)
+		} else {
+			t.Skipf("unexpected probe error: %v", err)
 		}
 	}
 	t.Cleanup(p.Close)
 	return p
 }
 
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || indexOf(s, sub) >= 0)
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
-}
 
 func seedTenant(t *testing.T, p *pgxpool.Pool) uuid.UUID {
 	t.Helper()
