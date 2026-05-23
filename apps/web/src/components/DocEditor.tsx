@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import mermaid from "mermaid";
 import { useEditor, EditorContent } from "@tiptap/react";
+
+mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
 import { BubbleMenu, FloatingMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -12,6 +15,63 @@ import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table
 import Typography from "@tiptap/extension-typography";
 import CharacterCount from "@tiptap/extension-character-count";
 import Underline from "@tiptap/extension-underline";
+
+// ─── Mermaid helpers ──────────────────────────────────────────────────────────
+
+function extractMermaidBlocks(doc: Record<string, unknown> | null): string[] {
+  if (!doc) return [];
+  const blocks: string[] = [];
+  function walk(node: Record<string, unknown>) {
+    if (node.type === "codeBlock" && (node.attrs as Record<string, unknown>)?.language === "mermaid") {
+      const text = ((node.content as Record<string, unknown>[]) ?? [])
+        .map((n) => (n.text as string) ?? "")
+        .join("");
+      if (text.trim()) blocks.push(text);
+    }
+    ((node.content as Record<string, unknown>[]) ?? []).forEach(walk);
+  }
+  walk(doc);
+  return blocks;
+}
+
+function MermaidPreviewSection({ blocks }: { blocks: string[] }) {
+  const [svgs, setSvgs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (blocks.length === 0) { setSvgs([]); return; }
+    let cancelled = false;
+    Promise.all(
+      blocks.map(async (code, i) => {
+        try {
+          const id = `mermaid-${i}-${Math.random().toString(36).slice(2)}`;
+          const { svg } = await mermaid.render(id, code);
+          return svg;
+        } catch {
+          return '<p class="text-[11px] text-danger p-2">⚠ Diagram syntax error</p>';
+        }
+      }),
+    ).then((results) => {
+      if (!cancelled) setSvgs(results);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks.join("\n")]);
+
+  if (svgs.length === 0) return null;
+  return (
+    <div className="border-t border-line bg-surface-2/40 px-4 py-3 space-y-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-3">Diagram Preview</p>
+      {svgs.map((svg, i) => (
+        <div
+          key={i}
+          className="overflow-x-auto rounded-xs border border-line bg-paper p-3"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      ))}
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +151,7 @@ function LinkInput({ onSet, onClose }: { onSet: (url: string) => void; onClose: 
 export function DocEditor({ value, onChange, readOnly = false, placeholder = "Start writing…" }: DocEditorProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const mermaidBlocks = useMemo(() => extractMermaidBlocks(value), [value]);
 
   const editor = useEditor({
     extensions: [
@@ -274,6 +335,9 @@ export function DocEditor({ value, onChange, readOnly = false, placeholder = "St
       <div className="flex items-center justify-end border-t border-line px-4 py-1.5 text-[11px] text-ink-3">
         <span>{charCount} characters</span>
       </div>
+
+      {/* Mermaid diagram preview — only visible when doc has mermaid code blocks */}
+      <MermaidPreviewSection blocks={mermaidBlocks} />
     </div>
   );
 }
