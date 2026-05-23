@@ -43,6 +43,22 @@ func main() {
 
 	svc := service.New(store.New(p))
 	h := api.NewRouter(svc, authz)
+
+	// Soft-attach JWT verifier against identity-svc JWKS so RequireAction
+	// (when read-side authz lands) finds claims in context. Boot-time
+	// fetch failure is non-fatal.
+	jwksURL := envOr("IDENTITY_JWKS_URL", "http://localhost:8082/.well-known/jwks.json")
+	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
+	var verifier *libauth.Verifier
+	if set, err := libauth.FetchJWKS(context.Background(), jwksURL); err != nil {
+		log.Warn().Err(err).Str("jwks_url", jwksURL).Msg("JWKS fetch failed — JWT verification disabled until restart")
+	} else {
+		verifier = libauth.NewVerifier(set, issuer)
+	}
+	if verifier != nil {
+		h = libauth.AttachClaims(verifier)(h)
+	}
+
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

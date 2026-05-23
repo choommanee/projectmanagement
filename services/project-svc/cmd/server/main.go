@@ -44,6 +44,24 @@ func main() {
 	// attach per-instance attrs (tenant_id, owner_user) to each decision.
 	loader := api.NewCedarLoader(p)
 	h := api.NewRouterWithLoader(svc, authz, loader)
+
+	// Soft-attach JWT verifier: parses the incoming Authorization: Bearer
+	// against identity-svc's JWKS so RequireAction downstream can find
+	// claims in context. Failure to reach JWKS at boot is non-fatal — the
+	// service still listens but routes guarded by RequireAction return
+	// 401 "missing claims" until a successful fetch on next restart.
+	jwksURL := envOr("IDENTITY_JWKS_URL", "http://localhost:8082/.well-known/jwks.json")
+	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
+	var verifier *libauth.Verifier
+	if set, err := libauth.FetchJWKS(context.Background(), jwksURL); err != nil {
+		log.Warn().Err(err).Str("jwks_url", jwksURL).Msg("JWKS fetch failed — JWT verification disabled until restart")
+	} else {
+		verifier = libauth.NewVerifier(set, issuer)
+	}
+	if verifier != nil {
+		h = libauth.AttachClaims(verifier)(h)
+	}
+
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

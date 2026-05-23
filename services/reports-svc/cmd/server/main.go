@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	libauth "github.com/pmplatform/libs/go/auth"
 	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/reports-svc/internal/api"
@@ -39,6 +40,21 @@ func main() {
 	// Plan #6 Task 6 — wire the Cedar resource loader.
 	loader := api.NewCedarLoader(p)
 	h := api.NewRouterWithLoader(svc, authz, loader)
+
+	// Soft-attach JWT verifier against identity-svc JWKS so RequireAction
+	// finds claims in context. Boot-time fetch failure is non-fatal.
+	jwksURL := envOr("IDENTITY_JWKS_URL", "http://localhost:8082/.well-known/jwks.json")
+	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
+	var verifier *libauth.Verifier
+	if set, err := libauth.FetchJWKS(context.Background(), jwksURL); err != nil {
+		log.Warn().Err(err).Str("jwks_url", jwksURL).Msg("JWKS fetch failed — JWT verification disabled until restart")
+	} else {
+		verifier = libauth.NewVerifier(set, issuer)
+	}
+	if verifier != nil {
+		h = libauth.AttachClaims(verifier)(h)
+	}
+
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

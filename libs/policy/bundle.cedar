@@ -5,6 +5,16 @@
 
 // --- Platform admin ---------------------------------------------------------
 
+// Super-role: platform-admin members may invoke any action on any resource.
+// Forbid rules (destructive actions requiring X-Confirm-Destructive, cross-
+// tenant ABAC denies) still apply via Cedar's forbid > permit precedence.
+permit (
+  principal,
+  action,
+  resource
+)
+when { context.roles.contains("platform-admin") };
+
 // Allow JWT signing-key rotation only to platform-admin members.
 permit (
   principal,
