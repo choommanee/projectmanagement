@@ -18,10 +18,10 @@ import (
 )
 
 // NewRouter wires the chi router for notification-svc.
-// authz is the Cedar authorizer injected at boot; it is threaded through the
-// router so future write endpoints can declare RequireAction guards inline.
+// authz is the Cedar authorizer injected at boot.
+// When authz is nil (tests that don't need Cedar), RequireAction becomes a
+// no-op — that is the contract in libs/go/auth.
 func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
-	_ = authz // reserved for future per-route Cedar guards
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -30,9 +30,19 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	})
 
 	r.Route("/v1", func(r chi.Router) {
+		// GET /v1/notifications — JWT required; store already filters by
+		// (tenant_id, user_id) via RLS so no Cedar action needed for reads.
 		r.Get("/notifications", listNotifications(svc))
-		r.Post("/notifications/read-all", markAllRead(svc))
-		r.Post("/notifications/{id}/read", markRead(svc))
+
+		// POST /v1/notifications/read-all — Cedar action notif.mark_all_read.
+		r.With(libauth.RequireAction(authz, "notif.mark_all_read", "*")).
+			Post("/notifications/read-all", markAllRead(svc))
+
+		// POST /v1/notifications/{id}/read — Cedar action notif.mark_read.
+		// Wildcard resource until a per-instance resource loader is added; the
+		// store enforces user_id + tenant_id ownership via RLS.
+		r.With(libauth.RequireAction(authz, "notif.mark_read", "*")).
+			Post("/notifications/{id}/read", markRead(svc))
 	})
 
 	return r

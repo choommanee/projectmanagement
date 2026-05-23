@@ -42,6 +42,9 @@ func main() {
 	var _ libauth.Authorizer = authz // compile-time interface check
 
 	st := store.New(p)
+	prefStore := store.NewPreference(p)
+	inapp := service.NewInAppChannel(st)
+	router := service.NewRouter(prefStore, inapp)
 	svc := service.New(st)
 	h := api.NewRouter(svc, authz)
 
@@ -80,7 +83,7 @@ func main() {
 			return
 		}
 		defer nc.Close()
-		if err := worker.Run(rootCtx, nc, st); err != nil && rootCtx.Err() == nil {
+		if err := worker.Run(rootCtx, nc, router); err != nil && rootCtx.Err() == nil {
 			log.Error().Err(err).Msg("worker exited")
 		}
 	}()

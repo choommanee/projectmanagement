@@ -12,6 +12,7 @@ import (
 
 	"github.com/pmplatform/libs/go/notification"
 
+	"github.com/pmplatform/services/notification-svc/internal/service"
 	"github.com/pmplatform/services/notification-svc/internal/store"
 	"github.com/pmplatform/services/notification-svc/internal/worker"
 )
@@ -30,17 +31,27 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	return p
 }
 
+// makeRouter returns a Router wired with a real InAppChannel backed by the pool.
+func makeRouter(p *pgxpool.Pool) *service.Router {
+	st := store.New(p)
+	prefStore := store.NewPreference(p)
+	inapp := service.NewInAppChannel(st)
+	return service.NewRouter(prefStore, inapp)
+}
+
 func TestHandle_BadJSON(t *testing.T) {
 	p := testPool(t)
-	if err := worker.Handle(context.Background(), store.New(p), []byte("not-json")); err == nil {
+	router := makeRouter(p)
+	if err := worker.Handle(context.Background(), router, []byte("not-json")); err == nil {
 		t.Fatal("expected error for bad json")
 	}
 }
 
 func TestHandle_MissingFields(t *testing.T) {
 	p := testPool(t)
+	router := makeRouter(p)
 	data, _ := json.Marshal(notification.Event{TenantID: uuid.NewString()})
-	if err := worker.Handle(context.Background(), store.New(p), data); err == nil {
+	if err := worker.Handle(context.Background(), router, data); err == nil {
 		t.Fatal("expected error for missing fields")
 	}
 }
@@ -58,6 +69,7 @@ func TestHandle_PersistsRow(t *testing.T) {
 		_, _ = p.Exec(context.Background(), `DELETE FROM tenant WHERE id = $1`, tid)
 	})
 
+	router := makeRouter(p)
 	uid := uuid.New()
 	ev := notification.Event{
 		TenantID: tid.String(), UserID: uid.String(),
@@ -65,7 +77,7 @@ func TestHandle_PersistsRow(t *testing.T) {
 		Payload: map[string]any{"x": 1},
 	}
 	data, _ := json.Marshal(ev)
-	if err := worker.Handle(context.Background(), store.New(p), data); err != nil {
+	if err := worker.Handle(context.Background(), router, data); err != nil {
 		t.Fatalf("Handle: %v", err)
 	}
 
