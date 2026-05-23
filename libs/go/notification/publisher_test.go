@@ -8,33 +8,27 @@ import (
 	natsx "github.com/pmplatform/libs/go/nats"
 )
 
-func TestPublish_Validation(t *testing.T) {
+// TestNoopPublisher_AlwaysNil verifies that NoopPublisher.Publish returns nil
+// for any event, including those that would fail JetStreamPublisher validation.
+// (This replaces the removed free-function Publish tests.)
+func TestNoopPublisher_AlwaysNil(t *testing.T) {
+	var p Publisher = NoopPublisher{}
 	cases := []struct {
 		name string
 		ev   Event
-		want string
 	}{
-		{"missing tenant", Event{UserID: "u", Kind: "k", Title: "t"}, "tenant_id"},
-		{"missing user", Event{TenantID: "t", Kind: "k", Title: "t"}, "user_id"},
-		{"missing kind", Event{TenantID: "t", UserID: "u", Title: "t"}, "kind"},
-		{"missing title", Event{TenantID: "t", UserID: "u", Kind: "k"}, "title"},
+		{"missing tenant", Event{UserID: "u", Kind: "k", Title: "t"}},
+		{"missing user", Event{TenantID: "t", Kind: "k", Title: "t"}},
+		{"missing kind", Event{TenantID: "t", UserID: "u", Title: "t"}},
+		{"missing title", Event{TenantID: "t", UserID: "u", Kind: "k"}},
+		{"fully valid", Event{TenantID: "t", UserID: "u", Kind: "k", Title: "hi"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := Publish(context.Background(), nil, tc.ev)
-			if err == nil {
-				t.Fatalf("expected validation error, got nil")
+			if err := p.Publish(context.Background(), tc.ev); err != nil {
+				t.Fatalf("NoopPublisher.Publish returned non-nil error: %v", err)
 			}
 		})
-	}
-}
-
-func TestPublish_NilClient(t *testing.T) {
-	err := Publish(context.Background(), nil, Event{
-		TenantID: "t", UserID: "u", Kind: "k", Title: "t",
-	})
-	if err == nil {
-		t.Fatal("expected error for nil client")
 	}
 }
 

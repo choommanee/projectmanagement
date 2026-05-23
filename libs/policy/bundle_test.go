@@ -272,6 +272,30 @@ func TestBundleABACGrid(t *testing.T) {
 	}
 }
 
+// TestNotifMarkAllRead_DenyEmptyUserID verifies that notif.mark_all_read is
+// denied when context.user_id is empty. The permit guard requires
+// context.user_id != "" so an empty string must yield deny.
+func TestNotifMarkAllRead_DenyEmptyUserID(t *testing.T) {
+	a := loadEngine(t)
+	allow, err := a.IsAllowed(libauth.AuthzRequest{
+		Principal: `User::"sub-1"`,
+		Action:    `Action::"notif.mark_all_read"`,
+		Resource:  `Resource::"*"`,
+		Context: map[string]any{
+			"roles":               []string{"project-manager"},
+			"tenant_id":           "t1",
+			"user_id":             "",
+			"confirm_destructive": false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("IsAllowed: %v", err)
+	}
+	if allow {
+		t.Fatal("notif.mark_all_read with empty user_id must be denied")
+	}
+}
+
 func TestAdapterNilDenies(t *testing.T) {
 	var a *Adapter
 	allow, err := a.IsAllowed(libauth.AuthzRequest{
