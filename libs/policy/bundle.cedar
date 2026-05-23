@@ -451,3 +451,42 @@ unless {
   context.roles.contains("platform-admin") &&
   context.confirm_destructive == true
 };
+
+// --- notification-svc ---
+
+// All authenticated users can read their own notifications.
+// ABAC: resource.user_id must match the caller's user_id in context.
+permit (
+  principal,
+  action == Action::"notif.read",
+  resource
+)
+when {
+  context has roles &&
+  resource has user_id &&
+  resource.user_id == context.user_id
+};
+
+// Mark one notification read — own only.
+permit (
+  principal,
+  action == Action::"notif.mark_read",
+  resource
+)
+when {
+  context has roles &&
+  resource has user_id &&
+  resource.user_id == context.user_id
+};
+
+// Mark all read — tenant-scoped, any authenticated user for their own.
+// context.user_id is set by the JWT middleware for every authenticated request.
+permit (
+  principal,
+  action == Action::"notif.mark_all_read",
+  resource
+)
+when {
+  context has user_id &&
+  context.user_id != ""
+};

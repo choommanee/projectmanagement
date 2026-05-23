@@ -368,3 +368,15 @@ The authoritative resource template per service is in:
 - `services/reports-svc/internal/api/handlers.go`
 
 Read endpoints are governed by the same ABAC `forbid` rules even though they only use `auth.Require` at the middleware level — Cedar evaluates resource attributes loaded by the per-service `cedar_loader.go`.
+
+## notification-svc (`services/notification-svc`)
+
+Route base: `/v1`.
+
+Actions use ABAC per-user scoping: `notif.read` and `notif.mark_read` require the resource `user_id` attribute to match `context.user_id` (the authenticated caller). `notif.mark_all_read` requires the caller to be authenticated (`context.user_id` present and non-empty); the JWT middleware enforces authentication before Cedar runs.
+
+| Method | Path | Action | Resource | Guard |
+| ------ | ---- | ------ | -------- | ----- |
+| GET | `/v1/notifications` | `notif.read` | `Notification::{:id}` | READ_ONLY (ABAC: own only) |
+| POST | `/v1/notifications/{id}/read` | `notif.mark_read` | `Notification::{:id}` | WRITE_GUARD (ABAC: own only) |
+| POST | `/v1/notifications/read-all` | `notif.mark_all_read` | `Notification::"*"` | WRITE_GUARD (any authenticated user) |

@@ -99,6 +99,13 @@ func TestBundleGrid(t *testing.T) {
 		{"report.dashboard.delete deny mfg-operator", "report.dashboard.delete", []string{"mfg-operator"}, false, false},
 		{"report.dashboard.create deny anon", "report.dashboard.create", nil, false, false},
 
+		// --- notification-svc (mark_all_read: any authenticated user) ------
+		// notif.mark_all_read is gated by context.user_id (set by JWT middleware).
+		// Unauthenticated requests never reach Cedar (auth.Require blocks them first),
+		// so only authenticated-user cases are exercised here.
+		{"notif.mark_all_read allow project-manager", "notif.mark_all_read", []string{"project-manager"}, false, true},
+		{"notif.mark_all_read allow tenant-admin", "notif.mark_all_read", []string{"tenant-admin"}, false, true},
+
 		// --- destructive forbid grid ---------------------------------------
 		// tenant.delete: even platform-admin needs confirm=true; tenant-admin
 		// is rejected because the forbid wins over the permit.
@@ -132,6 +139,7 @@ func TestBundleGrid(t *testing.T) {
 				Context: map[string]any{
 					"roles":               roles,
 					"tenant_id":           "t1",
+					"user_id":             "sub-1",
 					"confirm_destructive": r.confirm,
 				},
 			})
@@ -225,6 +233,13 @@ func TestBundleABACGrid(t *testing.T) {
 		{"report.dashboard.update same-tenant allow", "report.dashboard.update", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-call"}, []string{"bi-author"}, "t-call", false, true},
 		{"report.dashboard.update cross-tenant deny", "report.dashboard.update", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"bi-author"}, "t-call", false, false},
 		{"report.dashboard.delete cross-tenant deny", "report.dashboard.delete", `Dashboard::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"bi-author"}, "t-call", false, false},
+
+		// --- notification-svc (ABAC: resource.user_id == context.user_id) -
+		{"notif.read own notification allow", "notif.read", `Notification::"n1"`, map[string]any{"user_id": "sub-1"}, []string{"project-manager"}, "t-call", false, true},
+		{"notif.read cross-user deny", "notif.read", `Notification::"n1"`, map[string]any{"user_id": "sub-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"notif.read no attrs deny", "notif.read", `Notification::"n1"`, nil, []string{"project-manager"}, "t-call", false, false},
+		{"notif.mark_read own notification allow", "notif.mark_read", `Notification::"n1"`, map[string]any{"user_id": "sub-1"}, []string{"project-manager"}, "t-call", false, true},
+		{"notif.mark_read cross-user deny", "notif.mark_read", `Notification::"n1"`, map[string]any{"user_id": "sub-other"}, []string{"mfg-operator"}, "t-call", false, false},
 	}
 
 	for _, r := range rows {
@@ -241,6 +256,7 @@ func TestBundleABACGrid(t *testing.T) {
 				Context: map[string]any{
 					"roles":               roles,
 					"tenant_id":           r.ctxTenant,
+					"user_id":             "sub-1",
 					"confirm_destructive": r.confirm,
 				},
 				ResourceAttrs: r.attrs,
