@@ -24,6 +24,140 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
-    "new": "New"
+    "new": "New",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "error": "Something went wrong.",
+    "retry": "Retry",
+    "search": "Search",
+    "filter": "Filter",
+    "reset": "Reset",
+    "noResults": "No results found.",
+    "actions": "Actions",
+    "created": "Created",
+    "updated": "Updated",
+    "status": "Status",
+    "name": "Name",
+    "description": "Description",
+    "createdAt": "Created at",
+    "updatedAt": "Updated at"
+  },
+  "pm": {
+    "tasks": {
+      "title": "Tasks",
+      "status": {
+        "todo": "To Do",
+        "in_progress": "In Progress",
+        "blocked": "Blocked",
+        "review": "Review",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "priority": {
+        "low": "Low",
+        "med": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "type": {
+        "task": "Task",
+        "subtask": "Subtask",
+        "milestone": "Milestone",
+        "deliverable": "Deliverable",
+        "issue": "Issue",
+        "risk": "Risk",
+        "bug": "Bug"
+      },
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "assignee": "Assignee",
+        "reviewer": "Reviewer",
+        "startDate": "Start date",
+        "dueDate": "Due date",
+        "estimate": "Estimate (md)",
+        "actual": "Actual (md)",
+        "progress": "Progress",
+        "tags": "Tags"
+      },
+      "actions": {
+        "addDependency": "Add dependency",
+        "removeDependency": "Remove dependency",
+        "delete": "Delete task"
+      },
+      "empty": "No tasks yet. Create one to get started."
+    },
+    "sprints": {
+      "title": "Sprints",
+      "status": {
+        "planning": "Planning",
+        "active": "Active",
+        "completed": "Completed"
+      },
+      "fields": {
+        "name": "Sprint name",
+        "goal": "Sprint goal",
+        "startDate": "Start",
+        "endDate": "End"
+      },
+      "actions": {
+        "start": "Start sprint",
+        "complete": "Complete sprint"
+      },
+      "velocity": "Velocity",
+      "empty": "No sprints yet."
+    },
+    "inbox": {
+      "title": "Inbox",
+      "empty": "You're all caught up.",
+      "markRead": "Mark as read",
+      "markAllRead": "Mark all as read"
+    },
+    "reports": {
+      "title": "Reports",
+      "burndown": "Burndown",
+      "velocity": "Velocity",
+      "empty": "No report data available."
+    }
+  },
+  "mfg": {
+    "workOrders": {
+      "title": "Work Orders",
+      "status": {
+        "draft": "Draft",
+        "released": "Released",
+        "in_progress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "fields": {
+        "code": "WO Code",
+        "product": "Product",
+        "qty": "Quantity",
+        "unit": "Unit",
+        "scheduledStart": "Scheduled start",
+        "scheduledEnd": "Scheduled end",
+        "actualStart": "Actual start",
+        "actualEnd": "Actual end"
+      },
+      "actions": {
+        "release": "Release",
+        "cancel": "Cancel",
+        "complete": "Complete"
+      },
+      "empty": "No work orders."
+    },
+    "bom": {
+      "title": "Bill of Materials",
+      "fields": {
+        "part": "Part",
+        "qty": "Qty",
+        "unit": "Unit",
+        "level": "Level"
+      },
+      "empty": "No BOM items."
+    }
   }
 }

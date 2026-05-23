@@ -24,6 +24,140 @@
   "common": {
     "save": "บันทึก",
     "cancel": "ยกเลิก",
-    "new": "เพิ่มใหม่"
+    "new": "เพิ่มใหม่",
+    "edit": "แก้ไข",
+    "delete": "ลบ",
+    "confirm": "ยืนยัน",
+    "loading": "กำลังโหลด…",
+    "error": "เกิดข้อผิดพลาด",
+    "retry": "ลองใหม่",
+    "search": "ค้นหา",
+    "filter": "ตัวกรอง",
+    "reset": "รีเซ็ต",
+    "noResults": "ไม่พบผลลัพธ์",
+    "actions": "การดำเนินการ",
+    "created": "สร้างเมื่อ",
+    "updated": "อัปเดตเมื่อ",
+    "status": "สถานะ",
+    "name": "ชื่อ",
+    "description": "คำอธิบาย",
+    "createdAt": "วันที่สร้าง",
+    "updatedAt": "วันที่อัปเดต"
+  },
+  "pm": {
+    "tasks": {
+      "title": "งาน",
+      "status": {
+        "todo": "รอดำเนินการ",
+        "in_progress": "กำลังดำเนินการ",
+        "blocked": "ติดขัด",
+        "review": "รอตรวจสอบ",
+        "done": "เสร็จสิ้น",
+        "cancelled": "ยกเลิก"
+      },
+      "priority": {
+        "low": "ต่ำ",
+        "med": "ปานกลาง",
+        "high": "สูง",
+        "critical": "วิกฤต"
+      },
+      "type": {
+        "task": "งาน",
+        "subtask": "งานย่อย",
+        "milestone": "หลักไมล์",
+        "deliverable": "ผลส่งมอบ",
+        "issue": "ปัญหา",
+        "risk": "ความเสี่ยง",
+        "bug": "บัก"
+      },
+      "fields": {
+        "title": "ชื่องาน",
+        "description": "รายละเอียด",
+        "assignee": "ผู้รับผิดชอบ",
+        "reviewer": "ผู้ตรวจสอบ",
+        "startDate": "วันเริ่มต้น",
+        "dueDate": "วันครบกำหนด",
+        "estimate": "ประมาณการ (วัน)",
+        "actual": "เวลาจริง (วัน)",
+        "progress": "ความคืบหน้า",
+        "tags": "แท็ก"
+      },
+      "actions": {
+        "addDependency": "เพิ่มการพึ่งพา",
+        "removeDependency": "ลบการพึ่งพา",
+        "delete": "ลบงาน"
+      },
+      "empty": "ยังไม่มีงาน สร้างงานแรกได้เลย"
+    },
+    "sprints": {
+      "title": "สปรินต์",
+      "status": {
+        "planning": "วางแผน",
+        "active": "ดำเนินการ",
+        "completed": "เสร็จสิ้น"
+      },
+      "fields": {
+        "name": "ชื่อสปรินต์",
+        "goal": "เป้าหมายสปรินต์",
+        "startDate": "เริ่มต้น",
+        "endDate": "สิ้นสุด"
+      },
+      "actions": {
+        "start": "เริ่มสปรินต์",
+        "complete": "ปิดสปรินต์"
+      },
+      "velocity": "ความเร็ว",
+      "empty": "ยังไม่มีสปรินต์"
+    },
+    "inbox": {
+      "title": "กล่องรับ",
+      "empty": "ไม่มีรายการค้างอยู่",
+      "markRead": "ทำเครื่องหมายว่าอ่านแล้ว",
+      "markAllRead": "ทำเครื่องหมายทั้งหมดว่าอ่านแล้ว"
+    },
+    "reports": {
+      "title": "รายงาน",
+      "burndown": "Burndown",
+      "velocity": "ความเร็ว",
+      "empty": "ไม่มีข้อมูลรายงาน"
+    }
+  },
+  "mfg": {
+    "workOrders": {
+      "title": "ใบสั่งงาน",
+      "status": {
+        "draft": "ร่าง",
+        "released": "ปล่อยงาน",
+        "in_progress": "กำลังผลิต",
+        "completed": "เสร็จสิ้น",
+        "cancelled": "ยกเลิก"
+      },
+      "fields": {
+        "code": "รหัสใบสั่งงาน",
+        "product": "สินค้า",
+        "qty": "จำนวน",
+        "unit": "หน่วย",
+        "scheduledStart": "กำหนดเริ่ม",
+        "scheduledEnd": "กำหนดเสร็จ",
+        "actualStart": "เริ่มจริง",
+        "actualEnd": "เสร็จจริง"
+      },
+      "actions": {
+        "release": "ปล่อยงาน",
+        "cancel": "ยกเลิก",
+        "complete": "ปิดงาน"
+      },
+      "empty": "ไม่มีใบสั่งงาน"
+    },
+    "bom": {
+      "title": "รายการวัสดุ",
+      "fields": {
+        "part": "ชิ้นส่วน",
+        "qty": "จำนวน",
+        "unit": "หน่วย",
+        "level": "ระดับ"
+      },
+      "empty": "ไม่มีรายการวัสดุ"
+    }
   }
 }
