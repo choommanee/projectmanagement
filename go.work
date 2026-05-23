@@ -8,6 +8,7 @@ use (
 	./libs/go/httpx
 	./libs/go/logger
 	./libs/go/nats
+	./libs/go/notification
 	./libs/go/otel
 	./libs/policy
 	./services/_template
@@ -16,6 +17,7 @@ use (
 	./services/document-svc
 	./services/identity-svc
 	./services/mfg-svc
+	./services/notification-svc
 	./services/project-svc
 	./services/quality-svc
 	./services/reports-svc
