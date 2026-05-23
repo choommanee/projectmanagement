@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM Platform — Manufacturing ERP & Project Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,600&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050b14;
+  --surface:#0a1628;
+  --surface2:#0f1f38;
+  --border:rgba(255,255,255,0.06);
+  --border-b:rgba(14,165,233,0.22);
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --dim:#94a3b8;
+  --sky:#0ea5e9;
+  --sky-glow:rgba(14,165,233,0.1);
+  --gold:#f59e0b;
+  --gold-glow:rgba(245,158,11,0.1);
+  --green:#10b981;
+  --red:#ef4444;
+  --fd:'Cormorant Garamond',Georgia,serif;
+  --fm:'IBM Plex Mono','Courier New',monospace;
+  --fb:'IBM Plex Sans Thai','Helvetica Neue',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--fb);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.1rem 3rem;
+  background:rgba(5,11,20,0.88);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  transition:border-color .3s;
+}
+.nav-logo{font-family:var(--fm);font-size:.85rem;font-weight:500;color:var(--sky);letter-spacing:.18em}
+.nav-logo em{color:var(--muted);font-style:normal}
+.nav-links{display:flex;gap:2.5rem;align-items:center}
+.nav-links a{font-family:var(--fm);font-size:.7rem;letter-spacing:.12em;color:var(--muted);text-decoration:none;text-transform:uppercase;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{font-family:var(--fm);font-size:.72rem;font-weight:500;color:var(--bg);background:var(--sky);padding:.5rem 1.4rem;text-decoration:none;letter-spacing:.06em;transition:opacity .2s}
+.nav-cta:hover{opacity:.85}
+
+/* ── HERO ── */
+.hero{
+  position:relative;min-height:100vh;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:9rem 3rem 5rem;overflow:hidden;
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:68px 68px;
+}
+.hero-orbs{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 65% 55% at 10% 55%,rgba(14,165,233,.08) 0%,transparent 65%),
+    radial-gradient(ellipse 45% 40% at 88% 25%,rgba(245,158,11,.06) 0%,transparent 65%);
+}
+.hero-content{position:relative;max-width:1100px}
+.eyebrow{
+  font-family:var(--fm);font-size:.68rem;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--sky);
+  margin-bottom:2rem;display:flex;align-items:center;gap:1rem;
+}
+.eyebrow::before{content:'';display:block;width:2rem;height:1px;background:var(--sky)}
+h1{
+  font-family:var(--fd);
+  font-size:clamp(3.8rem,9vw,7.5rem);
+  font-weight:400;line-height:1.04;
+  letter-spacing:-.025em;margin-bottom:1.75rem;
+}
+h1 em{font-style:italic;color:var(--sky)}
+h1 .g{color:var(--gold)}
+.hero-sub{
+  font-size:1.05rem;font-weight:300;color:var(--dim);
+  max-width:540px;margin-bottom:3.5rem;line-height:1.85;
+}
+.stats-row{
+  display:grid;grid-template-columns:repeat(4,auto);
+  border:1px solid var(--border);max-width:660px;
+  background:rgba(10,22,40,.7);backdrop-filter:blur(8px);
+}
+.stat{padding:1.4rem 2rem;border-right:1px solid var(--border)}
+.stat:last-child{border-right:none}
+.stat-n{
+  font-family:var(--fm);font-size:2rem;font-weight:500;
+  color:var(--text);line-height:1;margin-bottom:.3rem;
+}
+.stat-n .a{color:var(--sky)}
+.stat-l{font-size:.65rem;font-weight:400;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+
+/* ── TICKER ── */
+.ticker-wrap{overflow:hidden;background:var(--sky);padding:.55rem 0}
+.ticker{display:flex;gap:2.5rem;white-space:nowrap;animation:tick 32s linear infinite}
+.ticker span{font-family:var(--fm);font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.9)}
+.dot{color:rgba(255,255,255,.35)}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ── SHARED SECTION ── */
+.section{padding:5.5rem 3rem;max-width:1200px;margin:0 auto}
+.divider{height:1px;background:var(--border);margin:0 3rem}
+.tag{
+  font-family:var(--fm);font-size:.67rem;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--sky);
+  margin-bottom:.8rem;display:flex;align-items:center;gap:.8rem;
+}
+.tag::before{content:'';display:inline-block;width:1.5rem;height:1px;background:currentColor}
+h2{font-family:var(--fd);font-size:clamp(2rem,4vw,3.25rem);font-weight:400;line-height:1.12;margin-bottom:.9rem}
+.sub{font-size:.95rem;color:var(--dim);max-width:540px;line-height:1.85;margin-bottom:3.5rem}
+
+/* ── PROBLEM ── */
+.prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+.prob-card{background:var(--surface);padding:2.5rem}
+.prob-head{font-family:var(--fm);font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.prob-head svg{flex-shrink:0}
+.prob-title{font-size:1.15rem;font-weight:600;margin-bottom:1rem}
+.prob-list{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.prob-list li{font-size:.87rem;color:var(--dim);display:flex;align-items:flex-start;gap:.5rem;line-height:1.55}
+.prob-list li::before{content:'—';color:var(--muted);flex-shrink:0;margin-top:.05em}
+
+/* ── FEATURES ── */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+.fc{background:var(--surface);padding:2.5rem;transition:background .25s;cursor:default;position:relative;overflow:hidden}
+.fc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--sky);opacity:0;transition:opacity .25s}
+.fc:hover{background:var(--surface2)}
+.fc:hover::after{opacity:1}
+.fc.mfg::after{background:var(--gold)}
+.fc.q::after{background:var(--green)}
+.fc.n::after{background:var(--sky)}
+.fc-icon{width:2.75rem;height:2.75rem;margin-bottom:1.5rem;color:var(--sky)}
+.fc.mfg .fc-icon{color:var(--gold)}
+.fc.q .fc-icon{color:var(--green)}
+.fc-num{font-family:var(--fm);font-size:.62rem;letter-spacing:.14em;color:var(--muted);margin-bottom:.7rem}
+.fc-title{font-size:1.1rem;font-weight:600;margin-bottom:.55rem}
+.fc-sub{font-size:.84rem;color:var(--dim);line-height:1.65;margin-bottom:1.25rem}
+.pills{display:flex;flex-wrap:wrap;gap:.35rem}
+.pill{font-family:var(--fm);font-size:.62rem;padding:.2rem .6rem;border:1px solid var(--border);color:var(--muted);letter-spacing:.04em;border-radius:2px}
+.fc.mfg .pill{border-color:rgba(245,158,11,.2);color:rgba(245,158,11,.75)}
+.fc.q   .pill{border-color:rgba(16,185,129,.2);color:rgba(16,185,129,.75)}
+.fc.n   .pill{border-color:rgba(14,165,233,.2);color:rgba(14,165,233,.75)}
+
+/* ── ARCHITECTURE ── */
+.arch-box{
+  border:1px solid var(--border);background:var(--surface);
+  padding:3.5rem;position:relative;overflow:hidden;
+}
+.arch-box::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 55% 70% at 50% 50%,rgba(14,165,233,.04) 0%,transparent 70%);
+  pointer-events:none;
+}
+.arch-layers{display:flex;flex-direction:column;gap:0;position:relative}
+.arch-row{display:flex;align-items:center;gap:1.25rem;padding:.9rem 0}
+.arch-row+.arch-row{border-top:1px solid var(--border)}
+.arch-lbl{
+  font-family:var(--fm);font-size:.6rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);
+  width:70px;flex-shrink:0;text-align:right;
+}
+.arch-nodes{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.node{
+  font-family:var(--fm);font-size:.7rem;padding:.45rem .9rem;
+  border:1px solid var(--border);background:rgba(10,22,40,.85);
+  color:var(--dim);letter-spacing:.04em;white-space:nowrap;
+}
+.node.sky{border-color:var(--border-b);color:var(--sky);background:var(--sky-glow)}
+.node.gold{border-color:rgba(245,158,11,.25);color:var(--gold);background:var(--gold-glow)}
+.node.green{border-color:rgba(16,185,129,.25);color:var(--green);background:rgba(16,185,129,.08)}
+.node.big{padding:.55rem 1.8rem;font-weight:500}
+.arch-arrow{
+  padding:.5rem 0 .5rem 6.25rem;
+  font-family:var(--fm);font-size:.65rem;
+  color:var(--sky);opacity:.6;letter-spacing:.08em;
+  display:flex;align-items:center;gap:.75rem;
+}
+.arch-arrow::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(14,165,233,.3),transparent);
+}
+
+/* ── TECH ── */
+.tech-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border)}
+.tc{background:var(--surface);padding:2rem}
+.tc-lbl{font-family:var(--fm);font-size:.62rem;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:.7rem}
+.tc-val{font-size:1rem;font-weight:600;margin-bottom:.4rem}
+.tc-desc{font-size:.8rem;color:var(--dim);line-height:1.55}
+
+/* ── CUSTOMERS ── */
+.cust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+.cust-card{border:1px solid var(--border);padding:2.5rem;background:var(--surface);position:relative;overflow:hidden}
+.cust-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--sky)}
+.cust-card.g1::before{background:var(--gold)}
+.cust-card.g2::before{background:var(--green)}
+.cust-icon{font-size:2rem;margin-bottom:1rem;display:block}
+.cust-title{font-size:1.05rem;font-weight:600;margin-bottom:.75rem}
+.cust-desc{font-size:.85rem;color:var(--dim);line-height:1.72}
+.cust-tags{margin-top:1.25rem;display:flex;flex-wrap:wrap;gap:.4rem}
+
+/* ── ROADMAP ── */
+.rd-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+.rd-head{font-family:var(--fm);font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem}
+.rd-head.done{color:var(--green)}.rd-head.plan{color:var(--gold)}
+.rd-items{display:flex;flex-direction:column;gap:.5rem}
+.ri{
+  display:flex;align-items:flex-start;gap:.75rem;
+  font-size:.87rem;color:var(--text);
+  padding:.7rem 1rem;
+  background:var(--surface);border:1px solid var(--border);
+}
+.ri-dot{width:6px;height:6px;border-radius:50%;margin-top:.45em;flex-shrink:0}
+.ri-dot.done{background:var(--green)}.ri-dot.plan{background:var(--gold);opacity:.7}
+
+/* ── CTA ── */
+.cta{
+  padding:7rem 3rem;background:var(--surface);
+  border-top:1px solid var(--border);
+  text-align:center;position:relative;overflow:hidden;
+}
+.cta::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 55% 65% at 50% 100%,rgba(14,165,233,.07) 0%,transparent 70%);
+}
+.cta-eye{font-family:var(--fm);font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--sky);margin-bottom:1.5rem;position:relative}
+.cta h2{font-family:var(--fd);font-size:clamp(2.5rem,5.5vw,4.5rem);font-weight:400;line-height:1.1;margin-bottom:.9rem;position:relative}
+.cta h2 em{font-style:italic;color:var(--sky)}
+.cta-sub{font-size:.95rem;color:var(--dim);margin-bottom:3rem;position:relative}
+.btns{display:flex;gap:1rem;justify-content:center;position:relative}
+.btn-p{font-family:var(--fm);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:1rem 2.5rem;background:var(--sky);color:var(--bg);text-decoration:none;font-weight:500;transition:opacity .2s}
+.btn-p:hover{opacity:.85}
+.btn-s{font-family:var(--fm);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:1rem 2.5rem;border:1px solid var(--border-b);color:var(--sky);text-decoration:none;transition:background .2s}
+.btn-s:hover{background:var(--sky-glow)}
+
+/* ── FOOTER ── */
+footer{padding:1.5rem 3rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.fl{font-family:var(--fm);font-size:.72rem;color:var(--muted);letter-spacing:.12em}
+
+/* ── ANIMATIONS ── */
+.fi{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease}
+.fi.vis{opacity:1;transform:translateY(0)}
+
+/* ── PULSE DOT ── */
+@keyframes pdot{0%,100%{opacity:.35;transform:scale(1)}50%{opacity:1;transform:scale(1.5)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1000px){
+  .feat-grid{grid-template-columns:1fr 1fr}
+  .prob-grid{grid-template-columns:1fr}
+  .tech-grid{grid-template-columns:repeat(2,1fr)}
+  .cust-grid{grid-template-columns:1fr}
+  .rd-grid{grid-template-columns:1fr}
+  nav{padding:1rem 1.5rem}
+  .nav-links{display:none}
+  .section,.hero{padding-left:1.5rem;padding-right:1.5rem}
+  .divider{margin:0 1.5rem}
+  .stats-row{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .feat-grid{grid-template-columns:1fr}
+  h1{font-size:3.2rem}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo">PM<em>//</em>Platform</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#roadmap">Roadmap</a>
+  </div>
+  <a href="#cta" class="nav-cta">ขอดูตัวอย่าง →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-orbs"></div>
+  <div class="hero-content">
+    <div class="eyebrow">Manufacturing ERP · Project Management · Multi-Tenant SaaS</div>
+    <h1>
+      ระบบ ERP<br>
+      <em>การผลิต</em> ที่<br>
+      <span class="g">คุณเป็นเจ้าของ</span>
+    </h1>
+    <p class="hero-sub">
+      แทนที่จะจ่าย SAP หรือ Dynamics 365 หลักล้านต่อปี —
+      deploy ระบบ ERP ระดับ enterprise ด้วยข้อมูลที่อยู่ใน
+      infrastructure ของคุณเอง พร้อมใช้งานได้จริง ไม่มี vendor lock-in
+    </p>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-n"><span class="a" data-count="10">0</span></div>
+        <div class="stat-l">Microservices</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n"><span data-count="80">0</span><span class="a">+</span></div>
+        <div class="stat-l">API Endpoints</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n"><span class="a">100</span>%</div>
+        <div class="stat-l">Tenant Isolated</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n"><span data-count="7">0</span></div>
+        <div class="stat-l">Roles / ABAC</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker">
+    <span>Manufacturing ERP</span><span class="dot">◆</span>
+    <span>IATF 16949 Ready</span><span class="dot">◆</span>
+    <span>PostgreSQL RLS Multi-Tenant</span><span class="dot">◆</span>
+    <span>Cedar ABAC Authorization</span><span class="dot">◆</span>
+    <span>Rust MRP Engine</span><span class="dot">◆</span>
+    <span>NATS JetStream</span><span class="dot">◆</span>
+    <span>Kubernetes Ready</span><span class="dot">◆</span>
+    <span>SSO · OIDC · MFA</span><span class="dot">◆</span>
+    <span>Teams · Slack · LINE Notify</span><span class="dot">◆</span>
+    <span>Manufacturing ERP</span><span class="dot">◆</span>
+    <span>IATF 16949 Ready</span><span class="dot">◆</span>
+    <span>PostgreSQL RLS Multi-Tenant</span><span class="dot">◆</span>
+    <span>Cedar ABAC Authorization</span><span class="dot">◆</span>
+    <span>Rust MRP Engine</span><span class="dot">◆</span>
+    <span>NATS JetStream</span><span class="dot">◆</span>
+    <span>Kubernetes Ready</span><span class="dot">◆</span>
+    <span>SSO · OIDC · MFA</span><span class="dot">◆</span>
+    <span>Teams · Slack · LINE Notify</span><span class="dot">◆</span>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- PROBLEM -->
+<div class="section fi">
+  <div class="tag">ปัญหาที่เราแก้</div>
+  <h2>ทำไม ERP ที่มีอยู่<br>ถึงไม่ตอบโจทย์</h2>
+  <p class="sub">ธุรกิจการผลิตไทยติดอยู่ในสามทางเลือกที่ล้วนมีข้อจำกัดร้ายแรง</p>
+  <div class="prob-grid">
+    <div class="prob-card">
+      <div class="prob-head">
+        <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+        ตัวเลือก A
+      </div>
+      <div class="prob-title">SAP / MS Dynamics 365</div>
+      <ul class="prob-list">
+        <li>ค่าลิขสิทธิ์หลักล้านบาทต่อปี ยังไม่รวม implementation</li>
+        <li>ต้องจ้าง consultant เฉพาะทาง ใช้เวลา deploy นานเป็นปี</li>
+        <li>Vendor lock-in ถาวร ย้ายออกยากและแพงมาก</li>
+        <li>Over-engineered และซับซ้อนเกินความต้องการ SME</li>
+      </ul>
+    </div>
+    <div class="prob-card">
+      <div class="prob-head">
+        <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+        ตัวเลือก B
+      </div>
+      <div class="prob-title">Excel &amp; Spreadsheet</div>
+      <ul class="prob-list">
+        <li>ไม่ scale เมื่อทีมหรือข้อมูลโตขึ้น</li>
+        <li>ไม่มี real-time collaboration หรือ version control</li>
+        <li>ข้อมูลกระจัดกระจาย ตรวจสอบและ audit ยาก</li>
+        <li>ไม่มี access control — ใครก็แก้ข้อมูลได้</li>
+      </ul>
+    </div>
+    <div class="prob-card">
+      <div class="prob-head">
+        <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+        ตัวเลือก C
+      </div>
+      <div class="prob-title">ซอฟต์แวร์ไทยทั่วไป</div>
+      <ul class="prob-list">
+        <li>ไม่มี APQP/PPAP/FMEA สำหรับมาตรฐาน IATF 16949</li>
+        <li>ไม่รองรับ multi-tenant หรือ multi-company</li>
+        <li>ไม่มี workflow automation และ audit trail</li>
+        <li>Architecture ไม่พร้อมสำหรับ cloud หรือ scale</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<div class="section fi" id="features">
+  <div class="tag">ความสามารถของระบบ</div>
+  <h2>ครบในระบบเดียว</h2>
+  <p class="sub">Manufacturing, PM, Quality, Workflow, Notification และ Document — อยู่บน platform เดียวกัน ข้อมูลเชื่อมถึงกันหมด</p>
+  <div class="feat-grid">
+
+    <!-- MFG -->
+    <div class="fc mfg">
+      <div class="fc-num">01 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="5" y="30" width="38" height="13" rx="1.5"/>
+        <rect x="13" y="17" width="22" height="13" rx="1.5"/>
+        <rect x="20" y="5" width="8" height="12" rx="1.5"/>
+        <line x1="24" y1="5" x2="24" y2="2" stroke-width="2"/>
+        <circle cx="24" cy="1.5" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="fc-title">Manufacturing</div>
+      <div class="fc-sub">BOM · Routing · Work Orders · MRP Engine · Lot Traceability — ครบวงจรตั้งแต่วางแผนจนส่งสินค้า powered by Rust compute engine</div>
+      <div class="pills">
+        <span class="pill">BOM Multi-Level</span>
+        <span class="pill">MRP (Rust)</span>
+        <span class="pill">Work Centers</span>
+        <span class="pill">Lot Genealogy</span>
+      </div>
+    </div>
+
+    <!-- PM -->
+    <div class="fc">
+      <div class="fc-num">02 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="6" y="8" width="36" height="32" rx="2"/>
+        <line x1="14" y1="20" x2="34" y2="20"/>
+        <line x1="14" y1="28" x2="26" y2="28"/>
+        <circle cx="11" cy="20" r="2.5" fill="currentColor" stroke="none"/>
+        <circle cx="11" cy="28" r="2.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <div class="fc-title">Project Management</div>
+      <div class="fc-sub">Projects · Tasks · Sprints · Dependencies พร้อม Role Workspaces แยกสำหรับ PM / BA / SA / Expert</div>
+      <div class="pills">
+        <span class="pill">Task Dependencies</span>
+        <span class="pill">Sprint Planning</span>
+        <span class="pill">Role Workspaces</span>
+        <span class="pill">Progress Tracking</span>
+      </div>
+    </div>
+
+    <!-- QUALITY -->
+    <div class="fc q">
+      <div class="fc-num">03 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M24 5L5 13v16c0 9 8.5 15 19 19 10.5-4 19-10 19-19V13z"/>
+        <polyline points="15,24 21,30 33,17" stroke-width="2"/>
+      </svg>
+      <div class="fc-title">Quality Management</div>
+      <div class="fc-sub">APQP · PPAP · FMEA · Control Plans · Inspections · NCR/CAPA ตามมาตรฐาน IATF 16949 ครบทุกกระบวนการ</div>
+      <div class="pills">
+        <span class="pill">APQP</span>
+        <span class="pill">PPAP</span>
+        <span class="pill">FMEA</span>
+        <span class="pill">CAPA</span>
+      </div>
+    </div>
+
+    <!-- WORKFLOW -->
+    <div class="fc">
+      <div class="fc-num">04 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="10" cy="24" r="5.5"/>
+        <circle cx="38" cy="12" r="5.5"/>
+        <circle cx="38" cy="36" r="5.5"/>
+        <line x1="15.4" y1="21.6" x2="32.6" y2="14.4"/>
+        <line x1="15.4" y1="26.4" x2="32.6" y2="33.6"/>
+      </svg>
+      <div class="fc-title">Workflow Automation</div>
+      <div class="fc-sub">สร้าง workflow อัตโนมัติด้วย DSL-based engine รองรับ Human Tasks, Expression, HTTP Call — ไม่ต้องเขียน code</div>
+      <div class="pills">
+        <span class="pill">DSL Engine</span>
+        <span class="pill">Human Tasks</span>
+        <span class="pill">Rust Runtime</span>
+        <span class="pill">HTTP Actions</span>
+      </div>
+    </div>
+
+    <!-- NOTIFICATION -->
+    <div class="fc n">
+      <div class="fc-num">05 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M24 5a15 15 0 0 1 15 15c0 9-3 13-5 17H14c-2-4-5-8-5-17A15 15 0 0 1 24 5z"/>
+        <line x1="20" y1="41" x2="28" y2="41"/>
+        <circle cx="36" cy="11" r="6" fill="var(--sky)" stroke="none" opacity="0.25"/>
+        <circle cx="36" cy="11" r="3.5" fill="var(--sky)" stroke="none"/>
+      </svg>
+      <div class="fc-title">Notification System</div>
+      <div class="fc-sub">ทุก event ในระบบแจ้งเตือนพร้อมกันหลายช่องทาง per-user preferences — เลือกเองได้ว่าจะรับอะไรผ่านไหน</div>
+      <div class="pills">
+        <span class="pill">Microsoft Teams</span>
+        <span class="pill">Slack</span>
+        <span class="pill">LINE Notify</span>
+        <span class="pill">SMTP Email</span>
+      </div>
+    </div>
+
+    <!-- DOCUMENT -->
+    <div class="fc">
+      <div class="fc-num">06 / 06</div>
+      <svg class="fc-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M10 5h21l11 11v27H10z"/>
+        <polyline points="31,5 31,16 42,16"/>
+        <line x1="18" y1="26" x2="30" y2="26"/>
+        <line x1="18" y1="32" x2="26" y2="32"/>
+      </svg>
+      <div class="fc-title">Documents &amp; Reports</div>
+      <div class="fc-sub">Document versioning · Templates · Comments · Dashboard แบบ schema-driven — สร้าง report เองได้โดยไม่ต้องเขียน code</div>
+      <div class="pills">
+        <span class="pill">Version History</span>
+        <span class="pill">Custom Dashboard</span>
+        <span class="pill">Full Audit Trail</span>
+        <span class="pill">Templates</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- HOW IT CONNECTS -->
+<div class="section fi">
+  <div class="tag">การเชื่อมโยง</div>
+  <h2>ทุก module<br>คุยกันอัตโนมัติ</h2>
+  <p class="sub">ไม่ใช่แค่ feature หลายอัน — แต่เป็น ecosystem ที่ทุกการกระทำ trigger ระบบอื่นต่อเนื่อง</p>
+
+  <div style="border:1px solid var(--border);background:var(--surface);padding:3rem;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 60% 70% at 50% 50%,rgba(14,165,233,.04) 0%,transparent 70%);pointer-events:none"></div>
+
+    <!-- Flow examples -->
+    <div style="display:flex;flex-direction:column;gap:2rem;position:relative">
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:1rem;align-items:center">
+        <div style="border:1px solid var(--border-b);padding:1rem;background:var(--sky-glow)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--sky);margin-bottom:.4rem">TRIGGER</div>
+          <div style="font-size:.87rem;font-weight:500">MFG<br>Release Work Order</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">WORKFLOW</div>
+          <div style="font-size:.87rem;font-weight:500">QA Approval<br>Human Task</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">NOTIFICATION</div>
+          <div style="font-size:.87rem;font-weight:500">แจ้ง Teams<br>+ Email + LINE</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid rgba(16,185,129,.25);padding:1rem;background:rgba(16,185,129,.05)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--green);margin-bottom:.4rem">AUDIT</div>
+          <div style="font-size:.87rem;font-weight:500">บันทึก Log<br>อัตโนมัติ</div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border)"></div>
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:1rem;align-items:center">
+        <div style="border:1px solid rgba(245,158,11,.25);padding:1rem;background:var(--gold-glow)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem">TRIGGER</div>
+          <div style="font-size:.87rem;font-weight:500">QA<br>NCR Created</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">PROJECT</div>
+          <div style="font-size:.87rem;font-weight:500">สร้าง CAPA<br>Task อัตโนมัติ</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">NOTIFICATION</div>
+          <div style="font-size:.87rem;font-weight:500">แจ้ง QE<br>ผ่าน Slack</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid rgba(16,185,129,.25);padding:1rem;background:rgba(16,185,129,.05)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--green);margin-bottom:.4rem">REPORT</div>
+          <div style="font-size:.87rem;font-weight:500">NCR Dashboard<br>อัปเดทเอง</div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border)"></div>
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:1rem;align-items:center">
+        <div style="border:1px solid var(--border-b);padding:1rem;background:var(--sky-glow)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--sky);margin-bottom:.4rem">TRIGGER</div>
+          <div style="font-size:.87rem;font-weight:500">Identity<br>Password Reset</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">NOTIFICATION</div>
+          <div style="font-size:.87rem;font-weight:500">ส่ง Email<br>OTP ทันที</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid var(--border);padding:1rem;background:var(--surface2)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">AUDIT</div>
+          <div style="font-size:.87rem;font-weight:500">Log security<br>event</div>
+        </div>
+        <div style="font-family:var(--fm);font-size:.8rem;color:var(--sky);text-align:center">→</div>
+        <div style="border:1px solid rgba(16,185,129,.25);padding:1rem;background:rgba(16,185,129,.05)">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--green);margin-bottom:.4rem">CEDAR</div>
+          <div style="font-size:.87rem;font-weight:500">ตรวจสิทธิ์<br>ทุก request</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ARCHITECTURE -->
+<div class="section fi" id="architecture">
+  <div class="tag">สถาปัตยกรรม</div>
+  <h2>ออกแบบมาเพื่อ Scale<br>และความปลอดภัย</h2>
+  <p class="sub">Microservices ที่ทุก service แยกกันอิสระ — crash ที่เดียวไม่กระทบส่วนอื่น ข้อมูลแยกตาม tenant ด้วย RLS ระดับ database</p>
+  <div class="arch-box">
+    <div class="arch-layers">
+      <div class="arch-row">
+        <div class="arch-lbl">BROWSER</div>
+        <div class="arch-nodes">
+          <div class="node sky">Next.js 15 App Router</div>
+          <div class="node sky">UI Kit + Design Tokens</div>
+          <div class="node sky">i18n EN / TH</div>
+        </div>
+      </div>
+      <div class="arch-arrow">▼ REST API · JWT Bearer Token · Cedar ABAC</div>
+      <div class="arch-row">
+        <div class="arch-lbl">SERVICES</div>
+        <div class="arch-nodes">
+          <div class="node gold">identity-svc</div>
+          <div class="node gold">tenant-svc</div>
+          <div class="node">project-svc</div>
+          <div class="node gold">mfg-svc</div>
+          <div class="node green">quality-svc</div>
+          <div class="node">workflow-svc</div>
+          <div class="node">notification-svc</div>
+          <div class="node">document-svc</div>
+          <div class="node">audit-svc</div>
+          <div class="node">reports-svc</div>
+        </div>
+      </div>
+      <div class="arch-arrow">▼ Publish / Subscribe (async, fan-out)</div>
+      <div class="arch-row">
+        <div class="arch-lbl">MESSAGE</div>
+        <div class="arch-nodes">
+          <div class="node sky big">NATS JetStream — Event Bus</div>
+        </div>
+      </div>
+      <div class="arch-arrow">▼ Persist · Query</div>
+      <div class="arch-row">
+        <div class="arch-lbl">DATA</div>
+        <div class="arch-nodes">
+          <div class="node green">PostgreSQL 16 + RLS</div>
+          <div class="node">Redis Cache</div>
+          <div class="node">MinIO / S3</div>
+          <div class="node">Meilisearch</div>
+        </div>
+      </div>
+      <div class="arch-arrow">▼ Compute-intensive workloads</div>
+      <div class="arch-row">
+        <div class="arch-lbl">ENGINES</div>
+        <div class="arch-nodes">
+          <div class="node gold">MRP Engine (Rust)</div>
+          <div class="node gold">Traceability Engine (Rust)</div>
+          <div class="node gold">Workflow Runtime (Rust)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- TECH -->
+<div class="section fi">
+  <div class="tag">ความน่าเชื่อถือทางเทคนิค</div>
+  <h2>Built for Enterprise</h2>
+  <p class="sub">เทคโนโลยีระดับ enterprise ที่บริษัทชั้นนำระดับโลกใช้งาน</p>
+  <div class="tech-grid">
+    <div class="tc">
+      <div class="tc-lbl">Authorization</div>
+      <div class="tc-val" style="color:var(--sky)">Cedar ABAC</div>
+      <div class="tc-desc">สิทธิ์ถึงระดับ record ไม่ใช่แค่ role — ป้องกัน privilege escalation ทุกรูปแบบ</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Data Isolation</div>
+      <div class="tc-val" style="color:var(--green)">PostgreSQL RLS</div>
+      <div class="tc-desc">Row-Level Security บังคับที่ database — ข้อมูลข้ามบริษัทรั่วไม่ได้แม้แต่ทีม dev</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Compute Engine</div>
+      <div class="tc-val" style="color:var(--gold)">Rust Runtime</div>
+      <div class="tc-desc">MRP, Traceability, Workflow engine เขียนด้วย Rust — เร็วกว่า Go/Node 3-10x</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Authentication</div>
+      <div class="tc-val" style="color:var(--sky)">OIDC + MFA</div>
+      <div class="tc-desc">SSO ผ่าน Google / Azure AD, TOTP MFA, JWT rotation, password reset ครบ</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Observability</div>
+      <div class="tc-val" style="color:var(--green)">OpenTelemetry</div>
+      <div class="tc-desc">Distributed tracing + metrics ทุก service ต่อเข้า Grafana / Jaeger ได้ทันที</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Deployment</div>
+      <div class="tc-val" style="color:var(--gold)">Helm + Kubernetes</div>
+      <div class="tc-desc">Helm chart พร้อมทุก service — deploy บน k8s ได้เลย รองรับ horizontal scaling</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Audit</div>
+      <div class="tc-val" style="color:var(--sky)">Full Audit Trail</div>
+      <div class="tc-desc">ทุก action บันทึก via NATS → PostgreSQL — ค้นหาตาม user, action, เวลาได้ทุกเมื่อ</div>
+    </div>
+    <div class="tc">
+      <div class="tc-lbl">Quality Standard</div>
+      <div class="tc-val" style="color:var(--green)">IATF 16949</div>
+      <div class="tc-desc">APQP, PPAP, FMEA, Control Plan, NCR/CAPA ครบ ตามมาตรฐานอุตสาหกรรมยานยนต์</div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- CUSTOMERS -->
+<div class="section fi">
+  <div class="tag">เหมาะกับใคร</div>
+  <h2>สามกลุ่มที่ได้ประโยชน์<br>สูงสุด</h2>
+  <p class="sub">PM Platform ไม่ได้ออกแบบมาสำหรับทุกคน — แต่สำหรับสามกลุ่มนี้ มันคือคำตอบที่ดีที่สุดในตลาด</p>
+  <div class="cust-grid">
+    <div class="cust-card">
+      <span class="cust-icon">🏭</span>
+      <div class="cust-title">โรงงานผลิต Tier-1 / Tier-2</div>
+      <div class="cust-desc">
+        ผู้ผลิตชิ้นส่วนยานยนต์หรืออิเล็กทรอนิกส์ที่ต้องการ APQP/PPAP พร้อม BOM, MRP และ lot traceability ในระบบเดียว แทนที่ Excel หลายชีตที่ audit ยาก และไม่ผ่านการ audit จาก OEM ลูกค้า
+      </div>
+      <div class="cust-tags">
+        <span class="pill" style="border-color:rgba(14,165,233,.3);color:rgba(14,165,233,.8)">IATF 16949</span>
+        <span class="pill" style="border-color:rgba(14,165,233,.3);color:rgba(14,165,233,.8)">OEM Supplier</span>
+        <span class="pill" style="border-color:rgba(14,165,233,.3);color:rgba(14,165,233,.8)">Traceability</span>
+      </div>
+    </div>
+    <div class="cust-card g1">
+      <span class="cust-icon">🏢</span>
+      <div class="cust-title">SME ต้องการ ERP<br>แต่ไม่ต้องการราคา SAP</div>
+      <div class="cust-desc">
+        บริษัทขนาดกลางที่เติบโตเกิน spreadsheet แล้ว แต่ SAP ซับซ้อนและแพงเกินไป PM Platform ให้ความสามารถระดับ enterprise ในราคาที่ควบคุมได้ deploy บน server ของตัวเองได้
+      </div>
+      <div class="cust-tags">
+        <span class="pill" style="border-color:rgba(245,158,11,.3);color:rgba(245,158,11,.8)">Self-host</span>
+        <span class="pill" style="border-color:rgba(245,158,11,.3);color:rgba(245,158,11,.8)">No Vendor Lock-in</span>
+        <span class="pill" style="border-color:rgba(245,158,11,.3);color:rgba(245,158,11,.8)">ข้อมูลอยู่กับคุณ</span>
+      </div>
+    </div>
+    <div class="cust-card g2">
+      <span class="cust-icon">💻</span>
+      <div class="cust-title">บริษัท IT<br>ที่รับพัฒนา Custom ERP</div>
+      <div class="cust-desc">
+        ทีมพัฒนาที่ต้องการ foundation ที่แข็งแกร่ง สถาปัตยกรรมพร้อม extend เพิ่ม module ใหม่ตาม pattern เดิมได้ทันที ไม่ต้องสร้าง multi-tenant, auth, audit จากศูนย์
+      </div>
+      <div class="cust-tags">
+        <span class="pill" style="border-color:rgba(16,185,129,.3);color:rgba(16,185,129,.8)">White-label</span>
+        <span class="pill" style="border-color:rgba(16,185,129,.3);color:rgba(16,185,129,.8)">Extensible</span>
+        <span class="pill" style="border-color:rgba(16,185,129,.3);color:rgba(16,185,129,.8)">Open Architecture</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ROADMAP -->
+<div class="section fi" id="roadmap">
+  <div class="tag">ความโปร่งใส</div>
+  <h2>สถานะปัจจุบัน —<br>บอกตรงๆ ไม่มีเกินจริง</h2>
+  <p class="sub">เราบอกชัดเจนว่าอะไรทำงานได้จริงวันนี้ และอะไรอยู่ใน roadmap — ไม่มี "coming soon" ที่ไม่มีแผน</p>
+  <div class="rd-grid">
+    <div>
+      <div class="rd-head done"><span>●</span> พร้อมใช้งานแล้ววันนี้</div>
+      <div class="rd-items">
+        <div class="ri"><div class="ri-dot done"></div>Manufacturing: BOM, Routing, Work Orders, MRP Engine, Lot Traceability</div>
+        <div class="ri"><div class="ri-dot done"></div>Quality: APQP, PPAP, FMEA, Control Plans, Inspections, NCR/CAPA</div>
+        <div class="ri"><div class="ri-dot done"></div>Project Management: Projects, Tasks, Sprints, Dependencies</div>
+        <div class="ri"><div class="ri-dot done"></div>Workflow Engine: DSL, Human Tasks, Expression, HTTP Call (Rust)</div>
+        <div class="ri"><div class="ri-dot done"></div>Identity: Login, MFA (TOTP), OIDC SSO, Password Reset, JWT Rotation</div>
+        <div class="ri"><div class="ri-dot done"></div>Notification: In-App, Email, Teams, Slack, LINE — per-user preferences</div>
+        <div class="ri"><div class="ri-dot done"></div>Multi-Tenant: PostgreSQL RLS isolation, Cedar ABAC, 7 roles</div>
+        <div class="ri"><div class="ri-dot done"></div>Document Management + Version History + Comments + Templates</div>
+        <div class="ri"><div class="ri-dot done"></div>Reports &amp; Dashboard (schema-driven, custom layout)</div>
+        <div class="ri"><div class="ri-dot done"></div>Full Audit Trail: ทุก action บันทึกอัตโนมัติผ่าน NATS</div>
+        <div class="ri"><div class="ri-dot done"></div>Kubernetes / Helm chart พร้อม deploy ทุก service</div>
+        <div class="ri"><div class="ri-dot done"></div>OpenTelemetry tracing + Prometheus metrics ทุก service</div>
+      </div>
+    </div>
+    <div>
+      <div class="rd-head plan"><span>○</span> Roadmap ที่วางแผนไว้</div>
+      <div class="rd-items">
+        <div class="ri"><div class="ri-dot plan"></div>Gantt Chart และ Kanban Board UI (Plan #5)</div>
+        <div class="ri"><div class="ri-dot plan"></div>Notification Preferences UI (ปัจจุบัน config ผ่าน API)</div>
+        <div class="ri"><div class="ri-dot plan"></div>NotificationCenter เชื่อม Real API (ปัจจุบัน UI ใช้ mock data)</div>
+        <div class="ri"><div class="ri-dot plan"></div>Rich Text Document Editor ใน Browser</div>
+        <div class="ri"><div class="ri-dot plan"></div>Mobile App (iOS / Android — web responsive แล้ว แต่ยังไม่มี native)</div>
+        <div class="ri"><div class="ri-dot plan"></div>MinIO/S3 File Attachment Integration</div>
+        <div class="ri"><div class="ri-dot plan"></div>Per-tenant Webhook Signing Keys (ปัจจุบันเป็น global key)</div>
+        <div class="ri"><div class="ri-dot plan"></div>Notification Retention Auto-Cleanup Policy</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta" id="cta">
+  <div class="cta-eye">Ready to Deploy</div>
+  <h2>เริ่มต้นด้วย<br><em>infrastructure ของคุณเอง</em></h2>
+  <p class="cta-sub">ติดต่อเราเพื่อขอ demo หรือข้อมูลเกี่ยวกับ licensing การ deploy และ support</p>
+  <div class="btns">
+    <a href="mailto:hello@pmplatform.io" class="btn-p">ขอดูตัวอย่าง</a>
+    <a href="#features" class="btn-s">ดู Features อีกครั้ง</a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="fl">PM<span style="color:var(--muted)">//</span>Platform · 2026</div>
+  <div class="fl" style="color:var(--muted)">Built with Go · Rust · Next.js 15 · PostgreSQL 16</div>
+</footer>
+
+<script>
+// Fade-in on scroll
+const els = document.querySelectorAll('.fi');
+const obs = new IntersectionObserver(e => {
+  e.forEach(x => { if(x.isIntersecting){ x.target.classList.add('vis'); obs.unobserve(x.target); } });
+}, {threshold:.08});
+els.forEach(e => obs.observe(e));
+
+// Counter animation
+function count(el, target, ms=1400) {
+  const start = performance.now();
+  const run = t => {
+    const p = Math.min((t-start)/ms,1);
+    const ease = 1-Math.pow(1-p,3);
+    el.textContent = Math.round(ease*target);
+    if(p<1) requestAnimationFrame(run);
+  };
+  requestAnimationFrame(run);
+}
+const counters = document.querySelectorAll('[data-count]');
+const cObs = new IntersectionObserver(e => {
+  e.forEach(x => { if(x.isIntersecting){ count(x.target, +x.target.dataset.count); cObs.unobserve(x.target); }});
+},{threshold:.5});
+counters.forEach(e => cObs.observe(e));
+
+// Nav border on scroll
+const nav = document.getElementById('nav');
+window.addEventListener('scroll',()=>{
+  nav.style.borderBottomColor = window.scrollY>60 ? 'rgba(14,165,233,.18)' : 'rgba(255,255,255,.06)';
+},{passive:true});
+</script>
+</body>
+</html>
