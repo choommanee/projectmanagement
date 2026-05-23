@@ -58,6 +58,7 @@ type Document struct {
 	Type                                  DocumentType
 	Title                                 string
 	Body                                  map[string]any
+	Metadata                              map[string]any
 	Status                                DocumentStatus
 	OwnerID                               *uuid.UUID
 	Tags                                  []string

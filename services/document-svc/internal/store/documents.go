@@ -90,19 +90,20 @@ func (s *Documents) Create(ctx context.Context, d *domain.Document) error {
 func (s *Documents) GetByID(ctx context.Context, tid, id uuid.UUID) (*domain.Document, error) {
 	var d domain.Document
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
-		var bodyBytes []byte
+		var bodyBytes, metaBytes []byte
 		err := tx.QueryRow(ctx, `
-			SELECT id, tenant_id, workspace_id, project_id, type, title, body, status,
+			SELECT id, tenant_id, workspace_id, project_id, type, title, body, metadata, status,
 			       owner_id, tags, current_version_id, created_at, updated_at, version
 			FROM document
 			WHERE id=$1 AND tenant_id=$2 AND deleted_at IS NULL`,
 			id, tid,
 		).Scan(&d.ID, &d.TenantID, &d.WorkspaceID, &d.ProjectID, &d.Type, &d.Title, &bodyBytes,
-			&d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version)
+			&metaBytes, &d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version)
 		if err != nil {
 			return err
 		}
 		d.Body = fromJSON(bodyBytes)
+		d.Metadata = fromJSON(metaBytes)
 		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -166,7 +167,7 @@ func (s *Documents) List(ctx context.Context, tid uuid.UUID, opts ListDocsOpts) 
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			fmt.Sprintf(`
-				SELECT id, tenant_id, workspace_id, project_id, type, title, body, status,
+				SELECT id, tenant_id, workspace_id, project_id, type, title, body, metadata, status,
 				       owner_id, tags, current_version_id, created_at, updated_at, version
 				FROM document
 				WHERE %s
@@ -180,12 +181,13 @@ func (s *Documents) List(ctx context.Context, tid uuid.UUID, opts ListDocsOpts) 
 		defer rows.Close()
 		for rows.Next() {
 			var d domain.Document
-			var bodyBytes []byte
+			var bodyBytes, metaBytes []byte
 			if err := rows.Scan(&d.ID, &d.TenantID, &d.WorkspaceID, &d.ProjectID, &d.Type, &d.Title, &bodyBytes,
-				&d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version); err != nil {
+				&metaBytes, &d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version); err != nil {
 				return err
 			}
 			d.Body = fromJSON(bodyBytes)
+			d.Metadata = fromJSON(metaBytes)
 			items = append(items, &d)
 		}
 		if rows.Err() != nil {
@@ -204,14 +206,15 @@ func (s *Documents) List(ctx context.Context, tid uuid.UUID, opts ListDocsOpts) 
 // Update applies a patch to the document and writes a new version snapshot atomically.
 func (s *Documents) Update(ctx context.Context, d *domain.Document) error {
 	bodyJSON := toJSON(d.Body)
+	metaJSON := toJSON(d.Metadata)
 	return s.withTenant(ctx, d.TenantID, func(tx pgx.Tx) error {
 		// Optimistic lock update
 		ct, err := tx.Exec(ctx, `
 			UPDATE document SET
-			  title=$3, body=$4, status=$5, owner_id=$6, tags=$7,
+			  title=$3, body=$4, metadata=$5, status=$6, owner_id=$7, tags=$8,
 			  updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$8 AND deleted_at IS NULL`,
-			d.ID, d.TenantID, d.Title, bodyJSON, string(d.Status), d.OwnerID, d.Tags, d.Version,
+			WHERE id=$1 AND tenant_id=$2 AND version=$9 AND deleted_at IS NULL`,
+			d.ID, d.TenantID, d.Title, bodyJSON, metaJSON, string(d.Status), d.OwnerID, d.Tags, d.Version,
 		)
 		if err != nil {
 			return err
@@ -396,19 +399,20 @@ func (s *Documents) Restore(ctx context.Context, tid, docID uuid.UUID, rev, curr
 
 		// Fetch the updated document
 		var d domain.Document
-		var dBodyBytes []byte
+		var dBodyBytes, dMetaBytes []byte
 		err = tx.QueryRow(ctx, `
-			SELECT id, tenant_id, workspace_id, project_id, type, title, body, status,
+			SELECT id, tenant_id, workspace_id, project_id, type, title, body, metadata, status,
 			       owner_id, tags, current_version_id, created_at, updated_at, version
 			FROM document
 			WHERE id=$1 AND tenant_id=$2`,
 			docID, tid,
 		).Scan(&d.ID, &d.TenantID, &d.WorkspaceID, &d.ProjectID, &d.Type, &d.Title, &dBodyBytes,
-			&d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version)
+			&dMetaBytes, &d.Status, &d.OwnerID, &d.Tags, &d.CurrentVersionID, &d.CreatedAt, &d.UpdatedAt, &d.Version)
 		if err != nil {
 			return err
 		}
 		d.Body = fromJSON(dBodyBytes)
+		d.Metadata = fromJSON(dMetaBytes)
 		restored = &d
 		return nil
 	})
