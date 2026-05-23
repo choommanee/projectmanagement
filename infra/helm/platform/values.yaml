@@ -91,6 +91,40 @@ tenant:
       memory: 256Mi
 
 # ---------------------------------------------------------------------------
+# notification-svc (NATS consumer + HTTP API on 8093)
+# ---------------------------------------------------------------------------
+notification:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/pmplatform/notification-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8093
+    targetPort: 8093
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    SMTP_HOST: ""
+    SMTP_PORT: "587"
+    SMTP_USER: ""
+    SMTP_PASSWORD: ""
+    SMTP_FROM: ""
+    SMTP_TLS: "true"
+    WEBHOOK_SIGNING_KEY: ""
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "notification-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
 # audit-worker (NATS consumer; exposes /healthz on 8091)
 # ---------------------------------------------------------------------------
 auditWorker:
