@@ -21,7 +21,7 @@ func openTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://app:app@localhost:5433/platform?sslmode=disable"
+		dsn = "postgres://app:app@localhost:5432/platform?sslmode=disable"
 	}
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -279,5 +279,81 @@ func TestPatchDocumentCreatesNewVersionHTTP(t *testing.T) {
 	}, headers)
 	if staleResp.Code != 409 {
 		t.Fatalf("stale patch: expected 409, got %d", staleResp.Code)
+	}
+}
+
+func TestPatchDocumentMetadata(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	pid := seedTestProject(t, p, tid)
+	h := newTestHandler(p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+	ctx := context.Background()
+
+	// Ensure workspace
+	wsResp := doJSON(t, h, "POST", "/v1/workspaces", map[string]any{
+		"project_id": pid.String(), "kind": "sa", "name": "SA Workspace",
+	}, headers)
+	if wsResp.Code != 200 {
+		t.Fatalf("ensure workspace: expected 200, got %d: %s", wsResp.Code, wsResp.Body.String())
+	}
+	var ws map[string]any
+	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
+	wsID := ws["ID"].(string)
+
+	// Create an ADR document
+	createResp := doJSON(t, h, "POST", "/v1/documents", map[string]any{
+		"workspace_id": wsID,
+		"project_id":   pid.String(),
+		"type":         "adr",
+		"title":        "Use PostgreSQL",
+	}, headers)
+	if createResp.Code != 201 {
+		t.Fatalf("create: expected 201, got %d: %s", createResp.Code, createResp.Body.String())
+	}
+	var doc map[string]any
+	_ = json.Unmarshal(createResp.Body.Bytes(), &doc)
+	docID := doc["ID"].(string)
+	t.Cleanup(func() { p.Exec(ctx, "DELETE FROM document WHERE id=$1", docID) })
+
+	// PATCH with metadata (ADR votes)
+	votes := []map[string]any{
+		{"userId": "user-001", "choice": "approved", "votedAt": "2026-05-23T10:00:00Z"},
+	}
+	patchResp := doJSON(t, h, "PATCH", "/v1/documents/"+docID, map[string]any{
+		"metadata": map[string]any{"votes": votes},
+		"version":  1,
+	}, headers)
+	if patchResp.Code != 200 {
+		t.Fatalf("patch metadata: expected 200, got %d: %s", patchResp.Code, patchResp.Body.String())
+	}
+	var patched map[string]any
+	_ = json.Unmarshal(patchResp.Body.Bytes(), &patched)
+
+	// Assert metadata echoed in response
+	meta, ok := patched["Metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected Metadata in response, got: %v", patched["Metadata"])
+	}
+	votesOut, ok := meta["votes"].([]any)
+	if !ok || len(votesOut) != 1 {
+		t.Fatalf("expected 1 vote in metadata, got: %v", meta["votes"])
+	}
+
+	// GET to confirm metadata persisted
+	getResp := doJSON(t, h, "GET", "/v1/documents/"+docID, nil, headers)
+	if getResp.Code != 200 {
+		t.Fatalf("get: expected 200, got %d", getResp.Code)
+	}
+	var fetched map[string]any
+	_ = json.Unmarshal(getResp.Body.Bytes(), &fetched)
+	fetchedMeta, ok := fetched["Metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected Metadata in GET response, got: %v", fetched["Metadata"])
+	}
+	fetchedVotes, ok := fetchedMeta["votes"].([]any)
+	if !ok || len(fetchedVotes) != 1 {
+		t.Fatalf("expected 1 persisted vote, got: %v", fetchedMeta["votes"])
 	}
 }

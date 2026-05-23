@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5433/platform?sslmode=disable")
+	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5432/platform?sslmode=disable")
 	port := envOr("PORT", "8084")
 
 	p, err := pgxpool.New(context.Background(), dsn)

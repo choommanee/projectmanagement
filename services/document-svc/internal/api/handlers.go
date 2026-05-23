@@ -266,12 +266,13 @@ func listDocuments(svc *service.Service) http.HandlerFunc {
 }
 
 type patchDocumentReq struct {
-	Title   string              `json:"title,omitempty"`
-	Body    map[string]any      `json:"body,omitempty"`
-	Status  domain.DocumentStatus `json:"status,omitempty"`
-	OwnerID *uuid.UUID          `json:"owner_id,omitempty"`
-	Tags    []string            `json:"tags,omitempty"`
-	Version int                 `json:"version"`
+	Title    string                `json:"title,omitempty"`
+	Body     map[string]any        `json:"body,omitempty"`
+	Metadata map[string]any        `json:"metadata,omitempty"`
+	Status   domain.DocumentStatus `json:"status,omitempty"`
+	OwnerID  *uuid.UUID            `json:"owner_id,omitempty"`
+	Tags     []string              `json:"tags,omitempty"`
+	Version  int                   `json:"version"`
 }
 
 func patchDocument(svc *service.Service) http.HandlerFunc {
@@ -304,6 +305,9 @@ func patchDocument(svc *service.Service) http.HandlerFunc {
 		}
 		if req.Body != nil {
 			d.Body = req.Body
+		}
+		if req.Metadata != nil {
+			d.Metadata = req.Metadata
 		}
 		if req.Status != "" {
 			d.Status = req.Status
