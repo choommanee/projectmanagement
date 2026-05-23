@@ -132,6 +132,10 @@ func createProject(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
+		var actorID string
+		if c, ok := libauth.FromCtx(r.Context()); ok {
+			actorID = c.Subject
+		}
 		p, err := svc.CreateProject(r.Context(), service.CreateProjectInput{
 			TenantID:    tid,
 			Code:        req.Code,
@@ -139,6 +143,7 @@ func createProject(svc *service.Service) http.HandlerFunc {
 			Description: req.Description,
 			Status:      req.Status,
 			OwnerID:     req.OwnerID,
+			ActorID:     actorID,
 		})
 		if err != nil {
 			switch {
@@ -225,37 +230,27 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		// Fetch current and apply patch
-		p, err := svc.Projects.GetByID(r.Context(), tid, id)
+		// Resolve caller identity for notification routing (best-effort).
+		var callerID string
+		if c, ok := libauth.FromCtx(r.Context()); ok {
+			callerID = c.Subject
+		}
+		p, err := svc.UpdateProject(r.Context(), service.UpdateProjectInput{
+			TenantID:    tid,
+			ID:          id,
+			Name:        req.Name,
+			Description: req.Description,
+			Status:      req.Status,
+			OwnerID:     req.OwnerID,
+			ProgressPct: req.ProgressPct,
+			Tags:        req.Tags,
+			Version:     req.Version,
+			UserID:      callerID,
+		})
 		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				writeErr(w, 404, err)
-				return
-			}
-			writeErr(w, 500, err)
-			return
-		}
-		if req.Name != "" {
-			p.Name = req.Name
-		}
-		if req.Description != "" {
-			p.Description = req.Description
-		}
-		if req.Status != "" {
-			p.Status = req.Status
-		}
-		if req.OwnerID != nil {
-			p.OwnerID = req.OwnerID
-		}
-		if req.ProgressPct != nil {
-			p.ProgressPct = *req.ProgressPct
-		}
-		if req.Tags != nil {
-			p.Tags = req.Tags
-		}
-		p.Version = req.Version
-		if err := svc.Projects.Update(r.Context(), p); err != nil {
 			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
 			case errors.Is(err, domain.ErrConflict):
 				writeErr(w, 409, err)
 			default:

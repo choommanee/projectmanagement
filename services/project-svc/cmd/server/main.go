@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	libauth "github.com/pmplatform/libs/go/auth"
+	natsx "github.com/pmplatform/libs/go/nats"
+	notiflib "github.com/pmplatform/libs/go/notification"
 	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/project-svc/internal/api"
@@ -39,7 +41,22 @@ func main() {
 	authz := &libpolicy.Adapter{Policies: ps}
 	var _ libauth.Authorizer = authz // compile-time interface check
 
-	svc := service.New(store.NewProjects(p), store.NewTasks(p), store.NewSprints(p))
+	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		if nc, err := natsx.Connect(natsURL); err != nil {
+			log.Warn().Err(err).Msg("nats unavailable — notif events disabled")
+		} else {
+			if pub, err := notiflib.NewJetStreamPublisher(nc); err != nil {
+				log.Warn().Err(err).Msg("notif publisher init failed")
+			} else {
+				notifPub = pub
+				defer nc.Close()
+			}
+		}
+	}
+
+	svc := service.New(store.NewProjects(p), store.NewTasks(p), store.NewSprints(p)).
+		WithNotifPublisher(notifPub)
 	// Plan #6 Task 6 — pass the Cedar resource loader so scoped authz can
 	// attach per-instance attrs (tenant_id, owner_user) to each decision.
 	loader := api.NewCedarLoader(p)

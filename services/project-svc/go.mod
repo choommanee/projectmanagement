@@ -6,6 +6,8 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/pmplatform/libs/go/nats v0.0.0
+	github.com/pmplatform/libs/go/notification v0.0.0
 	github.com/rs/zerolog v1.35.1
 )
 
@@ -18,4 +20,9 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
+)
+
+replace (
+	github.com/pmplatform/libs/go/nats => ../../libs/go/nats
+	github.com/pmplatform/libs/go/notification => ../../libs/go/notification
 )
