@@ -99,6 +99,7 @@ func RequireActionWithMapper(authz Authorizer, mapper PrincipalMapper, action, r
 			ctx := map[string]any{
 				"tenant_id": c.TenantID,
 				"roles":     append([]string(nil), c.Roles...),
+				"user_id":   c.Subject,
 			}
 			// Propagate the destructive-confirmation header into Cedar
 			// context so policies guarding destructive actions (DELETE on
@@ -199,6 +200,7 @@ func RequireActionScoped(authz Authorizer, action, template string, opts ...Scop
 			ctxMap := map[string]any{
 				"tenant_id": c.TenantID,
 				"roles":     append([]string(nil), c.Roles...),
+				"user_id":   c.Subject,
 			}
 			if v := r.Header.Get("X-Confirm-Destructive"); v != "" {
 				switch v {

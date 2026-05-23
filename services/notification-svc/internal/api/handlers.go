@@ -30,9 +30,9 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 	})
 
 	r.Route("/v1", func(r chi.Router) {
-		// GET /v1/notifications — JWT required; store already filters by
-		// (tenant_id, user_id) via RLS so no Cedar action needed for reads.
-		r.Get("/notifications", listNotifications(svc))
+		// GET /v1/notifications — Cedar action notif.read required per ADR-0002.
+		r.With(libauth.RequireAction(authz, "notif.read", `Notification::"*"`)).
+			Get("/notifications", listNotifications(svc))
 
 		// POST /v1/notifications/read-all — Cedar action notif.mark_all_read.
 		r.With(libauth.RequireAction(authz, "notif.mark_all_read", "*")).
