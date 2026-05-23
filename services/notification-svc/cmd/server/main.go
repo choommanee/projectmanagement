@@ -50,6 +50,14 @@ func main() {
 	} else if emailCh != nil {
 		channels = append(channels, emailCh)
 	}
+	webhookKey := []byte(os.Getenv("WEBHOOK_SIGNING_KEY"))
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	channels = append(channels,
+		service.NewTeamsChannel(httpClient, webhookKey),
+		service.NewSlackChannel(httpClient, webhookKey),
+		service.NewLineChannel(httpClient, webhookKey),
+	)
+
 	router := service.NewRouter(prefStore, channels...)
 	svc := service.New(st)
 	h := api.NewRouter(svc, authz)
