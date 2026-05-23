@@ -59,6 +59,7 @@ export interface DocSummary {
 
 export interface Document extends DocSummary {
   body: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
   currentVersionId?: string | null;
 }
 
@@ -117,6 +118,7 @@ function normDoc(r: Record<string, unknown>): Document {
     type: (g(r, "type") ?? "note") as DocumentType,
     title: String(g(r, "title") ?? ""),
     body: (g(r, "body") ?? { type: "doc", content: [] }) as Record<string, unknown>,
+    metadata: (g(r, "metadata") ?? null) as Record<string, unknown> | null,
     status: (g(r, "status") ?? "draft") as DocumentStatus,
     ownerId: (snake(r, "owner_id", "ownerId")) as string | null | undefined,
     tags: (g(r, "tags") ?? []) as string[],
@@ -202,7 +204,7 @@ export async function createDocument(input: { workspace_id: string; project_id: 
   return normDoc(await r.json());
 }
 
-export async function updateDocument(id: string, patch: { title?: string; body?: Record<string, unknown>; status?: DocumentStatus; owner_id?: string | null; tags?: string[]; version: number }): Promise<Document> {
+export async function updateDocument(id: string, patch: { title?: string; body?: Record<string, unknown>; metadata?: Record<string, unknown>; status?: DocumentStatus; owner_id?: string | null; tags?: string[]; version: number }): Promise<Document> {
   const r = await fetch(`/api/documents/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) {
     const e = await r.json().catch(() => ({})); throw new Error(e.error ?? `update doc failed: ${r.status}`);

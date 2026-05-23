@@ -40,6 +40,10 @@ import {
   TYPES_BY_KIND,
 } from "@/lib/api/documents";
 import { DocEditor } from "@/components/DocEditor";
+import { DocCover } from "@/components/DocCover";
+import { WorkspaceDashboard } from "@/components/WorkspaceDashboard";
+import { RTMView } from "@/components/RTMView";
+import { ADRVotingPanel } from "@/components/ADRVotingPanel";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -123,6 +127,7 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
   const [restoringVersion, setRestoringVersion] = useState(false);
 
   const [showNewDocDialog, setShowNewDocDialog] = useState(false);
+  const [initialDocType, setInitialDocType] = useState<DocumentType | undefined>(undefined);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -257,6 +262,25 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       if (msg.includes("409") || msg.toLowerCase().includes("conflict")) setConflictError(true);
     }
   }
+
+  // ── Metadata change (DocCover / RTMView / ADRVotingPanel) ─────────────────
+
+  const handleMetadataChange = useCallback(async (meta: Record<string, unknown>) => {
+    if (!openDoc) return;
+    try {
+      const updated = await updateDocument(openDoc.id, {
+        metadata: meta,
+        version: currentVersionRef.current,
+      });
+      setOpenDoc(updated);
+      currentVersionRef.current = updated.version;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) {
+        setConflictError(true);
+      }
+    }
+  }, [openDoc]);
 
   // ── Comments ───────────────────────────────────────────────────────────────
 
@@ -561,9 +585,26 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
               </div>
             )}
 
-            {/* Editor */}
-            <div className="min-h-0 flex-1 overflow-auto bg-paper">
-              <DocEditor value={editorValue} onChange={onEditorChange} />
+            {/* Editor area with type-specific panels */}
+            <div className="min-h-0 flex-1 overflow-auto bg-paper flex flex-col">
+              {/* Cover panel — all types except rtm */}
+              {openDoc.type !== "rtm" && (
+                <DocCover doc={openDoc} onMetadataChange={handleMetadataChange} />
+              )}
+              {/* RTM gets its own full view */}
+              {openDoc.type === "rtm" ? (
+                <RTMView doc={openDoc} onMetadataChange={handleMetadataChange} />
+              ) : (
+                <DocEditor value={editorValue} onChange={onEditorChange} />
+              )}
+              {/* ADR voting below editor */}
+              {openDoc.type === "adr" && (
+                <ADRVotingPanel
+                  doc={openDoc}
+                  onMetadataChange={handleMetadataChange}
+                  onStatusChange={(s) => void changeStatus(s)}
+                />
+              )}
             </div>
 
             {/* Footer */}
@@ -584,12 +625,16 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
             </div>
           </>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <p className="text-sm text-ink-3">Select a document or create a new one.</p>
-            <Button variant="primary" onClick={() => setShowNewDocDialog(true)}>
-              <Plus size={14} /> New Document
-            </Button>
-          </div>
+          <WorkspaceDashboard
+            kind={kind}
+            docs={docs}
+            allowedTypes={allowedTypes}
+            onSelectDoc={(id) => setSelectedDocId(id)}
+            onNewDoc={(type) => {
+              setInitialDocType(type);
+              setShowNewDocDialog(true);
+            }}
+          />
         )}
       </div>
 
@@ -786,11 +831,13 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
           projectId={projectId}
           kind={kind}
           allowedTypes={allowedTypes}
-          onClose={() => setShowNewDocDialog(false)}
+          initialType={initialDocType}
+          onClose={() => { setShowNewDocDialog(false); setInitialDocType(undefined); }}
           onCreated={(doc) => {
             setDocs((prev) => [doc, ...prev]);
             setSelectedDocId(doc.id);
             setShowNewDocDialog(false);
+            setInitialDocType(undefined);
           }}
         />
       )}
@@ -827,13 +874,14 @@ interface NewDocDialogProps {
   projectId: string;
   kind: WorkspaceKind;
   allowedTypes: DocumentType[];
+  initialType?: DocumentType;
   onClose: () => void;
   onCreated: (doc: Document) => void;
 }
 
-function NewDocDialog({ workspace, projectId, kind, allowedTypes, onClose, onCreated }: NewDocDialogProps) {
+function NewDocDialog({ workspace, projectId, kind, allowedTypes, initialType, onClose, onCreated }: NewDocDialogProps) {
   const [tab, setTab] = useState<"template" | "blank">("template");
-  const [selectedType, setSelectedType] = useState<DocumentType>(allowedTypes[0]);
+  const [selectedType, setSelectedType] = useState<DocumentType>(initialType ?? allowedTypes[0]);
   const [title, setTitle] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
