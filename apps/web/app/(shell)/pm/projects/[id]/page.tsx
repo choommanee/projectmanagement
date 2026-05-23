@@ -14,6 +14,9 @@ import {
   type Project,
 } from "@/lib/api/projects";
 import { ProjectTasksTab } from "@/components/ProjectTasksTab";
+import { GanttChart } from "@/components/GanttChart";
+import { TaskSheet } from "@/components/TaskSheet";
+import { listTasksForProject, type Task } from "@/lib/api/tasks";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,11 +77,12 @@ function statusTone(s: Project["status"]): "success" | "warning" | "neutral" | "
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "tasks" | "sprints" | "activity";
+type TabId = "overview" | "tasks" | "gantt" | "sprints" | "activity";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "tasks", label: "Tasks" },
+  { id: "gantt", label: "Gantt" },
   { id: "sprints", label: "Sprints" },
   { id: "activity", label: "Activity" },
 ];
@@ -113,6 +117,11 @@ export default function ProjectDetailPage({
   // Tag input buffer
   const [tagInput, setTagInput] = useState("");
 
+  // Gantt state
+  const [ganttTasks, setGanttTasks] = useState<Task[]>([]);
+  const [ganttLoading, setGanttLoading] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
   const fetchProject = useCallback(async () => {
     setLoading(true);
     setSaveError(null);
@@ -139,6 +148,15 @@ export default function ProjectDetailPage({
   useEffect(() => {
     void fetchProject();
   }, [fetchProject]);
+
+  useEffect(() => {
+    if (tab !== "gantt" || !id) return;
+    setGanttLoading(true);
+    listTasksForProject(id, { limit: 200 })
+      .then(({ items }) => setGanttTasks(items))
+      .catch(() => {})
+      .finally(() => setGanttLoading(false));
+  }, [tab, id]);
 
   const dirty = form && baseline.current ? isDirty(form, baseline.current) : false;
 
@@ -359,6 +377,28 @@ export default function ProjectDetailPage({
           />
         )}
         {tab === "tasks" && <ProjectTasksTab projectId={id} />}
+        {tab === "gantt" && (
+          <div className="p-0">
+            {ganttLoading ? (
+              <div className="flex items-center justify-center h-48 text-sm text-ink-3">Loading…</div>
+            ) : (
+              <GanttChart
+                tasks={ganttTasks}
+                onTaskClick={(t) => setSelectedTaskId(t.id)}
+              />
+            )}
+            {selectedTaskId && (
+              <TaskSheet
+                taskId={selectedTaskId}
+                onClose={() => setSelectedTaskId(null)}
+                onChanged={() => {
+                  setSelectedTaskId(null);
+                  listTasksForProject(id, { limit: 200 }).then(({ items }) => setGanttTasks(items)).catch(() => {});
+                }}
+              />
+            )}
+          </div>
+        )}
         {tab === "sprints" && <PlaceholderTab message="Sprints UI ships with Page #4" />}
         {tab === "activity" && (
           <PlaceholderTab message="Activity will surface from audit pipeline (Phase 2)" />
