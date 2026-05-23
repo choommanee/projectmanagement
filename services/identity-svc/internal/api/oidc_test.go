@@ -27,6 +27,7 @@ import (
 
 	libauth "github.com/pmplatform/libs/go/auth"
 	"github.com/pmplatform/libs/go/audit"
+	notiflib "github.com/pmplatform/libs/go/notification"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	sjwt "github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -219,7 +220,7 @@ func oidcTestSetup(t *testing.T, allowJIT bool) (*oidcSetup, func()) {
 	mfaEnrollments := store.NewMFAEnrollments(p)
 	ssoConfigs := store.NewSSOConfigs(p)
 
-	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
+	auth := service.NewAuth(users, store.NewSessions(p), signer, pub, notiflib.NoopPublisher{}).
 		WithRefreshTokens(tokens, 30*24*time.Hour).
 		WithMFA(mfaEnrollments)
 	refresh := service.NewRefresh(users, tokens, signer, pub)

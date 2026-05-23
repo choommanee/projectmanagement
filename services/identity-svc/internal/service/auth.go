@@ -10,6 +10,7 @@ import (
 
 	libauth "github.com/pmplatform/libs/go/auth"
 	"github.com/pmplatform/libs/go/audit"
+	notiflib "github.com/pmplatform/libs/go/notification"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/store"
@@ -35,14 +36,15 @@ type Auth struct {
 	mfa      *store.MFAEnrollments // nil-safe: Login branches into step-up only when set
 	signer   TokenSigner
 	aud      AuditPublisher
+	notif    notiflib.Publisher
 	// refreshTTL is the lifetime of the issued refresh_token row. Mirrors
 	// the value Refresh uses so a rotated token expires on the same cadence
 	// as one freshly minted at login.
 	refreshTTL time.Duration
 }
 
-func NewAuth(u *store.Users, s *store.Sessions, signer TokenSigner, aud AuditPublisher) *Auth {
-	return &Auth{users: u, sessions: s, signer: signer, aud: aud, refreshTTL: 720 * time.Hour}
+func NewAuth(u *store.Users, s *store.Sessions, signer TokenSigner, aud AuditPublisher, notif notiflib.Publisher) *Auth {
+	return &Auth{users: u, sessions: s, signer: signer, aud: aud, notif: notif, refreshTTL: 720 * time.Hour}
 }
 
 // WithRefreshTokens attaches the refresh_token store + TTL so Login dual-writes
@@ -213,6 +215,14 @@ func (a *Auth) Login(ctx context.Context, in LoginInput) (*LoginResponse, error)
 			TenantID: u.TenantID.String(),
 			UserID:   u.ID.String(),
 			Result:   "success",
+		})
+	}
+	if a.notif != nil {
+		_ = a.notif.Publish(ctx, notiflib.Event{
+			TenantID: u.TenantID.String(),
+			UserID:   u.ID.String(),
+			Kind:     "user.login",
+			Title:    "Login successful",
 		})
 	}
 

@@ -17,6 +17,7 @@ import (
 
 	libauth "github.com/pmplatform/libs/go/auth"
 	"github.com/pmplatform/libs/go/audit"
+	notiflib "github.com/pmplatform/libs/go/notification"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -83,12 +84,12 @@ func resetSetup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, string, s
 	users := store.NewUsers(p)
 	tokens := store.NewRefreshTokens(p)
 	resets := store.NewPasswordResets(p)
-	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
+	auth := service.NewAuth(users, store.NewSessions(p), signer, pub, notiflib.NoopPublisher{}).
 		WithRefreshTokens(tokens, 30*24*time.Hour)
 	refresh := service.NewRefresh(users, tokens, signer, pub)
 	mailer := &captureMailer{}
 	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, time.Hour,
-		"http://example/reset?token=")
+		"http://example/reset?token=", notiflib.NoopPublisher{})
 
 	h := NewRouterWithRefreshAndReset(auth, refresh, passwordReset, kp, nil, "", nil, nil, nil)
 	cleanup := func() {

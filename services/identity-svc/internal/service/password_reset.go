@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/pmplatform/libs/go/audit"
+	notiflib "github.com/pmplatform/libs/go/notification"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/store"
@@ -34,6 +35,7 @@ type PasswordReset struct {
 	resets  *store.PasswordResets
 	mailer  Mailer
 	aud     AuditPublisher
+	notif   notiflib.Publisher
 	ttl     time.Duration
 	linkURL string // e.g. https://app.example.com/reset?token=
 }
@@ -49,6 +51,7 @@ func NewPasswordReset(
 	aud AuditPublisher,
 	ttl time.Duration,
 	linkURL string,
+	notif notiflib.Publisher,
 ) *PasswordReset {
 	if ttl <= 0 {
 		ttl = time.Hour
@@ -62,6 +65,7 @@ func NewPasswordReset(
 		resets:  r,
 		mailer:  m,
 		aud:     aud,
+		notif:   notif,
 		ttl:     ttl,
 		linkURL: linkURL,
 	}
@@ -189,6 +193,14 @@ func (p *PasswordReset) ConsumeReset(ctx context.Context, presented, newPassword
 			TenantID: row.TenantID.String(),
 			UserID:   row.UserID.String(),
 			Result:   "success",
+		})
+	}
+	if p.notif != nil {
+		_ = p.notif.Publish(ctx, notiflib.Event{
+			TenantID: row.TenantID.String(),
+			UserID:   row.UserID.String(),
+			Kind:     "user.password_reset",
+			Title:    "Password reset successful",
 		})
 	}
 	return nil

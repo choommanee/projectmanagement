@@ -99,24 +99,31 @@ func main() {
 	mfaMasterKey := os.Getenv("MFA_MASTER_KEY")
 	ssoMasterKey := os.Getenv("SSO_MASTER_KEY")
 	webURL := envOr("WEB_URL", "http://localhost:3000")
-	auth := service.NewAuth(users, store.NewSessions(p), signer, pub).
-		WithRefreshTokens(tokens, refreshTTL).
-		WithMFA(mfaEnrollments)
-	refresh := service.NewRefresh(users, tokens, signer, pub)
 
+	// Notification publisher: shared by the mailer AND the auth service so
+	// login / password-reset events are routed to notification-svc.
+	// Declared before auth construction so both Auth and PasswordReset get the
+	// same live publisher once NATS becomes available.
+	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
 	// Mailer: use NotifSvcMailer (NATS → email channel) when NATS is available;
 	// fall back to LogMailer in dev environments where NATS is absent.
 	var mailer service.Mailer = service.NewLogMailer()
 	if natsClient != nil {
-		if notifPub, err := notiflib.NewJetStreamPublisher(natsClient); err != nil {
+		if np, err := notiflib.NewJetStreamPublisher(natsClient); err != nil {
 			log.Warn().Err(err).Msg("notif publisher init failed — mailer will use LogMailer")
 		} else {
-			mailer = service.NewNotifSvcMailer(notifPub)
+			notifPub = np
+			mailer = service.NewNotifSvcMailer(np)
 			log.Info().Msg("mailer: using NotifSvcMailer (NATS)")
 		}
 	}
 
-	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL)
+	auth := service.NewAuth(users, store.NewSessions(p), signer, pub, notifPub).
+		WithRefreshTokens(tokens, refreshTTL).
+		WithMFA(mfaEnrollments)
+	refresh := service.NewRefresh(users, tokens, signer, pub)
+
+	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL, notifPub)
 	ssoConfigs := store.NewSSOConfigs(p)
 
 	// MFA service is OPTIONAL at boot: an empty MFA_MASTER_KEY skips the

@@ -16,6 +16,7 @@ import (
 
 	libauth "github.com/pmplatform/libs/go/auth"
 	"github.com/pmplatform/libs/go/audit"
+	notiflib "github.com/pmplatform/libs/go/notification"
 
 	"github.com/pmplatform/services/identity-svc/internal/domain"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -65,7 +66,7 @@ func setup(t *testing.T) (http.Handler, *pgxpool.Pool, uuid.UUID, func()) {
 
 	// Use PG publisher for tests (no NATS dependency)
 	pub := audit.NewPgPublisher(p, "test")
-	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub)
+	auth := service.NewAuth(store.NewUsers(p), store.NewSessions(p), signer, pub, notiflib.NoopPublisher{})
 
 	// nil Store -> JWKS handler falls back to the in-memory keypair so tests
 	// remain insulated from the DB-backed signing_key row. Empty issuer
