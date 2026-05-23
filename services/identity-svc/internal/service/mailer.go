@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
+
+	notiflib "github.com/pmplatform/libs/go/notification"
 )
 
 // Mailer is the minimal interface PasswordReset uses to deliver a reset
@@ -28,4 +30,31 @@ func (LogMailer) Send(ctx context.Context, to, subject, body string) error {
 		Str("body", body).
 		Msg("mailer.send (LogMailer)")
 	return nil
+}
+
+// NotifSvcMailer implements Mailer by publishing to notification-svc via NATS.
+// Identity-svc publishes a notiflib.Event with Kind="system.email" and
+// Payload containing "to" — notification-svc picks it up and routes to the
+// email channel. TenantID and UserID are set to the "system" sentinel because
+// password-reset emails are issued before a session exists; the email channel
+// only uses Payload["to"] and ignores those fields.
+type NotifSvcMailer struct {
+	pub notiflib.Publisher
+}
+
+func NewNotifSvcMailer(pub notiflib.Publisher) *NotifSvcMailer {
+	return &NotifSvcMailer{pub: pub}
+}
+
+func (m *NotifSvcMailer) Send(ctx context.Context, to, subject, body string) error {
+	return m.pub.Publish(ctx, notiflib.Event{
+		TenantID: "system",
+		UserID:   "system",
+		Kind:     "system.email",
+		Title:    subject,
+		Body:     body,
+		Payload: map[string]any{
+			"to": to,
+		},
+	})
 }

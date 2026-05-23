@@ -44,7 +44,13 @@ func main() {
 	st := store.New(p)
 	prefStore := store.NewPreference(p)
 	inapp := service.NewInAppChannel(st)
-	router := service.NewRouter(prefStore, inapp)
+	channels := []service.Channel{inapp}
+	if emailCh, err := service.NewEmailChannelFromEnv(); err != nil {
+		log.Warn().Err(err).Msg("email channel disabled")
+	} else if emailCh != nil {
+		channels = append(channels, emailCh)
+	}
+	router := service.NewRouter(prefStore, channels...)
 	svc := service.New(st)
 	h := api.NewRouter(svc, authz)
 

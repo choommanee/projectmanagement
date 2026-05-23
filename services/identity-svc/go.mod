@@ -10,6 +10,7 @@ require (
 	github.com/pmplatform/libs/go/audit v0.0.0
 	github.com/pmplatform/libs/go/auth v0.0.0
 	github.com/pmplatform/libs/go/nats v0.0.0
+	github.com/pmplatform/libs/go/notification v0.0.0
 	github.com/pmplatform/libs/policy v0.0.0
 	github.com/pquerna/otp v1.5.0
 	github.com/rs/zerolog v1.35.1
@@ -48,5 +49,6 @@ replace (
 	github.com/pmplatform/libs/go/audit => ../../libs/go/audit
 	github.com/pmplatform/libs/go/auth => ../../libs/go/auth
 	github.com/pmplatform/libs/go/nats => ../../libs/go/nats
+	github.com/pmplatform/libs/go/notification => ../../libs/go/notification
 	github.com/pmplatform/libs/policy => ../../libs/policy
 )

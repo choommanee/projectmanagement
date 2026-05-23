@@ -15,6 +15,7 @@ import (
 	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
+	notiflib "github.com/pmplatform/libs/go/notification"
 	libpolicy "github.com/pmplatform/libs/policy"
 
 	"github.com/pmplatform/services/identity-svc/internal/api"
@@ -70,10 +71,13 @@ func main() {
 	pgPub := audit.NewPgPublisher(p, "identity-svc")
 
 	// NATS publisher is optional; used as primary when available.
+	// nc is hoisted so the notification mailer can reuse the same connection.
 	var natsFn audit.PublishFn
+	var natsClient *natsx.Client
 	if nc, err := natsx.Connect(natsURL); err != nil {
 		log.Warn().Err(err).Msg("nats unavailable — audit will fall back to postgres")
 	} else {
+		natsClient = nc
 		defer nc.Close()
 		if err := nc.EnsureStream(context.Background(), "AUDIT", []string{"audit.>"}); err != nil {
 			log.Warn().Err(err).Msg("nats stream init failed — audit will fall back to postgres")
@@ -99,7 +103,19 @@ func main() {
 		WithRefreshTokens(tokens, refreshTTL).
 		WithMFA(mfaEnrollments)
 	refresh := service.NewRefresh(users, tokens, signer, pub)
-	mailer := service.NewLogMailer()
+
+	// Mailer: use NotifSvcMailer (NATS → email channel) when NATS is available;
+	// fall back to LogMailer in dev environments where NATS is absent.
+	var mailer service.Mailer = service.NewLogMailer()
+	if natsClient != nil {
+		if notifPub, err := notiflib.NewJetStreamPublisher(natsClient); err != nil {
+			log.Warn().Err(err).Msg("notif publisher init failed — mailer will use LogMailer")
+		} else {
+			mailer = service.NewNotifSvcMailer(notifPub)
+			log.Info().Msg("mailer: using NotifSvcMailer (NATS)")
+		}
+	}
+
 	passwordReset := service.NewPasswordReset(users, tokens, resets, mailer, pub, resetTTL, resetLinkURL)
 	ssoConfigs := store.NewSSOConfigs(p)
 
