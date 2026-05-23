@@ -6,7 +6,7 @@ import { Button, Kbd } from "@pmplatform/ui-kit";
 import type { AppDef } from "./shell.types";
 import { AppSwitcher } from "./AppSwitcher";
 import { NotificationCenter } from "./NotificationCenter";
-import { mockNotifications } from "@/lib/mock/notifications";
+import { useNotifications } from "./useNotifications";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import Link from "next/link";
@@ -32,6 +32,7 @@ export function TopBar({
 }) {
   const { user, signOut } = useAuth();
   const { theme, setTheme, density, cycleDensity } = useTheme();
+  const { items: notifItems, markRead: handleMarkRead, markAllRead: handleMarkAllRead } = useNotifications();
   const t = useTranslations("shell");
   const DensityIcon = density === "compact" ? Rows4 : density === "comfortable" ? Rows2 : Rows3;
   const densityLabel: Record<typeof density, string> = {
@@ -86,7 +87,11 @@ export function TopBar({
 
       {/* Right: notifications, theme toggle, user */}
       <div className="ml-auto flex items-center gap-1">
-        <NotificationCenter items={mockNotifications} />
+        <NotificationCenter
+          items={notifItems}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+        />
 
         {/* Density toggle */}
         <Button
