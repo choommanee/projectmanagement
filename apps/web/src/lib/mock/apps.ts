@@ -25,10 +25,12 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "admin", name: "Admin", groups: [
         { id: "a1", name: "Settings", subareas: [
-          { id: "tenants",   name: "Tenants",        href: "/pm/tenants",   icon: "people"   },
-          { id: "workflows", name: "Workflows",      href: "/pm/workflows", icon: "workflow" },
-          { id: "audit",     name: "Audit Explorer", href: "/pm/audit",     icon: "settings" },
-          { id: "reports",   name: "Reports & BI",   href: "/pm/reports",   icon: "dashboard" },
+          { id: "tenants",       name: "Tenants",          href: "/pm/tenants",         icon: "people"    },
+          { id: "custom-fields", name: "Custom Fields",    href: "/pm/tenants/fields",  icon: "settings"  },
+          { id: "workflows",     name: "Workflows",        href: "/pm/workflows",       icon: "workflow"  },
+          { id: "audit",         name: "Audit Explorer",   href: "/pm/audit",           icon: "settings"  },
+          { id: "reports",       name: "Reports & BI",     href: "/pm/reports",         icon: "dashboard" },
+          { id: "dash-builder",  name: "Dashboard Builder",href: "/pm/reports/dashboard", icon: "dashboard" },
         ]},
       ]},
     ],
@@ -48,9 +50,10 @@ export const mockApps: AppDef[] = [
           { id: "mrp", name: "MRP Run",     href: "/mfg/mrp",         icon: "workflow"           },
         ]},
         { id: "g2", name: "Master Data", subareas: [
-          { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"  },
-          { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow" },
-          { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"    },
+          { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"   },
+          { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow"  },
+          { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"     },
+          { id: "inventory",   name: "Inventory",    href: "/mfg/inventory",    icon: "warehouse" },
         ]},
       ]},
       { id: "quality", name: "Quality", groups: [

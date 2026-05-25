@@ -9,9 +9,23 @@ import (
 	"github.com/pmplatform/services/tenant-svc/internal/store"
 )
 
-type Service struct{ s *store.Store }
+// Service is the tenant-svc application service.
+// CustomFields is optional; it is nil if the pool was not wired at boot
+// (legacy tests that call New(store) without the extra store).
+type Service struct {
+	s            *store.Store
+	CustomFields *store.CustomFieldStore
+}
 
+// New creates a Service backed by the given Store. Use WithCustomFields to
+// attach the custom field store.
 func New(s *store.Store) *Service { return &Service{s: s} }
+
+// WithCustomFields attaches the custom field store to the service.
+func (svc *Service) WithCustomFields(cf *store.CustomFieldStore) *Service {
+	svc.CustomFields = cf
+	return svc
+}
 
 type CreateInput struct {
 	Slug, Name, Region string

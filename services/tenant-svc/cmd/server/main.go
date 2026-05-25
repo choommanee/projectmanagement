@@ -43,7 +43,8 @@ func main() {
 	// middleware can attach per-instance attrs (tenant_id, owner_user) to
 	// each request envelope.
 	loader := api.NewCedarLoader(p)
-	h := api.NewRouterWithLoader(service.New(store.New(p)), authz, loader)
+	svc := service.New(store.New(p)).WithCustomFields(store.NewCustomFieldStore(p))
+	h := api.NewRouterWithLoader(svc, authz, loader)
 	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {

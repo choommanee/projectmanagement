@@ -16,6 +16,26 @@ import (
 	"github.com/pmplatform/services/tenant-svc/internal/service"
 )
 
+// tenantIDFromCtx extracts the caller's tenant UUID from JWT claims injected
+// by the auth middleware. Falls back to the X-Tenant-Id header if claims are
+// absent (unauthenticated test routes).
+func tenantIDFromCtx(r *http.Request) (uuid.UUID, bool) {
+	if c, ok := libauth.FromCtx(r.Context()); ok && c != nil && c.TenantID != "" {
+		id, err := uuid.Parse(c.TenantID)
+		if err == nil {
+			return id, true
+		}
+	}
+	// Fallback: explicit header (forwarded by Next.js proxy)
+	if h := r.Header.Get("X-Tenant-Id"); h != "" {
+		id, err := uuid.Parse(h)
+		if err == nil {
+			return id, true
+		}
+	}
+	return uuid.Nil, false
+}
+
 // initURLParam wires libauth.URLParam to chi.URLParam exactly once so the
 // scoped authz middleware can resolve `{:id}` placeholders without forcing
 // libs/go/auth to import chi.
@@ -64,6 +84,14 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireActionScoped(authz, "tenant.update", "Tenant::{:id}", loaderOpts...)).Patch("/{id}", update(svc))
 		r.With(libauth.RequireActionScoped(authz, "tenant.delete", "Tenant::{:id}", loaderOpts...)).Delete("/{id}", del(svc))
 	})
+
+	// Custom field definition endpoints — tenant-scoped EAV field registry.
+	r.Route("/v1/custom-fields", func(r chi.Router) {
+		r.Get("/", listCustomFields(svc))
+		r.With(libauth.RequireAction(authz, "tenant.admin", "*")).Post("/", createCustomField(svc))
+		r.With(libauth.RequireAction(authz, "tenant.admin", "*")).Delete("/{id}", deleteCustomField(svc))
+	})
+
 	return r
 }
 
@@ -206,6 +234,104 @@ func getBySlug(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, t)
+	}
+}
+
+// --- Custom field handlers ---
+
+// GET /v1/custom-fields?entity_type=task
+func listCustomFields(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc.CustomFields == nil {
+			writeErr(w, http.StatusNotImplemented, errors.New("custom fields store not wired"))
+			return
+		}
+		tid, ok := tenantIDFromCtx(r)
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("tenant not identified"))
+			return
+		}
+		entityType := r.URL.Query().Get("entity_type")
+		fields, err := svc.CustomFields.List(r.Context(), tid, entityType)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		if fields == nil {
+			fields = []domain.CustomFieldDef{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"items": fields, "total": len(fields)})
+	}
+}
+
+// POST /v1/custom-fields
+func createCustomField(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc.CustomFields == nil {
+			writeErr(w, http.StatusNotImplemented, errors.New("custom fields store not wired"))
+			return
+		}
+		tid, ok := tenantIDFromCtx(r)
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("tenant not identified"))
+			return
+		}
+		var req struct {
+			EntityType string   `json:"entity_type"`
+			FieldKey   string   `json:"field_key"`
+			Label      string   `json:"label"`
+			FieldType  string   `json:"field_type"`
+			Options    []string `json:"options"`
+			Required   bool     `json:"required"`
+			SortOrder  int      `json:"sort_order"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.FieldKey == "" || req.Label == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("invalid body: field_key and label required"))
+			return
+		}
+		opts := req.Options
+		if opts == nil {
+			opts = []string{}
+		}
+		f, err := svc.CustomFields.Create(r.Context(), tid, domain.CreateCustomFieldParams{
+			EntityType: req.EntityType,
+			FieldKey:   req.FieldKey,
+			Label:      req.Label,
+			FieldType:  domain.FieldType(req.FieldType),
+			Options:    opts,
+			Required:   req.Required,
+			SortOrder:  req.SortOrder,
+		})
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, f)
+	}
+}
+
+// DELETE /v1/custom-fields/{id}
+func deleteCustomField(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if svc.CustomFields == nil {
+			writeErr(w, http.StatusNotImplemented, errors.New("custom fields store not wired"))
+			return
+		}
+		tid, ok := tenantIDFromCtx(r)
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("tenant not identified"))
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("invalid id"))
+			return
+		}
+		if err := svc.CustomFields.Delete(r.Context(), tid, id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
