@@ -26,8 +26,8 @@ import (
 
 func main() {
 	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5432/platform?sslmode=disable")
-	port := envOr("PORT", "8089")
-	runtimeURL := envOr("WORKFLOW_RUNTIME_URL", "http://localhost:8090")
+	port := envOr("PORT", "8090")
+	runtimeURL := envOr("WORKFLOW_RUNTIME_URL", "http://localhost:19090")
 
 	// OTEL tracing: non-fatal; service still starts if collector is unreachable.
 	if otelShutdown, err := libotel.SetupOTLP(context.Background(), "workflow-svc"); err != nil {
