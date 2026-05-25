@@ -8,11 +8,11 @@ if [ -f .env ]; then
 fi
 
 CMD="${1:-up}"
-DSN="postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5433}/${POSTGRES_DB:-platform}?sslmode=disable"
+DSN="postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-platform}?sslmode=disable"
 
 # Apply in dependency order. Each dir gets its own version table to avoid
 # the shared goose_db_version cross-contamination across directories.
-ORDER=(_shared tenant identity project document mfg quality workflow audit reports)
+ORDER=(_shared tenant identity project document mfg quality workflow audit reports notification)
 
 for name in "${ORDER[@]}"; do
   dir="infra/migrations/$name"

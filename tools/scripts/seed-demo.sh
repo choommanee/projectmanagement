@@ -4,9 +4,22 @@
 # User:   email=demo@demo.co, password=DemoPass#2026
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 TENANT_URL="${TENANT_URL:-http://localhost:8081}"
-PG_CONTAINER="${PG_CONTAINER:-pm-platform-postgres-1}"
-PG_DSN="postgres://app:app@localhost:5433/platform?sslmode=disable"
+PG_HOST="${POSTGRES_HOST:-localhost}"
+PG_PORT="${POSTGRES_PORT:-5432}"
+PG_USER="${POSTGRES_USER:-app}"
+PG_PASSWORD="${POSTGRES_PASSWORD:-app}"
+PG_DB="${POSTGRES_DB:-platform}"
+PG_DSN="${PG_DSN:-postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable}"
 
 DEMO_SLUG="demo-co"
 DEMO_EMAIL="demo@demo.co"
@@ -38,7 +51,7 @@ echo ">> Tenant ID: $TENANT_ID"
 
 # ── 2. Check if user already exists ───────────────────────────────────────────
 echo ">> Checking if user '$DEMO_EMAIL' already exists..."
-EXISTING=$(docker exec "$PG_CONTAINER" psql -U app -d platform -tAc \
+EXISTING=$(PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
   "SELECT id FROM app_user WHERE email = '$DEMO_EMAIL' AND tenant_id = '$TENANT_ID' LIMIT 1;" 2>/dev/null || true)
 
 if [ -n "$EXISTING" ]; then
@@ -81,8 +94,8 @@ func main() {
 GOEOF
 
 # Copy go.mod from identity-svc so we can use golang.org/x/crypto
-cp /Users/sakdachoommanee/Documents/projectmanagment/services/identity-svc/go.mod "$TMPDIR_HASH/go.mod"
-cp /Users/sakdachoommanee/Documents/projectmanagment/services/identity-svc/go.sum "$TMPDIR_HASH/go.sum" 2>/dev/null || true
+cp "$ROOT/services/identity-svc/go.mod" "$TMPDIR_HASH/go.mod"
+cp "$ROOT/services/identity-svc/go.sum" "$TMPDIR_HASH/go.sum" 2>/dev/null || true
 # Update module name to avoid conflicts
 sed -i.bak 's|^module.*|module bcrypttool|' "$TMPDIR_HASH/go.mod"
 
@@ -96,19 +109,14 @@ echo ">> Hash computed."
 
 # ── 4. Insert user via psql (bypassing RLS with SUPERUSER session) ─────────────
 echo ">> Inserting user into app_user..."
-docker exec "$PG_CONTAINER" psql -U app -d platform -c "
-  SET session_replication_role = replica;
-  INSERT INTO app_user (tenant_id, email, display_name, status, password_hash)
-  VALUES (
-    '$TENANT_ID'::uuid,
-    '$DEMO_EMAIL',
-    '$DEMO_DISPLAY',
-    'active',
-    '$HASH'
-  )
-  ON CONFLICT (tenant_id, email) DO NOTHING;
-  RESET session_replication_role;
-"
+PGPASSWORD="$PG_PASSWORD" psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" <<SQL
+BEGIN;
+SET LOCAL app.current_tenant = '$TENANT_ID';
+INSERT INTO app_user (tenant_id, email, display_name, status, password_hash)
+VALUES ('$TENANT_ID'::uuid, '$DEMO_EMAIL', '$DEMO_DISPLAY', 'active', '$HASH')
+ON CONFLICT (tenant_id, email) DO NOTHING;
+COMMIT;
+SQL
 
 echo ""
 echo "=== seed-demo: complete ==="
