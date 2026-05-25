@@ -80,6 +80,7 @@ permit (
     Action::"project.task.remove_dependency",
     Action::"project.sprint.create",
     Action::"project.sprint.update",
+    Action::"project.sprint.delete",
     Action::"project.sprint.assign_task",
     Action::"project.sprint.unassign_task"
   ],
@@ -152,7 +153,8 @@ permit (
     Action::"mfg.lot.create",
     Action::"mfg.lot.update_status",
     Action::"mfg.lot.add_genealogy",
-    Action::"mfg.mrp.run"
+    Action::"mfg.mrp.run",
+    Action::"mfg.inventory.post"
   ],
   resource
 )
@@ -319,6 +321,7 @@ forbid (
     Action::"project.task.update",
     Action::"project.task.delete",
     Action::"project.sprint.update",
+    Action::"project.sprint.delete",
     Action::"project.sprint.assign_task",
     Action::"project.sprint.unassign_task"
   ],

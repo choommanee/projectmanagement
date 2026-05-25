@@ -106,6 +106,13 @@ func (s *Sprints) Update(ctx context.Context, sp *domain.Sprint) error {
 	})
 }
 
+func (s *Sprints) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `DELETE FROM sprint WHERE id=$1 AND tenant_id=$2`, id, tid)
+		return err
+	})
+}
+
 func (s *Sprints) AssignTask(ctx context.Context, tid, sprintID, taskID uuid.UUID) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, "INSERT INTO sprint_task(sprint_id, task_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", sprintID, taskID)

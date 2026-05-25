@@ -98,6 +98,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireActionScoped(authz, "project.sprint.create", "Project::{:id}", loaderOpts...)).Post("/projects/{id}/sprints", createSprint(svc))
 		r.Get("/sprints/{id}", getSprint(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.sprint.update", "Sprint::{:id}", loaderOpts...)).Patch("/sprints/{id}", updateSprint(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.sprint.delete", "Sprint::{:id}", loaderOpts...)).Delete("/sprints/{id}", deleteSprint(svc))
 		r.Get("/sprints/{id}/tasks", listSprintTasks(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.sprint.assign_task", "Sprint::{:id}", loaderOpts...)).Post("/sprints/{id}/tasks/{taskId}", assignTask(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.sprint.unassign_task", "Sprint::{:id}", loaderOpts...)).Delete("/sprints/{id}/tasks/{taskId}", unassignTask(svc))
@@ -217,6 +218,8 @@ type updateProjectReq struct {
 	OwnerID     *uuid.UUID           `json:"owner_id,omitempty"`
 	ProgressPct *int                 `json:"progress_pct,omitempty"`
 	Tags        []string             `json:"tags,omitempty"`
+	StartDate   *string              `json:"start_date,omitempty"`
+	DueDate     *string              `json:"due_date,omitempty"`
 	Version     int                  `json:"version"`
 }
 
@@ -241,6 +244,30 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 		if c, ok := libauth.FromCtx(r.Context()); ok {
 			callerID = c.Subject
 		}
+		// Parse optional date strings (YYYY-MM-DD or RFC3339).
+		parseDatePtr := func(s *string) (*time.Time, error) {
+			if s == nil || *s == "" {
+				return nil, nil
+			}
+			if t, err := time.Parse("2006-01-02", *s); err == nil {
+				return &t, nil
+			}
+			t, err := time.Parse(time.RFC3339, *s)
+			if err != nil {
+				return nil, err
+			}
+			return &t, nil
+		}
+		startDate, err := parseDatePtr(req.StartDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("invalid start_date format, expected YYYY-MM-DD"))
+			return
+		}
+		dueDate, err := parseDatePtr(req.DueDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("invalid due_date format, expected YYYY-MM-DD"))
+			return
+		}
 		p, err := svc.UpdateProject(r.Context(), service.UpdateProjectInput{
 			TenantID:    tid,
 			ID:          id,
@@ -250,6 +277,8 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 			OwnerID:     req.OwnerID,
 			ProgressPct: req.ProgressPct,
 			Tags:        req.Tags,
+			StartDate:   startDate,
+			DueDate:     dueDate,
 			Version:     req.Version,
 			UserID:      callerID,
 		})
@@ -711,8 +740,8 @@ type createSprintReq struct {
 	Name        string               `json:"name"`
 	Goal        string               `json:"goal,omitempty"`
 	Status      domain.SprintStatus  `json:"status,omitempty"`
-	StartDate   *time.Time           `json:"start_date,omitempty"`
-	EndDate     *time.Time           `json:"end_date,omitempty"`
+	StartDate   *string              `json:"start_date,omitempty"`
+	EndDate     *string              `json:"end_date,omitempty"`
 	CapacityPts int                  `json:"capacity_pts,omitempty"`
 }
 
@@ -732,14 +761,37 @@ func createSprint(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
+		parseOptDate := func(s *string) (*time.Time, error) {
+			if s == nil || *s == "" {
+				return nil, nil
+			}
+			if t, e := time.Parse("2006-01-02", *s); e == nil {
+				return &t, nil
+			}
+			t, e := time.Parse(time.RFC3339, *s)
+			if e != nil {
+				return nil, e
+			}
+			return &t, nil
+		}
+		startDate, err := parseOptDate(req.StartDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("invalid start_date format, expected YYYY-MM-DD"))
+			return
+		}
+		endDate, err := parseOptDate(req.EndDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("invalid end_date format, expected YYYY-MM-DD"))
+			return
+		}
 		sp, err := svc.CreateSprint(r.Context(), service.CreateSprintInput{
 			TenantID:    tid,
 			ProjectID:   projectID,
 			Name:        req.Name,
 			Goal:        req.Goal,
 			Status:      req.Status,
-			StartDate:   req.StartDate,
-			EndDate:     req.EndDate,
+			StartDate:   startDate,
+			EndDate:     endDate,
 			CapacityPts: req.CapacityPts,
 		})
 		if err != nil {
@@ -824,6 +876,8 @@ type updateSprintReq struct {
 	Goal        *string             `json:"goal"`
 	Status      domain.SprintStatus `json:"status,omitempty"`
 	CapacityPts *int                `json:"capacity_pts,omitempty"`
+	StartDate   *string             `json:"start_date,omitempty"`
+	EndDate     *string             `json:"end_date,omitempty"`
 	Version     int                 `json:"version"`
 }
 
@@ -860,6 +914,34 @@ func updateSprint(svc *service.Service) http.HandlerFunc {
 		if req.CapacityPts != nil {
 			sp.CapacityPts = *req.CapacityPts
 		}
+		if req.StartDate != nil {
+			if *req.StartDate == "" {
+				sp.StartDate = nil
+			} else {
+				if t, e := time.Parse("2006-01-02", *req.StartDate); e == nil {
+					sp.StartDate = &t
+				} else if t, e := time.Parse(time.RFC3339, *req.StartDate); e == nil {
+					sp.StartDate = &t
+				} else {
+					writeErr(w, 400, errors.New("invalid start_date format, expected YYYY-MM-DD"))
+					return
+				}
+			}
+		}
+		if req.EndDate != nil {
+			if *req.EndDate == "" {
+				sp.EndDate = nil
+			} else {
+				if t, e := time.Parse("2006-01-02", *req.EndDate); e == nil {
+					sp.EndDate = &t
+				} else if t, e := time.Parse(time.RFC3339, *req.EndDate); e == nil {
+					sp.EndDate = &t
+				} else {
+					writeErr(w, 400, errors.New("invalid end_date format, expected YYYY-MM-DD"))
+					return
+				}
+			}
+		}
 		sp.Version = req.Version
 		if err := svc.Sprints.Update(r.Context(), sp); err != nil {
 			switch {
@@ -871,6 +953,25 @@ func updateSprint(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, sp)
+	}
+}
+
+func deleteSprint(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Sprints.Delete(r.Context(), tid, id); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		w.WriteHeader(204)
 	}
 }
 

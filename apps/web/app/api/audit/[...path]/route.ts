@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentTenantId, currentAccessToken } from "@/lib/auth/serverTenant";
 
-const SVC = process.env.AUDIT_URL ?? "http://localhost:8091";
+const SVC = process.env.AUDIT_URL ?? "http://localhost:8089";
 
 function methodHandler(method: string) {
   return async function (req: Request, ctx: { params: Promise<{ path: string[] }> }) {
