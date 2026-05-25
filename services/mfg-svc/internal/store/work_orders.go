@@ -437,6 +437,13 @@ func (s *WorkOrders) UpdateLotStatus(ctx context.Context, tid, id uuid.UUID, sta
 	})
 }
 
+func (s *WorkOrders) DeleteLot(ctx context.Context, tid, id uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `DELETE FROM lot WHERE id=$1 AND tenant_id=$2`, id, tid)
+		return err
+	})
+}
+
 // ListActiveWorkOrdersForMRP returns planned/released WOs with item IDs and due dates.
 type WOForMRP struct {
 	ID      uuid.UUID

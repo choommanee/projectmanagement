@@ -122,6 +122,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		// Lots standalone
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.lot.create", "*")).Post("/lots", createLot(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.lot.delete", "Lot::{:id}", loaderOpts...)).Delete("/lots/{id}", deleteLot(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.lot.update_status", "Lot::{:id}", loaderOpts...)).Patch("/lots/{id}/status", updateLotStatus(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.lot.add_genealogy", "Lot::{:id}", loaderOpts...)).Post("/lots/{id}/genealogy", addLotGenealogy(svc))
 		r.Get("/lots/{id}/trace", traceLot(svc))
@@ -134,6 +135,12 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.Get("/mrp/runs/{id}/demands", listMRPDemands(svc))
 		r.Get("/mrp/runs/{id}/supplies", listMRPSupplies(svc))
 		r.Get("/mrp/runs/{id}/actions", listMRPActions(svc))
+
+		// Inventory
+		r.Get("/inventory", listInventory(svc))
+		r.Get("/inventory/items/{itemId}/balance", getItemBalance(svc))
+		r.With(libauth.RequireAction(authz, "mfg.inventory.post", "*")).
+			Post("/inventory/transactions", postInventoryTransaction(svc))
 	})
 
 	return r
@@ -1176,11 +1183,13 @@ func listWorkOrders(svc *service.Service) http.HandlerFunc {
 }
 
 type updateWOReq struct {
-	Status   domain.WOStatus   `json:"status,omitempty"`
-	Priority domain.WOPriority `json:"priority,omitempty"`
-	DueDate  *string           `json:"due_date,omitempty"`
-	Notes    string            `json:"notes,omitempty"`
-	Version  int               `json:"version"`
+	Status       domain.WOStatus  `json:"status,omitempty"`
+	Priority     domain.WOPriority `json:"priority,omitempty"`
+	DueDate      *string           `json:"due_date,omitempty"`
+	Notes        string            `json:"notes,omitempty"`
+	// WorkCenterID uses json.RawMessage so we can distinguish null (clear) from absent (keep).
+	WorkCenterID json.RawMessage   `json:"work_center_id,omitempty"`
+	Version      int               `json:"version"`
 }
 
 func updateWorkOrder(svc *service.Service) http.HandlerFunc {
@@ -1221,6 +1230,17 @@ func updateWorkOrder(svc *service.Service) http.HandlerFunc {
 			t, err := parseDate(*req.DueDate)
 			if err == nil {
 				wo.DueDate = &t
+			}
+		}
+		if len(req.WorkCenterID) > 0 {
+			// "null" → clear; "\"<uuid>\"" → set; "\"\"" → clear
+			var wcRaw *string
+			if jerr := json.Unmarshal(req.WorkCenterID, &wcRaw); jerr == nil {
+				if wcRaw == nil || *wcRaw == "" {
+					wo.WorkCenterID = nil
+				} else if wcID, perr := uuid.Parse(*wcRaw); perr == nil {
+					wo.WorkCenterID = &wcID
+				}
 			}
 		}
 		wo.Version = req.Version
@@ -1408,6 +1428,25 @@ func listLots(svc *service.Service) http.HandlerFunc {
 
 type updateLotStatusReq struct {
 	Status domain.LotStatus `json:"status"`
+}
+
+func deleteLot(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.WorkOrders.DeleteLot(r.Context(), tid, id); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		w.WriteHeader(204)
+	}
 }
 
 func updateLotStatus(svc *service.Service) http.HandlerFunc {

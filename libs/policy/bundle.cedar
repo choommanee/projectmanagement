@@ -151,6 +151,7 @@ permit (
     Action::"mfg.work_order.delete",
     Action::"mfg.work_order.release",
     Action::"mfg.lot.create",
+    Action::"mfg.lot.delete",
     Action::"mfg.lot.update_status",
     Action::"mfg.lot.add_genealogy",
     Action::"mfg.mrp.run",
