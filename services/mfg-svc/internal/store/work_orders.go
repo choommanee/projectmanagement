@@ -439,8 +439,14 @@ func (s *WorkOrders) UpdateLotStatus(ctx context.Context, tid, id uuid.UUID, sta
 
 func (s *WorkOrders) DeleteLot(ctx context.Context, tid, id uuid.UUID) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `DELETE FROM lot WHERE id=$1 AND tenant_id=$2`, id, tid)
-		return err
+		ct, err := tx.Exec(ctx, `DELETE FROM lot WHERE id=$1 AND tenant_id=$2`, id, tid)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
 	})
 }
 

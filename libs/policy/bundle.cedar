@@ -146,6 +146,7 @@ permit (
     Action::"mfg.routing.delete_operation",
     Action::"mfg.work_center.create",
     Action::"mfg.work_center.update",
+    Action::"mfg.work_center.delete",
     Action::"mfg.work_order.create",
     Action::"mfg.work_order.update",
     Action::"mfg.work_order.delete",
@@ -342,6 +343,7 @@ forbid (
     Action::"mfg.item.delete",
     Action::"mfg.bom.update",
     Action::"mfg.bom.activate",
+    Action::"mfg.work_center.delete",
     Action::"mfg.work_order.update",
     Action::"mfg.work_order.delete",
     Action::"mfg.work_order.release"

@@ -102,3 +102,16 @@ func (s *WorkCenters) Update(ctx context.Context, wc *domain.WorkCenter) error {
 		return nil
 	})
 }
+
+func (s *WorkCenters) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `DELETE FROM work_center WHERE id=$1 AND tenant_id=$2`, id, tid)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}

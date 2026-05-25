@@ -88,6 +88,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireAction(authz, "mfg.work_center.create", "*")).Post("/work-centers", createWorkCenter(svc))
 		r.Get("/work-centers/{id}", getWorkCenter(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.work_center.update", "WorkCenter::{:id}", loaderOpts...)).Patch("/work-centers/{id}", updateWorkCenter(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.work_center.delete", "WorkCenter::{:id}", loaderOpts...)).Delete("/work-centers/{id}", deleteWorkCenter(svc))
 
 		// BOM standalone
 		r.Get("/boms/{id}", getBOM(svc))
@@ -564,6 +565,29 @@ func updateWorkCenter(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, wc)
+	}
+}
+
+func deleteWorkCenter(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.WorkCenters.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		w.WriteHeader(204)
 	}
 }
 
@@ -1442,6 +1466,10 @@ func deleteLot(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		if err := svc.WorkOrders.DeleteLot(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
 			writeErr(w, 500, err)
 			return
 		}

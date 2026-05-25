@@ -968,6 +968,10 @@ func deleteSprint(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		if err := svc.Sprints.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
 			writeErr(w, 500, err)
 			return
 		}
