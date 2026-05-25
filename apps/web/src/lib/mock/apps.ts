@@ -13,6 +13,7 @@ export const mockApps: AppDef[] = [
         { id: "w1", name: "Projects", subareas: [
           { id: "projects", name: "Active Projects", href: "/pm/projects", icon: "folder",    count: 7  },
           { id: "tasks",    name: "My Tasks",        href: "/pm/tasks",    icon: "tasks",     count: 12 },
+          { id: "backlog",  name: "Backlog",         href: "/pm/backlog",  icon: "tasks"                },
           { id: "sprints",  name: "Sprints",         href: "/pm/sprints",  icon: "sprint",    count: 2  },
           { id: "inbox",    name: "My Tasks (Approvals)", href: "/pm/inbox", icon: "tasks",   count: 0  },
         ]},
