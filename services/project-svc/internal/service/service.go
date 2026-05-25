@@ -95,6 +95,8 @@ type UpdateProjectInput struct {
 	OwnerID     *uuid.UUID
 	ProgressPct *int
 	Tags        []string
+	StartDate   *time.Time
+	DueDate     *time.Time
 	Version     int
 	UserID      string // caller, for notification routing
 }
@@ -123,6 +125,12 @@ func (svc *Service) UpdateProject(ctx context.Context, in UpdateProjectInput) (*
 	}
 	if in.Tags != nil {
 		p.Tags = in.Tags
+	}
+	if in.StartDate != nil {
+		p.StartDate = in.StartDate
+	}
+	if in.DueDate != nil {
+		p.DueDate = in.DueDate
 	}
 	p.Version = in.Version
 	if err := svc.Projects.Update(ctx, p); err != nil {

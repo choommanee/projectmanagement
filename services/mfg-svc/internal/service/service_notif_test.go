@@ -115,6 +115,7 @@ func TestReleaseWorkOrder_PublishesNotifEvent(t *testing.T) {
 		wos,
 		store.NewMRP(p),
 		store.NewGenealogy(p),
+		store.NewInventory(p),
 		"",
 		"",
 	).WithNotifPublisher(pub)

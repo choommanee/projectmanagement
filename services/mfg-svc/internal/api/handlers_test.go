@@ -58,7 +58,7 @@ func newTestServer(t *testing.T, p *pgxpool.Pool) http.Handler {
 	mrp := store.NewMRP(p)
 	genealogy := store.NewGenealogy(p)
 	// Use empty engine URLs — unreachable triggers graceful synthetic fallback.
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, "http://localhost:19999", "http://localhost:19998")
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, store.NewInventory(p), "http://localhost:19999", "http://localhost:19998")
 	return api.NewRouter(svc, nil)
 }
 
