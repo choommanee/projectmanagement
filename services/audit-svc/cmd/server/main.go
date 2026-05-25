@@ -11,8 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	"github.com/go-chi/chi/v5"
 	libauth "github.com/pmplatform/libs/go/auth"
+	libotel "github.com/pmplatform/libs/go/otel"
 	libpolicy "github.com/pmplatform/libs/policy"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/pmplatform/services/audit-svc/internal/api"
 	"github.com/pmplatform/services/audit-svc/internal/service"
@@ -22,6 +25,13 @@ import (
 func main() {
 	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5432/platform?sslmode=disable")
 	port := envOr("PORT", "8091")
+
+	// OTEL tracing: non-fatal; service still starts if collector is unreachable.
+	if otelShutdown, err := libotel.SetupOTLP(context.Background(), "audit-svc"); err != nil {
+		log.Warn().Err(err).Msg("OTEL setup failed — continuing without tracing")
+	} else {
+		defer otelShutdown()
+	}
 
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -59,7 +69,11 @@ func main() {
 		h = libauth.AttachClaims(verifier)(h)
 	}
 
-	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	mux := chi.NewRouter()
+	mux.Get("/metrics", libotel.PrometheusHandler().ServeHTTP)
+	mux.Mount("/", h)
+	tracedHandler := otelhttp.NewHandler(mux, "audit-svc")
+	srv := &http.Server{Addr: ":" + port, Handler: tracedHandler, ReadHeaderTimeout: 5 * time.Second}
 
 	go func() {
 		log.Info().Str("addr", srv.Addr).Msg("audit-svc listening")

@@ -12,11 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
 	notiflib "github.com/pmplatform/libs/go/notification"
+	libotel "github.com/pmplatform/libs/go/otel"
 	libpolicy "github.com/pmplatform/libs/policy"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/pmplatform/services/identity-svc/internal/api"
 	"github.com/pmplatform/services/identity-svc/internal/jwt"
@@ -31,6 +34,13 @@ func main() {
 	kid := envOr("JWT_KID", "kid-dev-1")
 	natsURL := envOr("NATS_URL", "nats://localhost:4222")
 	rotationInterval := parseDurEnv("JWT_ROTATION_INTERVAL", 0)
+
+	// OTEL tracing: non-fatal; service still starts if collector is unreachable.
+	if otelShutdown, err := libotel.SetupOTLP(context.Background(), "identity-svc"); err != nil {
+		log.Warn().Err(err).Msg("OTEL setup failed — continuing without tracing")
+	} else {
+		defer otelShutdown()
+	}
 
 	p, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
@@ -160,7 +170,13 @@ func main() {
 	var _ libauth.Authorizer = authz // compile-time interface check
 	h := api.NewRouterFullWithOIDC(auth, refresh, passwordReset, mfaSvc, oidcSvc, kp, keyStore, issuer, authz, authz, p)
 	h = api.WithUserList(h, keyStore, issuer, users)
-	srv := &http.Server{Addr: ":" + port, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+
+	// Wrap with a thin mux that exposes /metrics before the OTEL HTTP handler.
+	mux := chi.NewRouter()
+	mux.Get("/metrics", libotel.PrometheusHandler().ServeHTTP)
+	mux.Mount("/", h)
+	tracedHandler := otelhttp.NewHandler(mux, "identity-svc")
+	srv := &http.Server{Addr: ":" + port, Handler: tracedHandler, ReadHeaderTimeout: 5 * time.Second}
 
 	// Top-level cancellable context for background workers (rotation scheduler).
 	rootCtx, cancelRoot := context.WithCancel(context.Background())
