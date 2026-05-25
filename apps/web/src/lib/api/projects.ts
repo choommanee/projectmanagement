@@ -85,6 +85,7 @@ export async function updateProject(
     name?: string;
     description?: string;
     status?: Project["status"];
+    owner_id?: string | null;
     progress_pct?: number;
     start_date?: string | null;
     due_date?: string | null;

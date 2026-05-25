@@ -3,6 +3,7 @@ module github.com/pmplatform/services/identity-svc
 go 1.25.0
 
 require (
+	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
@@ -15,13 +16,14 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/crypto v0.51.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cedar-policy/cedar-go v1.6.1 // indirect
-	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -39,7 +41,6 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	golang.org/x/exp v0.0.0-20220921023135-46d9e7742f1e // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect

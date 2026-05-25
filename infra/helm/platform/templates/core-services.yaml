@@ -1,0 +1,514 @@
+{{- if .Values.project.enabled -}}
+{{- $svc := "project-svc" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.project.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.project.image.repository }}:{{ .Values.project.image.tag }}"
+          imagePullPolicy: {{ .Values.project.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.project.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.project.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.project.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.project.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.project.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.project.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.project.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.project.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.project.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.project.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.project.service.port }}
+      targetPort: {{ .Values.project.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.document.enabled -}}
+{{- $svc := "document-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.document.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.document.image.repository }}:{{ .Values.document.image.tag }}"
+          imagePullPolicy: {{ .Values.document.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.document.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.document.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.document.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.document.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.document.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.document.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.document.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.document.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.document.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.document.service.port }}
+      targetPort: {{ .Values.document.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.mfg.enabled -}}
+{{- $svc := "mfg-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.mfg.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.mfg.image.repository }}:{{ .Values.mfg.image.tag }}"
+          imagePullPolicy: {{ .Values.mfg.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.mfg.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.mfg.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.mfg.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.mfg.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: MRP_ENGINE_URL
+              value: {{ .Values.mfg.env.MRP_ENGINE_URL | quote }}
+            - name: TRACE_ENGINE_URL
+              value: {{ .Values.mfg.env.TRACE_ENGINE_URL | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.mfg.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.mfg.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.mfg.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.mfg.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.mfg.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.mfg.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.mfg.service.port }}
+      targetPort: {{ .Values.mfg.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.quality.enabled -}}
+{{- $svc := "quality-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.quality.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.quality.image.repository }}:{{ .Values.quality.image.tag }}"
+          imagePullPolicy: {{ .Values.quality.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.quality.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.quality.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.quality.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.quality.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.quality.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.quality.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.quality.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.quality.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.quality.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.quality.service.port }}
+      targetPort: {{ .Values.quality.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.workflow.enabled -}}
+{{- $svc := "workflow-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.workflow.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.workflow.image.repository }}:{{ .Values.workflow.image.tag }}"
+          imagePullPolicy: {{ .Values.workflow.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.workflow.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.workflow.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.workflow.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: NATS_URL
+              value: {{ .Values.workflow.env.NATS_URL | default .Values.nats.url | quote }}
+            - name: WORKFLOW_RUNTIME_URL
+              value: {{ .Values.workflow.env.WORKFLOW_RUNTIME_URL | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.workflow.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.workflow.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.workflow.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.workflow.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.workflow.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.workflow.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.workflow.service.port }}
+      targetPort: {{ .Values.workflow.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.reports.enabled -}}
+{{- $svc := "reports-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.reports.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.reports.image.repository }}:{{ .Values.reports.image.tag }}"
+          imagePullPolicy: {{ .Values.reports.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.reports.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.reports.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.reports.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.reports.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.reports.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.reports.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.reports.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.reports.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.reports.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.reports.service.port }}
+      targetPort: {{ .Values.reports.service.targetPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.auditSvc.enabled -}}
+{{- $svc := "audit-svc" -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  replicas: {{ .Values.auditSvc.replicas }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ $svc }}
+          image: "{{ .Values.auditSvc.image.repository }}:{{ .Values.auditSvc.image.tag }}"
+          imagePullPolicy: {{ .Values.auditSvc.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.auditSvc.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.auditSvc.service.targetPort | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.auditSvc.env.DATABASE_URL | default .Values.postgres.dsn | quote }}
+            - name: IDENTITY_JWKS_URL
+              value: {{ .Values.auditSvc.env.IDENTITY_JWKS_URL | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.auditSvc.env.JWT_ISSUER | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.auditSvc.env.OTEL_EXPORTER_OTLP_ENDPOINT | default .Values.observability.otlpEndpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.auditSvc.env.OTEL_SERVICE_NAME | quote }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.auditSvc.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "platform.fullname" (dict "ctx" . "svc" $svc) }}
+  labels:
+    {{- include "platform.serviceLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+spec:
+  type: {{ .Values.auditSvc.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "ctx" . "svc" $svc) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.auditSvc.service.port }}
+      targetPort: {{ .Values.auditSvc.service.targetPort }}
+      protocol: TCP
+{{- end }}

@@ -113,6 +113,8 @@ describe("sprints API client", () => {
     const sp = await createSprint("proj-001", {
       name: "Sprint 1",
       goal: "Ship MVP",
+      start_date: "2026-06-01",
+      end_date: "2026-06-14",
       capacity_pts: 40,
     });
 
@@ -124,6 +126,9 @@ describe("sprints API client", () => {
         body: expect.stringContaining('"name":"Sprint 1"'),
       }),
     );
+    const body = String((mockFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body).toContain('"start_date":"2026-06-01"');
+    expect(body).toContain('"end_date":"2026-06-14"');
   });
 
   it("updateSprint sends PATCH with version in body", async () => {

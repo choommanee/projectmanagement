@@ -83,7 +83,13 @@ describe("projects API client", () => {
     });
     global.fetch = mockFetch;
 
-    await updateProject("p-1", { name: "Updated", version: 1 });
+    await updateProject("p-1", {
+      name: "Updated",
+      owner_id: "user-001",
+      start_date: "2026-06-01",
+      due_date: "2026-06-20",
+      version: 1,
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/projects/p-1",
@@ -92,6 +98,10 @@ describe("projects API client", () => {
         body: expect.stringContaining('"version":1'),
       }),
     );
+    const body = String((mockFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body).toContain('"owner_id":"user-001"');
+    expect(body).toContain('"start_date":"2026-06-01"');
+    expect(body).toContain('"due_date":"2026-06-20"');
   });
 
   it("deleteProject sends version as query param", async () => {

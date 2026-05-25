@@ -1,27 +1,59 @@
 # Dev Setup
 
 ## Prereqs
-- Go 1.23, Rust 1.83, Node 22, pnpm 9, Docker Desktop, goose
+- Go 1.25+, Rust 1.83+, Node 22+, pnpm 9+, goose
+- PostgreSQL 16+ (required for `local` profile)
+- Docker Desktop (optional, only for `docker` profile)
 
 ## Bootstrap
 ```
 ./tools/scripts/bootstrap.sh
-./tools/scripts/dev-up.sh
-./tools/scripts/migrate.sh up
 ```
 
-## Run a Go service
+## Start Development Profile
+
+### 1) Local (no Docker, recommended when RAM is limited)
+Core PM stack:
+```
+./tools/scripts/dev-up.sh local core
+```
+
+Full stack (PM + MFG engines/services):
+```
+./tools/scripts/dev-up.sh local full
+```
+
+Stop/check:
+```
+./tools/scripts/dev-local-status.sh
+./tools/scripts/dev-down.sh local
+```
+
+### 2) Docker
+```
+./tools/scripts/dev-up.sh docker
+./tools/scripts/dev-down.sh docker
+```
+
+## Run Individually (optional)
+
+### Go service
 ```
 cd services/<svc>
 go run ./cmd/server
 ```
 
-## Run a Rust engine
+### Rust engine
 ```
 cargo run -p <engine-name>
 ```
 
-## Run the web app
+### Web app
 ```
 pnpm --filter web dev
 ```
+
+## Quick Verification
+- Web: `http://localhost:3000/pm/home`
+- Identity health: `http://localhost:8082/healthz`
+- Project health: `http://localhost:8083/healthz`

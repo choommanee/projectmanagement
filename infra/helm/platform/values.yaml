@@ -25,12 +25,12 @@ observability:
 # Toggle blocks (legacy). Per-service config blocks below are the source of truth
 # for image/resources/env.
 services:
-  identity:    { enabled: true,  replicas: 2 }
-  tenant:      { enabled: true,  replicas: 2 }
-  project:     { enabled: false, replicas: 2 }
-  workspace:   { enabled: false, replicas: 2 }
-  workflow:    { enabled: false, replicas: 2 }
-  audit:       { enabled: true,  replicas: 1 }
+  identity:    { enabled: true, replicas: 2 }
+  tenant:      { enabled: true, replicas: 2 }
+  project:     { enabled: true, replicas: 2 }
+  workspace:   { enabled: true, replicas: 2 }
+  workflow:    { enabled: true, replicas: 2 }
+  audit:       { enabled: true, replicas: 1 }
 
 # ---------------------------------------------------------------------------
 # identity-svc
@@ -116,6 +116,208 @@ notification:
     WEBHOOK_SIGNING_KEY: ""
     OTEL_EXPORTER_OTLP_ENDPOINT: ""
     OTEL_SERVICE_NAME: "notification-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# project-svc
+# ---------------------------------------------------------------------------
+project:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/project-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8083
+    targetPort: 8083
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "project-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# document-svc
+# ---------------------------------------------------------------------------
+document:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/document-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8084
+    targetPort: 8084
+  env:
+    DATABASE_URL: ""
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "document-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# mfg-svc
+# ---------------------------------------------------------------------------
+mfg:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/mfg-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8085
+    targetPort: 8085
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    MRP_ENGINE_URL: "http://mrp-engine:8086"
+    TRACE_ENGINE_URL: "http://traceability-engine:8088"
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "mfg-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# quality-svc
+# ---------------------------------------------------------------------------
+quality:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/quality-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8087
+    targetPort: 8087
+  env:
+    DATABASE_URL: ""
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "quality-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# workflow-svc
+# ---------------------------------------------------------------------------
+workflow:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/pmplatform/workflow-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8089
+    targetPort: 8089
+  env:
+    DATABASE_URL: ""
+    NATS_URL: "nats://nats:4222"
+    WORKFLOW_RUNTIME_URL: "http://workflow-runtime:8090"
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "workflow-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# reports-svc
+# ---------------------------------------------------------------------------
+reports:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/pmplatform/reports-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8092
+    targetPort: 8092
+  env:
+    DATABASE_URL: ""
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "reports-svc"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# audit-svc
+# ---------------------------------------------------------------------------
+auditSvc:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/pmplatform/audit-svc
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8091
+    targetPort: 8091
+  env:
+    DATABASE_URL: ""
+    IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
+    JWT_ISSUER: "http://identity-svc:8082"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ""
+    OTEL_SERVICE_NAME: "audit-svc"
   resources:
     requests:
       cpu: 50m

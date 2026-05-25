@@ -17,6 +17,8 @@ import { ProjectTasksTab } from "@/components/ProjectTasksTab";
 import { GanttChart } from "@/components/GanttChart";
 import { TaskSheet } from "@/components/TaskSheet";
 import { listTasksForProject, type Task } from "@/lib/api/tasks";
+import { listSprintsForProject, type Sprint } from "@/lib/api/sprints";
+import { listAudit, type AuditEvent } from "@/lib/api/audit";
 import { UserPicker } from "@/components/UserPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -177,6 +179,7 @@ export default function ProjectDetailPage({
         name: form.name,
         description: form.description,
         status: form.status,
+        owner_id: form.ownerId || null,
         progress_pct: form.progressPct,
         start_date: form.startDate || null,
         due_date: form.dueDate || null,
@@ -400,10 +403,8 @@ export default function ProjectDetailPage({
             )}
           </div>
         )}
-        {tab === "sprints" && <PlaceholderTab message="Sprints UI ships with Page #4" />}
-        {tab === "activity" && (
-          <PlaceholderTab message="Activity will surface from audit pipeline (Phase 2)" />
-        )}
+        {tab === "sprints" && <ProjectSprintsTab projectId={id} />}
+        {tab === "activity" && <ProjectActivityTab projectId={id} />}
       </div>
 
       {showDelete && (
@@ -546,14 +547,169 @@ function OverviewTab({
   );
 }
 
-// ─── Placeholder tab ──────────────────────────────────────────────────────────
+function sprintStatusTone(status: Sprint["status"]): "neutral" | "success" | "warning" {
+  if (status === "active") return "success";
+  if (status === "closed") return "neutral";
+  return "warning";
+}
 
-function PlaceholderTab({ message }: { message: string }) {
+function ProjectSprintsTab({ projectId }: { projectId: string }) {
+  const [items, setItems] = useState<Sprint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    listSprintsForProject(projectId)
+      .then((sprints) => {
+        if (!cancelled) setItems(sprints);
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  const active = items.filter((s) => s.status === "active").length;
+  const totalCapacity = items.reduce((sum, s) => sum + (s.capacityPts ?? 0), 0);
+
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="rounded-md border border-dashed border-line px-8 py-6 text-sm text-ink-3">
-        {message}
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <MiniKpi label="Sprints" value={String(items.length)} />
+        <MiniKpi label="Active" value={String(active)} />
+        <MiniKpi label="Capacity" value={totalCapacity > 0 ? `${totalCapacity} pts` : "—"} />
       </div>
+
+      {error && (
+        <div className="rounded-sm border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
+      )}
+
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 rounded-sm bg-surface-2" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line px-6 py-8 text-center text-sm text-ink-3">
+          No sprints yet for this project. Create one from <a href="/pm/sprints" className="text-accent underline">Sprint Board</a>.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line bg-surface-2 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                <th className="px-3 py-2">Sprint</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Window</th>
+                <th className="px-3 py-2">Capacity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((sp, i) => (
+                <tr key={sp.id} className={`border-b border-line last:border-0 ${i % 2 === 0 ? "bg-paper" : "bg-surface"}`}>
+                  <td className="px-3 py-2">
+                    <a className="font-medium text-ink hover:underline" href={`/pm/sprints/${sp.id}`}>{sp.name}</a>
+                    {sp.goal && <div className="text-xs text-ink-3">{sp.goal}</div>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Tag tone={sprintStatusTone(sp.status)} dot>{sp.status}</Tag>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-ink-2">
+                    {sp.startDate ? sp.startDate.slice(0, 10) : "—"} → {sp.endDate ? sp.endDate.slice(0, 10) : "—"}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-ink-2">{sp.capacityPts > 0 ? `${sp.capacityPts} pts` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectActivityTab({ projectId }: { projectId: string }) {
+  const [items, setItems] = useState<AuditEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    listAudit({ entityId: projectId, limit: 25, offset: 0 })
+      .then((res) => {
+        if (!cancelled) setItems(res.items);
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  return (
+    <div className="space-y-3">
+      {error && (
+        <div className="rounded-sm border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
+      )}
+
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-10 rounded-sm bg-surface-2" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line px-6 py-8 text-center text-sm text-ink-3">
+          No audit activity found for this project yet. View full stream at <a href="/pm/audit" className="text-accent underline">Audit Explorer</a>.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-line">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-line bg-surface-2 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+                <th className="px-3 py-2">Time</th>
+                <th className="px-3 py-2">Service</th>
+                <th className="px-3 py-2">Action</th>
+                <th className="px-3 py-2">Result</th>
+                <th className="px-3 py-2">User</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((ev, i) => (
+                <tr key={ev.id} className={`border-b border-line last:border-0 ${i % 2 === 0 ? "bg-paper" : "bg-surface"}`}>
+                  <td className="px-3 py-2 font-mono text-xs text-ink-2">{ev.ts ? ev.ts.slice(0, 19).replace("T", " ") : "—"}</td>
+                  <td className="px-3 py-2 text-xs text-ink-2">{ev.service || "—"}</td>
+                  <td className="px-3 py-2 text-xs text-ink">{ev.action || "—"}</td>
+                  <td className="px-3 py-2">
+                    <Tag tone={ev.result === "deny" || ev.result === "error" ? "danger" : "success"}>{ev.result || "ok"}</Tag>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-ink-3">{ev.userId ? `${ev.userId.slice(0, 8)}…` : "system"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniKpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-line bg-paper px-3 py-2">
+      <div className="text-[10px] uppercase tracking-[0.08em] text-ink-3">{label}</div>
+      <div className="mt-1 font-mono text-sm text-ink">{value}</div>
     </div>
   );
 }

@@ -387,3 +387,235 @@ func TestAssignTaskToSprint(t *testing.T) {
 		t.Fatalf("Unassign task: expected 204, got %d", rr.Code)
 	}
 }
+
+func TestTaskPlanningFieldsRoundTripHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "TPF-001", "name": "Task Planning Fields"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	assignee := uuid.NewString()
+	reviewer := uuid.NewString()
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{
+		"code":        "TPF-T001",
+		"title":       "Planning Task",
+		"status":      "in_progress",
+		"assignee_id": assignee,
+		"reviewer_id": reviewer,
+		"estimate_md": 4.5,
+		"start_date":  "2026-06-01",
+		"due_date":    "2026-06-07",
+		"tags":        []string{"plan", "timeline"},
+	}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("Create task: expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+
+	if got := task["Status"]; got != "in_progress" {
+		t.Fatalf("expected status in_progress, got %v", got)
+	}
+	if got := task["AssigneeID"]; got != assignee {
+		t.Fatalf("expected assignee %s, got %v", assignee, got)
+	}
+	if got := task["ReviewerID"]; got != reviewer {
+		t.Fatalf("expected reviewer %s, got %v", reviewer, got)
+	}
+	if got := task["StartDate"].(string); got[:10] != "2026-06-01" {
+		t.Fatalf("expected start_date 2026-06-01, got %s", got)
+	}
+	if got := task["DueDate"].(string); got[:10] != "2026-06-07" {
+		t.Fatalf("expected due_date 2026-06-07, got %s", got)
+	}
+}
+
+func TestUpdateTaskCanClearOptionalPlanningFieldsHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "UTC-001", "name": "Update Task Clear"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{
+		"code":        "UTC-T001",
+		"title":       "Task with optional fields",
+		"assignee_id": uuid.NewString(),
+		"reviewer_id": uuid.NewString(),
+		"start_date":  "2026-07-01",
+		"due_date":    "2026-07-10",
+	}, headers)
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+
+	rr = doJSON(t, h, "PATCH", "/v1/tasks/"+taskID, map[string]any{
+		"assignee_id": nil,
+		"reviewer_id": nil,
+		"start_date":  nil,
+		"due_date":    nil,
+		"version":     1,
+	}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("Patch clear: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var patched map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &patched)
+	if patched["AssigneeID"] != nil {
+		t.Fatalf("expected assignee cleared, got %v", patched["AssigneeID"])
+	}
+	if patched["ReviewerID"] != nil {
+		t.Fatalf("expected reviewer cleared, got %v", patched["ReviewerID"])
+	}
+	if patched["StartDate"] != nil {
+		t.Fatalf("expected start_date cleared, got %v", patched["StartDate"])
+	}
+	if patched["DueDate"] != nil {
+		t.Fatalf("expected due_date cleared, got %v", patched["DueDate"])
+	}
+}
+
+func TestSprintPlanningFieldsAndValidationHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "SPF-001", "name": "Sprint Planning Fields"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/sprints", map[string]any{
+		"name":         "Iteration 1",
+		"status":       "active",
+		"start_date":   "2026-08-01",
+		"end_date":     "2026-08-14",
+		"capacity_pts": 42,
+	}, headers)
+	if rr.Code != 201 {
+		t.Fatalf("Create sprint: expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var sprint map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
+	sprintID := sprint["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
+
+	if got := sprint["Status"]; got != "active" {
+		t.Fatalf("expected active status, got %v", got)
+	}
+	if got := sprint["CapacityPts"]; got != float64(42) {
+		t.Fatalf("expected capacity 42, got %v", got)
+	}
+	if got := sprint["StartDate"].(string); got[:10] != "2026-08-01" {
+		t.Fatalf("expected start_date 2026-08-01, got %s", got)
+	}
+	if got := sprint["EndDate"].(string); got[:10] != "2026-08-14" {
+		t.Fatalf("expected end_date 2026-08-14, got %s", got)
+	}
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/sprints", map[string]any{
+		"name":       "Invalid Window",
+		"start_date": "2026-08-20",
+		"end_date":   "2026-08-10",
+	}, headers)
+	if rr.Code != 400 {
+		t.Fatalf("Create invalid sprint: expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestProjectPlanningFieldsCanSetAndClearHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "PRP-001", "name": "Project Planning Patch"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	owner := uuid.NewString()
+	rr = doJSON(t, h, "PATCH", "/v1/projects/"+pid, map[string]any{
+		"owner_id":     owner,
+		"start_date":   "2026-09-01",
+		"due_date":     "2026-09-30",
+		"progress_pct": 30,
+		"version":      1,
+	}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("Patch set fields: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var patched map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &patched)
+	if patched["OwnerID"] != owner {
+		t.Fatalf("expected owner set, got %v", patched["OwnerID"])
+	}
+
+	rr = doJSON(t, h, "PATCH", "/v1/projects/"+pid, map[string]any{
+		"owner_id":   nil,
+		"start_date": nil,
+		"due_date":   nil,
+		"version":    2,
+	}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("Patch clear fields: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &patched)
+	if patched["OwnerID"] != nil || patched["StartDate"] != nil || patched["DueDate"] != nil {
+		t.Fatalf("expected owner/start/due cleared, got owner=%v start=%v due=%v", patched["OwnerID"], patched["StartDate"], patched["DueDate"])
+	}
+}
+
+func TestTaskPlanValidationHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "TPV-001", "name": "Task Plan Validation"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{
+		"code":        "TPV-T1",
+		"title":       "Invalid negative md",
+		"estimate_md": -1,
+	}, headers)
+	if rr.Code != 400 {
+		t.Fatalf("negative estimate: expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{
+		"code":       "TPV-T2",
+		"title":      "Invalid date range",
+		"start_date": "2026-10-10",
+		"due_date":   "2026-10-01",
+	}, headers)
+	if rr.Code != 400 {
+		t.Fatalf("invalid date range: expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}

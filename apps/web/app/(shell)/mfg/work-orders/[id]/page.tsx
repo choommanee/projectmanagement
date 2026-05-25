@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { ProcessFlowBar } from "@/shell/ProcessFlowBar";
-import { ComingSoon } from "@/shell/ComingSoon";
 import { Tag } from "@pmplatform/ui-kit";
 import { Button } from "@pmplatform/ui-kit";
 import { Input } from "@pmplatform/ui-kit";
@@ -14,7 +13,6 @@ import {
   listWoOperations, listWoMaterials, listItems, listWorkCenters,
   type WorkOrder, type WOOperation, type WOMaterial, type WOStatus, type WOPriority, type Item, type WorkCenter,
 } from "@/lib/api/mfg";
-import { Factory } from "lucide-react";
 
 const WO_STAGES = [
   { id: "planned", label: "Planned" },
@@ -461,12 +459,53 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Quality Tab */}
         {tab === "quality" && (
-          <ComingSoon title="Quality" description="Inspection plans and measurement records" icon={Factory} plan="Phase 2 — Plan #10" />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <MetricTile label="Operations" value={String(ops.length)} hint="routing execution steps" />
+              <MetricTile label="Materials" value={String(mats.length)} hint="issued vs required lines" />
+              <MetricTile label="WO Status" value={wo.status.replace("_", " ")} hint="quality gates follow status" />
+            </div>
+            <div className="rounded-md border border-line bg-paper p-4">
+              <h3 className="text-sm font-semibold text-ink">Quality Execution</h3>
+              <p className="mt-1 text-sm text-ink-3">
+                Run receiving/in-process/final inspections and capture NCR/CAPA actions tied to this work order.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/mfg/inspections" className="rounded-xs border border-line px-3 py-1.5 text-xs text-ink hover:bg-surface-2">
+                  Open Inspections
+                </Link>
+                <Link href="/mfg/ncrs" className="rounded-xs border border-line px-3 py-1.5 text-xs text-ink hover:bg-surface-2">
+                  Open NCR / CAPA
+                </Link>
+                <Link href="/mfg/control-plans" className="rounded-xs border border-line px-3 py-1.5 text-xs text-ink hover:bg-surface-2">
+                  Open Control Plans
+                </Link>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Traceability Tab */}
         {tab === "traceability" && (
-          <ComingSoon title="Traceability" description="Lot and serial genealogy graph" icon={Factory} plan="Phase 2 — Plan #11" />
+          <div className="space-y-4">
+            <div className="rounded-md border border-line bg-paper p-4">
+              <h3 className="text-sm font-semibold text-ink">Genealogy and Lot Tracking</h3>
+              <p className="mt-1 text-sm text-ink-3">
+                Use traceability explorer to drill forward/backward genealogy for lots and serials produced by this order.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/mfg/traceability" className="rounded-xs border border-line px-3 py-1.5 text-xs text-ink hover:bg-surface-2">
+                  Open Traceability Explorer
+                </Link>
+                <Link href="/mfg/items" className="rounded-xs border border-line px-3 py-1.5 text-xs text-ink hover:bg-surface-2">
+                  Open Item Master
+                </Link>
+              </div>
+            </div>
+            <div className="rounded-md border border-line bg-surface px-4 py-3 text-xs text-ink-3">
+              Tip: release/start/complete events from this work order are captured in PM Audit timeline for cross-functional review.
+            </div>
+          </div>
         )}
       </div>
 
@@ -489,6 +528,16 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
       {confirm === "delete" && (
         <DeleteConfirmDialog code={wo.code} onClose={() => setConfirm(null)} onConfirm={handleDelete} />
       )}
+    </div>
+  );
+}
+
+function MetricTile({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-sm border border-line bg-paper px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.08em] text-ink-3">{label}</p>
+      <p className="mt-1 text-sm font-mono text-ink">{value}</p>
+      <p className="mt-1 text-[11px] text-ink-3">{hint}</p>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
   type Dependency,
 } from "@/lib/api/tasks";
 import { statusTone, priorityTone, statusLabel, priorityLabel } from "@/lib/api/taskTones";
+import { UserPicker } from "@/components/UserPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -351,20 +352,18 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
 
               {/* Assignment */}
               <SectionCard title="Assignment">
-                <Field label="Assignee ID">
-                  <Input
+                <Field label="Assignee">
+                  <UserPicker
                     value={form.assigneeId}
-                    onChange={(e) => patch({ assigneeId: e.target.value })}
-                    placeholder="UUID (identity lookup in Phase 2)"
-                    className="font-mono text-[12px]"
+                    onChange={(id) => patch({ assigneeId: id })}
+                    placeholder="Search assignee…"
                   />
                 </Field>
-                <Field label="Reviewer ID">
-                  <Input
+                <Field label="Reviewer">
+                  <UserPicker
                     value={form.reviewerId}
-                    onChange={(e) => patch({ reviewerId: e.target.value })}
-                    placeholder="UUID"
-                    className="font-mono text-[12px]"
+                    onChange={(id) => patch({ reviewerId: id })}
+                    placeholder="Search reviewer…"
                   />
                 </Field>
               </SectionCard>

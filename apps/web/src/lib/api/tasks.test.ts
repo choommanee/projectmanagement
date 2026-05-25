@@ -89,7 +89,15 @@ describe("tasks API client", () => {
     });
     global.fetch = mockFetch;
 
-    await createTask("proj-001", { code: "T-1", title: "First task", estimate_md: 2.5 });
+    await createTask("proj-001", {
+      code: "T-1",
+      title: "First task",
+      status: "in_progress",
+      estimate_md: 2.5,
+      start_date: "2026-06-01",
+      due_date: "2026-06-05",
+      tags: ["plan"],
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/projects/proj-001/tasks",
@@ -98,6 +106,10 @@ describe("tasks API client", () => {
         body: expect.stringContaining('"estimate_md":2.5'),
       }),
     );
+    const body = String((mockFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body).toContain('"status":"in_progress"');
+    expect(body).toContain('"start_date":"2026-06-01"');
+    expect(body).toContain('"due_date":"2026-06-05"');
   });
 
   it("createTask throws with backend error message on non-2xx", async () => {

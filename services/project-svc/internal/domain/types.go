@@ -143,3 +143,62 @@ func ValidateCode(c string) error {
 	}
 	return nil
 }
+
+func IsValidTaskType(v TaskType) bool {
+	switch v {
+	case TaskTypeTask, TaskTypeSubtask, TaskTypeMilestone, TaskTypeDeliverable, TaskTypeIssue, TaskTypeRisk, TaskTypeBug:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidTaskStatus(v TaskStatus) bool {
+	switch v {
+	case TaskTodo, TaskInProgress, TaskBlocked, TaskReview, TaskDone, TaskCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidTaskPriority(v TaskPriority) bool {
+	switch v {
+	case PrioLow, PrioMed, PrioHigh, PrioCritical:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidSprintStatus(v SprintStatus) bool {
+	switch v {
+	case SprintPlanning, SprintActive, SprintClosed:
+		return true
+	default:
+		return false
+	}
+}
+
+func ValidateTaskPlan(estimateMd, actualMd float64, progressPct int, startDate, dueDate *time.Time) error {
+	if estimateMd < 0 || actualMd < 0 {
+		return ErrInvalidInput
+	}
+	if progressPct < 0 || progressPct > 100 {
+		return ErrInvalidInput
+	}
+	if startDate != nil && dueDate != nil && dueDate.Before(*startDate) {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+func ValidateSprintPlan(capacityPts int, startDate, endDate *time.Time) error {
+	if capacityPts < 0 {
+		return ErrInvalidInput
+	}
+	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+		return ErrInvalidInput
+	}
+	return nil
+}

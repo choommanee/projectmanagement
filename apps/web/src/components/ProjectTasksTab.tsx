@@ -66,6 +66,12 @@ export function ProjectTasksTab({ projectId }: Props) {
     void fetchTasks();
   }, [fetchTasks]);
 
+  const totalEstimateMd = tasks.reduce((sum, t) => sum + (t.estimateMd ?? 0), 0);
+  const totalActualMd = tasks.reduce((sum, t) => sum + (t.actualMd ?? 0), 0);
+  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const completionPct = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const remainingMd = Math.max(0, totalEstimateMd - totalActualMd);
+
   return (
     <div className="flex flex-col gap-3">
       {/* Toolbar */}
@@ -105,6 +111,13 @@ export function ProjectTasksTab({ projectId }: Props) {
             New Task
           </Button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <MiniMetric label="Estimate (md)" value={totalEstimateMd.toFixed(1)} />
+        <MiniMetric label="Actual (md)" value={totalActualMd.toFixed(1)} />
+        <MiniMetric label="Remaining (md)" value={remainingMd.toFixed(1)} />
+        <MiniMetric label="Done %" value={`${completionPct}%`} />
       </div>
 
       {/* Error */}
@@ -220,6 +233,15 @@ export function ProjectTasksTab({ projectId }: Props) {
           onCreated={() => { setShowCreate(false); void fetchTasks(); }}
         />
       )}
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-line bg-paper px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.08em] text-ink-3">{label}</p>
+      <p className="mt-1 font-mono text-sm text-ink">{value}</p>
     </div>
   );
 }
