@@ -10,6 +10,7 @@ import {
   type ApqpProject, type ApqpPhase, type ApqpStatus, type Milestone,
 } from "@/lib/api/quality";
 import { listItems, type Item } from "@/lib/api/mfg";
+import { UserPicker } from "@/components/UserPicker";
 
 const PHASES: { value: string; label: string }[] = [
   { value: "", label: "All" },
@@ -117,7 +118,11 @@ function NewApqpDialog({ items, onClose, onCreated }: {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink-2">Owner (optional)</label>
-            <Input value={form.owner_id} onChange={e => setForm(f => ({ ...f, owner_id: e.target.value }))} placeholder="User ID or name" />
+            <UserPicker
+              value={form.owner_id}
+              onChange={id => setForm(f => ({ ...f, owner_id: id }))}
+              placeholder="Owner (search by name)"
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
@@ -129,11 +134,12 @@ function NewApqpDialog({ items, onClose, onCreated }: {
   );
 }
 
-function ApqpDetailPane({ project, itemMap, onClose, onUpdated }: {
+function ApqpDetailPane({ project, itemMap, onClose, onUpdated, onDeleted }: {
   project: ApqpProject;
   itemMap: Map<string, Item>;
   onClose: () => void;
   onUpdated: (p: ApqpProject) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [form, setForm] = useState({
     name: project.name,
@@ -174,7 +180,7 @@ function ApqpDetailPane({ project, itemMap, onClose, onUpdated }: {
     try {
       await deleteApqp(project.id, project.version);
       onClose();
-      onUpdated({ ...project, id: "__deleted__" });
+      onDeleted(project.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally { setDeleting(false); }
@@ -235,7 +241,11 @@ function ApqpDetailPane({ project, itemMap, onClose, onUpdated }: {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink-2">Owner</label>
-              <Input value={form.owner_id} onChange={e => setForm(f => ({ ...f, owner_id: e.target.value }))} placeholder="User ID" />
+              <UserPicker
+                value={form.owner_id}
+                onChange={id => setForm(f => ({ ...f, owner_id: id }))}
+                placeholder="Owner (search by name)"
+              />
             </div>
           </div>
 
@@ -314,13 +324,13 @@ export default function ApqpPage() {
   });
 
   function handleUpdated(p: ApqpProject) {
-    if (p.id === "__deleted__") {
-      setProjects(prev => prev.filter(x => x.id !== selected?.id));
-      setSelected(null);
-    } else {
-      setProjects(prev => prev.map(x => x.id === p.id ? p : x));
-      setSelected(p);
-    }
+    setProjects(prev => prev.map(x => x.id === p.id ? p : x));
+    setSelected(p);
+  }
+
+  function handleDeleted(id: string) {
+    setProjects(prev => prev.filter(x => x.id !== id));
+    setSelected(null);
   }
 
   return (
@@ -402,7 +412,7 @@ export default function ApqpPage() {
       )}
 
       {selected && (
-        <ApqpDetailPane project={selected} itemMap={itemMap} onClose={() => setSelected(null)} onUpdated={handleUpdated} />
+        <ApqpDetailPane project={selected} itemMap={itemMap} onClose={() => setSelected(null)} onUpdated={handleUpdated} onDeleted={handleDeleted} />
       )}
     </div>
   );

@@ -292,14 +292,17 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const { items } = await listDashboards({ limit: 100 });
       setDashboards(items);
-    } catch {
-      // silent
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -309,9 +312,10 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setLoadingSummary(true);
+    setMetricsError(null);
     getSummaryMetrics()
       .then(setSummary)
-      .catch(() => null)
+      .catch((e: unknown) => { setMetricsError((e as Error).message); })
       .finally(() => setLoadingSummary(false));
   }, []);
 
@@ -320,11 +324,12 @@ export default function ReportsPage() {
 
   async function handleDelete(d: Dashboard) {
     setDeleting(d.id);
+    setError(null);
     try {
       await deleteDashboard(d.id, d.version);
       setDashboards((prev) => prev.filter((x) => x.id !== d.id));
-    } catch {
-      // silent
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setDeleting(null);
     }
@@ -366,7 +371,17 @@ export default function ReportsPage() {
           </header>
 
           {/* ── Live instrument strip ─────────────────────────────────── */}
+          {metricsError && (
+            <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+              Metrics unavailable: {metricsError}
+            </div>
+          )}
           <InstrumentStrip summary={summary} loading={loadingSummary} />
+          {error && (
+            <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+              {error}
+            </div>
+          )}
 
           {/* ── Pinned ───────────────────────────────────────────────── */}
           {pinned.length > 0 && (

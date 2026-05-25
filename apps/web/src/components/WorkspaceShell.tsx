@@ -132,6 +132,8 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
+  const [mutError, setMutError] = useState<string | null>(null);
+
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentVersionRef = useRef<number>(1);
 
@@ -244,7 +246,11 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       setDocs((prev) => prev.map((d) => d.id === updated.id ? { ...d, title: updated.title, version: updated.version } : d));
     } catch (e) {
       const msg = (e as Error).message;
-      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) setConflictError(true);
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) {
+        setConflictError(true);
+      } else {
+        setMutError(msg);
+      }
     }
   }
 
@@ -259,7 +265,11 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       setDocs((prev) => prev.map((d) => d.id === updated.id ? { ...d, status: updated.status, version: updated.version } : d));
     } catch (e) {
       const msg = (e as Error).message;
-      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) setConflictError(true);
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) {
+        setConflictError(true);
+      } else {
+        setMutError(msg);
+      }
     }
   }
 
@@ -303,8 +313,8 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       setComments((prev) => [...prev, c]);
       setNewComment("");
       setReplyTo(null);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      setMutError((e as Error).message);
     } finally {
       setCommentsBusy(false);
     }
@@ -362,8 +372,8 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       setPreviewVersion(null);
       setShowVersions(false);
       setDirty(false);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      setMutError((e as Error).message);
     } finally {
       setRestoringVersion(false);
     }
@@ -379,8 +389,9 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
       setOpenDoc(null);
       setDocs((prev) => prev.filter((d) => d.id !== openDoc.id));
       setShowDeleteDialog(false);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      setMutError((e as Error).message);
+      setShowDeleteDialog(false);
     }
   }
 
@@ -423,7 +434,15 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
   }
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* ── Mutation error bar ──────────────────────────────────────────────── */}
+      {mutError && (
+        <div className="flex items-center gap-2 border-b border-danger/30 bg-danger/5 px-4 py-1.5 font-mono text-[11px] text-danger">
+          <span className="flex-1">{mutError}</span>
+          <button type="button" onClick={() => setMutError(null)} className="text-danger/60 hover:text-danger">×</button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ── Left rail: doc list ─────────────────────────────────────────────── */}
       <div className="flex w-60 shrink-0 flex-col border-r border-line bg-surface-2">
         {/* Search */}
@@ -520,6 +539,8 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
               {renaming ? (
                 <input
                   autoFocus
+                  aria-label="Document title"
+                  title="Document title"
                   className="flex-1 rounded-xs border border-accent bg-surface px-2 py-1 text-base font-semibold text-ink focus:outline-none"
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
@@ -660,7 +681,7 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
         <div className="flex w-72 shrink-0 flex-col border-l border-line bg-surface shadow-sm">
           <div className="flex items-center justify-between border-b border-line px-3 py-2">
             <span className="text-[13px] font-semibold text-ink">Comments</span>
-            <button type="button" onClick={() => setShowComments(false)} className="text-ink-3 hover:text-ink">
+            <button type="button" title="Close comments" aria-label="Close comments" onClick={() => setShowComments(false)} className="text-ink-3 hover:text-ink">
               <X size={14} />
             </button>
           </div>
@@ -732,7 +753,7 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
             {replyTo && (
               <div className="flex items-center gap-1 text-[11px] text-ink-3">
                 Replying…
-                <button type="button" className="ml-auto hover:text-ink" onClick={() => setReplyTo(null)}>
+                <button type="button" title="Cancel reply" aria-label="Cancel reply" className="ml-auto hover:text-ink" onClick={() => setReplyTo(null)}>
                   <X size={11} />
                 </button>
               </div>
@@ -769,7 +790,7 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <h3 className="text-base font-semibold text-ink">Version History</h3>
-              <button type="button" onClick={() => { setShowVersions(false); setPreviewVersion(null); }} className="text-ink-3 hover:text-ink">
+              <button type="button" title="Close version history" aria-label="Close version history" onClick={() => { setShowVersions(false); setPreviewVersion(null); }} className="text-ink-3 hover:text-ink">
                 <X size={16} />
               </button>
             </div>
@@ -863,6 +884,7 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -929,7 +951,7 @@ function NewDocDialog({ workspace, projectId, kind, allowedTypes, initialType, o
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">New Document</h2>
-          <button type="button" onClick={onClose} className="text-ink-3 hover:text-ink"><X size={16} /></button>
+          <button type="button" title="Close" aria-label="Close" onClick={onClose} className="text-ink-3 hover:text-ink"><X size={16} /></button>
         </div>
 
         {/* Tabs */}

@@ -692,7 +692,7 @@ function ProjectActivityTab({ projectId }: { projectId: string }) {
                   <td className="px-3 py-2 text-xs text-ink-2">{ev.service || "—"}</td>
                   <td className="px-3 py-2 text-xs text-ink">{ev.action || "—"}</td>
                   <td className="px-3 py-2">
-                    <Tag tone={ev.result === "deny" || ev.result === "error" ? "danger" : "success"}>{ev.result || "ok"}</Tag>
+                    <Tag tone={ev.result === "denied" || ev.result === "error" ? "danger" : "success"}>{ev.result || "ok"}</Tag>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-ink-3">{ev.userId ? `${ev.userId.slice(0, 8)}…` : "system"}</td>
                 </tr>

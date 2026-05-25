@@ -286,6 +286,8 @@ export default function DashboardViewerPage() {
   const [loadingDash, setLoadingDash] = useState(!isPrebuilt);
   const [pinning, setPinning] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [mutError, setMutError] = useState<string | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Fetch real summary metrics for all dashboards
   useEffect(() => {
@@ -296,7 +298,10 @@ export default function DashboardViewerPage() {
   useEffect(() => {
     if (isPrebuilt) return;
     setLoadingDash(true);
-    getDashboard(id).then(setDashboard).catch(() => null).finally(() => setLoadingDash(false));
+    getDashboard(id)
+      .then(setDashboard)
+      .catch((e: unknown) => { setDashboardError((e as Error).message); return null; })
+      .finally(() => setLoadingDash(false));
   }, [id, isPrebuilt]);
 
   const name = prebuilt?.name ?? dashboard?.name ?? "";
@@ -309,14 +314,15 @@ export default function DashboardViewerPage() {
   const handlePin = useCallback(async () => {
     if (!dashboard) return;
     setPinning(true);
+    setMutError(null);
     try {
       const updated = await updateDashboard(dashboard.id, {
         isPinned: !dashboard.isPinned,
         version: dashboard.version,
       });
       setDashboard(updated);
-    } catch {
-      // ignore
+    } catch (e) {
+      setMutError((e as Error).message);
     } finally {
       setPinning(false);
     }
@@ -325,10 +331,12 @@ export default function DashboardViewerPage() {
   const handleDelete = useCallback(async () => {
     if (!dashboard) return;
     setDeleting(true);
+    setMutError(null);
     try {
       await deleteDashboard(dashboard.id, dashboard.version);
       router.push("/pm/reports");
-    } catch {
+    } catch (e) {
+      setMutError((e as Error).message);
       setDeleting(false);
     }
   }, [dashboard, router]);
@@ -336,6 +344,7 @@ export default function DashboardViewerPage() {
   const handleDuplicate = useCallback(async () => {
     const srcWidgets = prebuilt?.widgets ?? dashboard?.widgets ?? [];
     const srcName = prebuilt?.name ?? dashboard?.name ?? "Dashboard";
+    setMutError(null);
     try {
       const dup = await createDashboard({
         name: `${srcName} (copy)`,
@@ -345,8 +354,8 @@ export default function DashboardViewerPage() {
         layout: dashboard?.layout,
       });
       router.push(`/pm/reports/${dup.id}`);
-    } catch {
-      // ignore
+    } catch (e) {
+      setMutError((e as Error).message);
     }
   }, [prebuilt, dashboard, router]);
 
@@ -367,6 +376,16 @@ export default function DashboardViewerPage() {
 
       <div className="flex-1 overflow-auto">
         <div className="mx-auto max-w-[1400px] px-6 py-6 space-y-5">
+          {dashboardError && (
+            <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+              {dashboardError}
+            </div>
+          )}
+          {mutError && (
+            <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+              {mutError}
+            </div>
+          )}
           {/* Editorial header */}
           <header className="flex items-end justify-between gap-6 border-b border-line pb-5">
             <div className="flex flex-col gap-2">

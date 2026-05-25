@@ -5,20 +5,9 @@ import { CommandBar } from "@/shell/CommandBar";
 import { Tag } from "@pmplatform/ui-kit";
 import { Button } from "@pmplatform/ui-kit";
 import { Input } from "@pmplatform/ui-kit";
-import { listItems, listLotsForItem, type Item, type Lot, type LotStatus } from "@/lib/api/mfg";
+import { listItems, listLotsForItem, traceForLot, linkGenealogyLot, type Item, type Lot, type LotStatus, type TraceNode } from "@/lib/api/mfg";
 
 type TraceDirection = "forward" | "backward";
-
-interface TraceNode {
-  lot_id: string;
-  lot_no: string;
-  item_id: string;
-  item_code: string;
-  qty: number;
-  status: LotStatus;
-  depth: number;
-  children?: TraceNode[];
-}
 
 function lotStatusTone(s: LotStatus): "success" | "warning" | "danger" | "neutral" {
   if (s === "released") return "success";
@@ -88,15 +77,7 @@ function AddDownstreamDialog({ currentLotId, items, onClose, onLinked }: {
     if (!childLotId) { setError("Select a child lot to link"); return; }
     setLoading(true); setError(null);
     try {
-      const r = await fetch(`/api/mfg/lots/${childLotId}/genealogy`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ parent_lot_id: currentLotId, qty: Number(qty) }),
-      });
-      if (!r.ok) {
-        const e = await r.json().catch(() => ({})) as Record<string, string>;
-        throw new Error(e.error ?? `Failed: ${r.status}`);
-      }
+      await linkGenealogyLot(childLotId, currentLotId, Number(qty));
       onLinked();
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to link"); }
     finally { setLoading(false); }
@@ -182,7 +163,7 @@ export default function TraceabilityPage() {
     setTraceNodes([]);
     setLotsLoading(true);
     try { setLots(await listLotsForItem(item.id)); }
-    catch { setLots([]); }
+    catch (e) { setLots([]); setTraceError(e instanceof Error ? e.message : "Failed to load lots"); }
     finally { setLotsLoading(false); }
   }
 
@@ -192,16 +173,11 @@ export default function TraceabilityPage() {
     setTraceError(null);
     setTraceNodes([]);
     try {
-      const r = await fetch(`/api/mfg/lots/${lot.id}/trace?direction=${dir}&max_depth=10`);
-      if (!r.ok) throw new Error(`Trace failed: ${r.status}`);
-      const body = await r.json() as Record<string, unknown>;
-      const root = (body.root ?? body) as TraceNode;
+      const root = await traceForLot(lot.id, dir);
       if (root && (root.lot_id || root.lot_no)) {
         setTraceNodes(flattenTree(root));
       } else {
-        // flat list fallback
-        const nodes = (body.nodes ?? body.items ?? []) as TraceNode[];
-        setTraceNodes(nodes);
+        setTraceNodes([]);
       }
     } catch (e) {
       setTraceError(e instanceof Error ? e.message : "Trace failed");

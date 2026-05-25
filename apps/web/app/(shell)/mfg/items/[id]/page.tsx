@@ -11,7 +11,7 @@ import {
   getItem, updateItem, deleteItem, listUoms, listBomsForItem, createBomForItem, getBom,
   listRoutingsForItem, createRoutingForItem, addRoutingOperation, updateRoutingOperation, deleteRoutingOperation,
   listLotsForItem, createLot,
-  type Item, type UOM, type BOMHeader, type BOMLine, type RoutingHeader, type RoutingOperation, type Lot, type ItemType, type ItemStatus, type LotStatus,
+  type Item, type UOM, type BOMHeader, type RoutingHeader, type RoutingOperation, type Lot, type ItemType, type ItemStatus, type LotStatus,
   listWorkCenters, type WorkCenter,
 } from "@/lib/api/mfg";
 
@@ -129,7 +129,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     try {
       const list = await listRoutingsForItem(id);
       setRoutings(list);
-    } catch { /* noop */ } finally { setRoutingLoading(false); }
+    } catch (err) {
+      setBomErr(err instanceof Error ? err.message : "Failed to load routings");
+    } finally { setRoutingLoading(false); }
   }, [id]);
 
   const loadLots = useCallback(async () => {
@@ -137,7 +139,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     try {
       const list = await listLotsForItem(id);
       setLots(list);
-    } catch { /* noop */ } finally { setLotLoading(false); }
+    } catch (err) {
+      setLotErr(err instanceof Error ? err.message : "Failed to load lots");
+    } finally { setLotLoading(false); }
   }, [id]);
 
   useEffect(() => {
@@ -196,12 +200,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   async function handleSelectBom(bom: BOMHeader) {
     setSelectedBom(bom);
     try {
-      const full = await getBom(bom.id);
-      // getBom doesn't return lines from backend — load items list to hydrate
-      const lineRes = await fetch(`/api/mfg/boms/${bom.id}`);
-      const lineData = await lineRes.json() as Record<string, unknown>;
-      const lines = (lineData.lines ?? lineData.Lines ?? []) as BOMLine[];
-      setSelectedBomFull({ ...full, lines });
+      const bomWithLines = await getBom(bom.id);
+      const lines = bomWithLines.lines ?? [];
+      setSelectedBomFull({ ...bomWithLines, lines });
     } catch {
       setSelectedBomFull(bom);
     }

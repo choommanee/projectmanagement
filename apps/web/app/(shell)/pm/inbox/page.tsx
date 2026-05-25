@@ -9,6 +9,7 @@ import {
   listHumanTasks, completeHumanTask, getInstance,
   type HumanTask, type WorkflowInstance,
 } from "@/lib/api/workflows";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -186,46 +187,44 @@ function CompleteSheet({ task, instanceInfo, onClose, onCompleted }: CompleteShe
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InboxPage() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<HumanTask[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [selectedTask, setSelectedTask] = useState<HumanTask | null>(null);
   const [selectedInstance, setSelectedInstance] = useState<WorkflowInstance | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    const meta = readUserMeta();
-    setUserId(meta.id);
-  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params: { status: string; assignee_id?: string; limit: number } = {
         status: "open",
         limit: 100,
       };
-      if (myTasksOnly && userId) {
-        params.assignee_id = userId;
+      if (myTasksOnly && user?.id) {
+        params.assignee_id = user.id;
       }
       const { items, total: t } = await listHumanTasks(params);
       setTasks(items);
       setTotal(t);
-    } catch { /* ignore */ }
+    } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
-  }, [myTasksOnly, userId]);
+  }, [myTasksOnly, user]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleRowClick = async (task: HumanTask) => {
     setSelectedTask(task);
     setSelectedInstance(null);
+    setError(null);
     try {
       const detail = await getInstance(task.instanceId);
       setSelectedInstance(detail);
-    } catch { /* ignore */ }
+    } catch (e) { setError((e as Error).message); }
   };
 
   const handleCompleted = async () => {
@@ -248,6 +247,11 @@ export default function InboxPage() {
       />
 
       <div className="flex flex-1 flex-col overflow-auto p-4">
+        {error && (
+          <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+            {error}
+          </div>
+        )}
         {/* Filter toggle */}
         <div className="mb-4 flex items-center gap-3">
           <div className="flex rounded-md border border-line overflow-hidden text-xs">

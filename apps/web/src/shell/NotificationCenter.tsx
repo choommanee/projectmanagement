@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@pmplatform/ui-kit";
 import type { AppNotification } from "@/lib/api/notifications";
@@ -23,6 +24,13 @@ interface NotificationCenterProps {
 export function NotificationCenter({ items, onMarkRead, onMarkAllRead }: NotificationCenterProps) {
   const [open, setOpen] = useState(false);
   const unread = items.filter((n) => !n.readAt).length;
+  const router = useRouter();
+
+  function handleNotifClick(n: AppNotification) {
+    if (!n.readAt) onMarkRead(n.id);
+    const url = n.payload?.url as string | undefined;
+    if (url) router.push(url);
+  }
 
   return (
     <div className="relative">
@@ -61,7 +69,8 @@ export function NotificationCenter({ items, onMarkRead, onMarkAllRead }: Notific
               items.map((n) => (
                 <div
                   key={n.id}
-                  className={`group flex items-start gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors cursor-default ${
+                  onClick={() => handleNotifClick(n)}
+                  className={`group flex items-start gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors cursor-pointer ${
                     !n.readAt ? "bg-accent-soft/10" : ""
                   }`}
                 >

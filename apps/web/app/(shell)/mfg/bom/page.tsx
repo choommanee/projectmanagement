@@ -8,7 +8,7 @@ import { Input } from "@pmplatform/ui-kit";
 import { BomTree } from "@/components/BomTree";
 import {
   listItems, listBomsForItem, createBomForItem, getBom, listUoms,
-  type Item, type BOMHeader, type BOMLine, type UOM,
+  type Item, type BOMHeader, type UOM,
 } from "@/lib/api/mfg";
 
 export default function BomExplorerPage() {
@@ -64,12 +64,9 @@ export default function BomExplorerPage() {
     setSelectedBomFull(null);
     setBomDetailLoading(true);
     try {
-      const full = await getBom(bom.id);
-      // getBom header doesn't include lines — fetch them via the proxy
-      const lineRes = await fetch(`/api/mfg/boms/${bom.id}`);
-      const lineData = await lineRes.json() as Record<string, unknown>;
-      const lines = (lineData.lines ?? lineData.Lines ?? []) as BOMLine[];
-      setSelectedBomFull({ ...full, lines });
+      const bomWithLines = await getBom(bom.id);
+      const lines = bomWithLines.lines ?? [];
+      setSelectedBomFull({ ...bomWithLines, lines });
     } catch {
       setSelectedBomFull(bom);
     } finally {
@@ -134,8 +131,8 @@ export default function BomExplorerPage() {
       {!selectedItem ? (
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="w-full max-w-sm rounded-md border border-dashed border-line-strong bg-surface p-8 text-center">
-            <div className="text-3xl mb-3">📋</div>
-            <h2 className="text-base font-semibold text-ink">Select an Item</h2>
+            <span className="font-mono text-[11px] text-ink-3">No BOMs found for this filter.</span>
+            <h2 className="mt-2 text-base font-semibold text-ink">Select an Item</h2>
             <p className="mt-1 text-sm text-ink-3">Use the search above to find a finished good or assembly to view its bill of materials.</p>
           </div>
         </div>

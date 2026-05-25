@@ -105,3 +105,11 @@ export async function listSprintTasks(sprintId: string): Promise<TaskT[]> {
   const { normTask } = await import("./tasks");
   return (items ?? []).map((x) => normTask(x as Record<string, unknown>));
 }
+
+export async function deleteSprint(id: string): Promise<void> {
+  const r = await fetch(`/api/sprints/${id}`, { method: "DELETE" });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(e.error ?? `delete sprint failed: ${r.status}`);
+  }
+}

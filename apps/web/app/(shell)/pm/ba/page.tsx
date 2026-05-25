@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-import { Button, Tag } from "@pmplatform/ui-kit";
+import { Button, Input, Tag } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { listProjects, type Project } from "@/lib/api/projects";
 
@@ -22,13 +22,18 @@ export default function BALandingPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    listProjects({ limit: 50 })
-      .then(({ items }) => setProjects(items))
-      .catch((e) => setError((e as Error).message))
-      .finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    const timer = setTimeout(() => {
+      listProjects({ limit: 100, q: search || undefined })
+        .then(({ items }) => setProjects(items))
+        .catch((e) => setError((e as Error).message))
+        .finally(() => setLoading(false));
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <div className="flex h-full flex-col">
@@ -39,6 +44,13 @@ export default function BALandingPage() {
           <h1 className="text-2xl font-semibold text-ink">BA Workspace</h1>
           <p className="mt-1 text-sm text-ink-3">BRD / FRD / User Stories / RTM — pick a project to open its workspace.</p>
         </div>
+
+        <Input
+          placeholder="Search projects…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="mb-4 max-w-xs"
+        />
 
         {loading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

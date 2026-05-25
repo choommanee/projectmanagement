@@ -425,12 +425,14 @@ interface VersionsTabProps {
 function VersionsTab({ workflowId, currentVersion, onPublish, onView }: VersionsTabProps) {
   const [versions, setVersions] = useState<WorkflowVersion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     listVersions(workflowId)
       .then(setVersions)
-      .catch(() => {})
+      .catch((e: unknown) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [workflowId]);
 
@@ -438,6 +440,11 @@ function VersionsTab({ workflowId, currentVersion, onPublish, onView }: Versions
 
   return (
     <div className="overflow-auto p-4">
+      {error && (
+        <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+          {error}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
@@ -511,13 +518,15 @@ function RunsTab({ workflowId }: RunsTabProps) {
   const router = useRouter();
   const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const { items } = await listInstances(workflowId, { limit: 50 });
       setInstances(items);
-    } catch { /* ignore */ }
+    } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [workflowId]);
 
@@ -531,6 +540,11 @@ function RunsTab({ workflowId }: RunsTabProps) {
         <span className="text-xs text-ink-3">{instances.length} runs</span>
         <Button size="sm" variant="ghost" onClick={load}><RefreshCw size={12} /> Refresh</Button>
       </div>
+      {error && (
+        <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+          {error}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
@@ -722,6 +736,7 @@ export default function WorkflowDetailPage() {
   const [def, setDef] = useState<WorkflowDef | null>(null);
   const [draftVersion, setDraftVersion] = useState<WorkflowVersion | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("designer");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
@@ -754,7 +769,7 @@ export default function WorkflowDetailPage() {
         const steps = draft.dsl?.steps ?? [];
         setDslSteps(steps);
       }
-    } catch { /* ignore */ }
+    } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [id]);
 
@@ -844,7 +859,7 @@ export default function WorkflowDetailPage() {
       await deleteWorkflow(def.id, def.version);
       router.push("/pm/workflows");
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -861,7 +876,7 @@ export default function WorkflowDetailPage() {
     try {
       const updated = await patchWorkflow(def.id, { name: nameDraft.trim(), version: def.version });
       setDef(updated);
-    } catch { /* ignore */ }
+    } catch (e) { setError((e as Error).message); }
     finally { setEditingName(false); }
   };
 
@@ -913,6 +928,12 @@ export default function WorkflowDetailPage() {
           { id: "delete", label: "Delete", icon: <Trash2 size={14} />, variant: "danger", onClick: () => setShowDeleteConfirm(true) },
         ]}
       />
+
+      {error && (
+        <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+          {error}
+        </div>
+      )}
 
       {/* Header card */}
       <div className="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">

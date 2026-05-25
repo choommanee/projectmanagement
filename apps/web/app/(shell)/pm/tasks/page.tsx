@@ -10,6 +10,7 @@ import { listProjects, type Project } from "@/lib/api/projects";
 import { statusTone, priorityTone, statusLabel, priorityLabel } from "@/lib/api/taskTones";
 import { TaskSheet } from "@/components/TaskSheet";
 import { UserPicker } from "@/components/UserPicker";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
@@ -58,7 +59,9 @@ function InitialsAvatar({ id }: { id?: string | null }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,13 @@ export default function TasksPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
+  // Load projects for display lookup
+  useEffect(() => {
+    listProjects({ limit: 200 })
+      .then((r) => setProjects(r.items))
+      .catch(() => {});
+  }, []);
+
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -82,6 +92,7 @@ export default function TasksPage() {
         q: search || undefined,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
+        ...(myTasks && user?.id ? { assignee: user.id } : {}),
       });
       setTasks(result.items);
       setTotal(result.total);
@@ -90,7 +101,7 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search, myTasks, page]);
+  }, [statusFilter, search, myTasks, user, page]);
 
   useEffect(() => {
     void fetchTasks();
@@ -286,7 +297,7 @@ export default function TasksPage() {
                         <span className="block truncate text-ink">{task.title}</span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className="font-mono text-[11px] text-ink-3">{task.projectId.slice(0, 8)}</span>
+                        <span className="font-mono text-[11px] text-ink-3">{projects.find(p => p.id === task.projectId)?.code ?? task.projectId.slice(0, 8)}</span>
                       </td>
                       <td className="px-3 py-2">
                         <Tag tone="neutral">{task.type}</Tag>

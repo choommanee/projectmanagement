@@ -779,3 +779,50 @@ export async function listMrpActions(runId: string): Promise<MrpAction[]> {
   const body = await r.json();
   return ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normMrpAction);
 }
+
+// ─── Lot genealogy / traceability ─────────────────────────────────────────
+
+export interface TraceNode {
+  lot_id: string;
+  lot_no: string;
+  item_id: string;
+  item_code: string;
+  qty: number;
+  status: LotStatus;
+  depth: number;
+  children?: TraceNode[];
+}
+
+export async function traceForLot(
+  lotId: string,
+  direction: "forward" | "backward" = "forward",
+  maxDepth = 10
+): Promise<TraceNode> {
+  const r = await apiFetch(
+    `${SVC}/lots/${lotId}/trace?direction=${direction}&max_depth=${maxDepth}`
+  );
+  if (!r.ok) throw new Error(`trace failed: ${r.status}`);
+  const body = await r.json() as Record<string, unknown>;
+  return (body.root ?? body) as TraceNode;
+}
+
+export async function linkGenealogyLot(
+  childLotId: string,
+  parentLotId: string,
+  qty: number
+): Promise<void> {
+  const r = await apiFetch(`${SVC}/lots/${childLotId}/genealogy`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ parent_lot_id: parentLotId, qty }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(e.error ?? `link genealogy failed: ${r.status}`);
+  }
+}
+
+export async function deleteLot(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/lots/${id}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`delete lot failed: ${r.status}`);
+}
