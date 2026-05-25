@@ -42,6 +42,24 @@ permit (
 )
 when { context.roles.contains("tenant-admin") };
 
+// --- Identity: user management ---
+
+// Only tenant-admin (and platform-admin via the super-permit above) may invite,
+// update, or deactivate users within their tenant.
+permit (
+  principal,
+  action in [
+    Action::"identity.user.create",
+    Action::"identity.user.update",
+    Action::"identity.user.delete"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("platform-admin")
+};
+
 // --- Sample CRUD policies (placeholders; not yet enforced elsewhere) -------
 
 // Tenants: only platform-admin may create/delete tenants; tenant-admin may update.
