@@ -173,6 +173,11 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
   }, []);
 
   useEffect(() => {
+    // Cancel any pending auto-save for the outgoing document before loading the new one
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
     if (selectedDocId) void loadDoc(selectedDocId);
     else { setOpenDoc(null); setEditorValue(EMPTY_DOC); }
   }, [selectedDocId, loadDoc]);

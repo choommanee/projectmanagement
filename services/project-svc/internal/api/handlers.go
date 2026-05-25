@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -112,59 +111,6 @@ func tenantOr400(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	return tid, true
 }
 
-type optionalUUID struct {
-	Set   bool
-	Value *uuid.UUID
-}
-
-func (o *optionalUUID) UnmarshalJSON(data []byte) error {
-	o.Set = true
-	if string(data) == "null" {
-		o.Value = nil
-		return nil
-	}
-	var v uuid.UUID
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	o.Value = &v
-	return nil
-}
-
-type optionalDate struct {
-	Set   bool
-	Value *time.Time
-}
-
-func (o *optionalDate) UnmarshalJSON(data []byte) error {
-	o.Set = true
-	if string(data) == "null" {
-		o.Value = nil
-		return nil
-	}
-	var raw string
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	if raw == "" {
-		o.Value = nil
-		return nil
-	}
-	t, err := parseDate(raw)
-	if err != nil {
-		return err
-	}
-	o.Value = &t
-	return nil
-}
-
-func parseDate(v string) (time.Time, error) {
-	if t, err := time.Parse("2006-01-02", v); err == nil {
-		return t, nil
-	}
-	return time.Parse(time.RFC3339, v)
-}
-
 // --- Projects ---
 
 type createProjectReq struct {
@@ -262,9 +208,7 @@ type updateProjectReq struct {
 	Name        string               `json:"name,omitempty"`
 	Description string               `json:"description,omitempty"`
 	Status      domain.ProjectStatus `json:"status,omitempty"`
-	OwnerID     optionalUUID         `json:"owner_id"`
-	StartDate   optionalDate         `json:"start_date"`
-	DueDate     optionalDate         `json:"due_date"`
+	OwnerID     *uuid.UUID           `json:"owner_id,omitempty"`
 	ProgressPct *int                 `json:"progress_pct,omitempty"`
 	Tags        []string             `json:"tags,omitempty"`
 	Version     int                  `json:"version"`
@@ -292,26 +236,19 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 			callerID = c.Subject
 		}
 		p, err := svc.UpdateProject(r.Context(), service.UpdateProjectInput{
-			TenantID:     tid,
-			ID:           id,
-			Name:         req.Name,
-			Description:  req.Description,
-			Status:       req.Status,
-			OwnerID:      req.OwnerID.Value,
-			OwnerIDSet:   req.OwnerID.Set,
-			StartDate:    req.StartDate.Value,
-			StartDateSet: req.StartDate.Set,
-			DueDate:      req.DueDate.Value,
-			DueDateSet:   req.DueDate.Set,
-			ProgressPct:  req.ProgressPct,
-			Tags:         req.Tags,
-			Version:      req.Version,
-			UserID:       callerID,
+			TenantID:    tid,
+			ID:          id,
+			Name:        req.Name,
+			Description: req.Description,
+			Status:      req.Status,
+			OwnerID:     req.OwnerID,
+			ProgressPct: req.ProgressPct,
+			Tags:        req.Tags,
+			Version:     req.Version,
+			UserID:      callerID,
 		})
 		if err != nil {
 			switch {
-			case errors.Is(err, domain.ErrInvalidInput):
-				writeErr(w, 400, err)
 			case errors.Is(err, domain.ErrNotFound):
 				writeErr(w, 404, err)
 			case errors.Is(err, domain.ErrConflict):
@@ -357,19 +294,15 @@ func deleteProject(svc *service.Service) http.HandlerFunc {
 // --- Tasks ---
 
 type createTaskReq struct {
-	Code        string              `json:"code"`
-	Title       string              `json:"title"`
-	Description string              `json:"description,omitempty"`
-	ParentID    *uuid.UUID          `json:"parent_id,omitempty"`
-	Type        domain.TaskType     `json:"type,omitempty"`
-	Status      domain.TaskStatus   `json:"status,omitempty"`
-	Priority    domain.TaskPriority `json:"priority,omitempty"`
-	AssigneeID  *uuid.UUID          `json:"assignee_id,omitempty"`
-	ReviewerID  *uuid.UUID          `json:"reviewer_id,omitempty"`
-	EstimateMd  float64             `json:"estimate_md,omitempty"`
-	StartDate   *string             `json:"start_date,omitempty"`
-	DueDate     *string             `json:"due_date,omitempty"`
-	Tags        []string            `json:"tags,omitempty"`
+	Code        string               `json:"code"`
+	Title       string               `json:"title"`
+	Description string               `json:"description,omitempty"`
+	ParentID    *uuid.UUID           `json:"parent_id,omitempty"`
+	Type        domain.TaskType      `json:"type,omitempty"`
+	Priority    domain.TaskPriority  `json:"priority,omitempty"`
+	AssigneeID  *uuid.UUID           `json:"assignee_id,omitempty"`
+	ReviewerID  *uuid.UUID           `json:"reviewer_id,omitempty"`
+	EstimateMd  float64              `json:"estimate_md,omitempty"`
 }
 
 func createTask(svc *service.Service) http.HandlerFunc {
@@ -388,24 +321,6 @@ func createTask(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		var startDate *time.Time
-		if req.StartDate != nil && *req.StartDate != "" {
-			parsed, err := parseDate(*req.StartDate)
-			if err != nil {
-				writeErr(w, 400, errors.New("invalid start_date"))
-				return
-			}
-			startDate = &parsed
-		}
-		var dueDate *time.Time
-		if req.DueDate != nil && *req.DueDate != "" {
-			parsed, err := parseDate(*req.DueDate)
-			if err != nil {
-				writeErr(w, 400, errors.New("invalid due_date"))
-				return
-			}
-			dueDate = &parsed
-		}
 		t, err := svc.CreateTask(r.Context(), service.CreateTaskInput{
 			TenantID:    tid,
 			ProjectID:   projectID,
@@ -414,14 +329,10 @@ func createTask(svc *service.Service) http.HandlerFunc {
 			Title:       req.Title,
 			Description: req.Description,
 			Type:        req.Type,
-			Status:      req.Status,
 			Priority:    req.Priority,
 			AssigneeID:  req.AssigneeID,
 			ReviewerID:  req.ReviewerID,
 			EstimateMd:  req.EstimateMd,
-			StartDate:   startDate,
-			DueDate:     dueDate,
-			Tags:        req.Tags,
 		})
 		if err != nil {
 			switch {
@@ -531,23 +442,29 @@ func listTasks(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-type updateTaskReq struct {
-	Title       string              `json:"title,omitempty"`
-	Description string              `json:"description,omitempty"`
-	Type        domain.TaskType     `json:"type,omitempty"`
-	Status      domain.TaskStatus   `json:"status,omitempty"`
-	Priority    domain.TaskPriority `json:"priority,omitempty"`
-	AssigneeID  optionalUUID        `json:"assignee_id"`
-	ReviewerID  optionalUUID        `json:"reviewer_id"`
-	StartDate   optionalDate        `json:"start_date"`
-	DueDate     optionalDate        `json:"due_date"`
-	EstimateMd  *float64            `json:"estimate_md,omitempty"`
-	ActualMd    *float64            `json:"actual_md,omitempty"`
-	ProgressPct *int                `json:"progress_pct,omitempty"`
-	SortOrder   *int                `json:"sort_order,omitempty"`
-	Tags        []string            `json:"tags,omitempty"`
-	ParentID    optionalUUID        `json:"parent_id"`
-	Version     int                 `json:"version"`
+
+// updateTaskReq fields are all optional so that a PATCH request only touches
+// the fields the caller explicitly provided. String fields use *string so that
+// callers can send `"title": ""` to clear a value. The legacy value-type
+// fields (Title, Description, Type, Status, Priority) are converted to
+// pointers during decoding via a custom json.RawMessage approach — we keep
+// the approach simple by using json.Number / raw decode into the patch struct
+// directly via pointer fields.
+type updateTaskReqV2 struct {
+	Title       *string              `json:"title"`
+	Description *string              `json:"description"`
+	Type        *domain.TaskType     `json:"type"`
+	Status      *domain.TaskStatus   `json:"status"`
+	Priority    *domain.TaskPriority `json:"priority"`
+	AssigneeID  **uuid.UUID          `json:"assignee_id"`
+	ReviewerID  **uuid.UUID          `json:"reviewer_id"`
+	EstimateMd  *float64             `json:"estimate_md"`
+	ActualMd    *float64             `json:"actual_md"`
+	ProgressPct *int                 `json:"progress_pct"`
+	SortOrder   *int                 `json:"sort_order"`
+	Tags        *[]string            `json:"tags"`
+	ParentID    **uuid.UUID          `json:"parent_id"`
+	Version     int                  `json:"version"`
 }
 
 func updateTask(svc *service.Service) http.HandlerFunc {
@@ -561,92 +478,51 @@ func updateTask(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		var req updateTaskReq
+		var req updateTaskReqV2
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Version <= 0 {
-			writeErr(w, 400, errors.New("version is required"))
-			return
+
+		// Build a TaskPatch with only the fields present in the request.
+		// Nil fields are left untouched by the COALESCE UPDATE in the store.
+		p := store.TaskPatch{
+			TenantID:    tid,
+			ID:          id,
+			Version:     req.Version,
+			EstimateMd:  req.EstimateMd,
+			ActualMd:    req.ActualMd,
+			ProgressPct: req.ProgressPct,
+			SortOrder:   req.SortOrder,
+			Tags:        req.Tags,
+			AssigneeID:  req.AssigneeID,
+			ReviewerID:  req.ReviewerID,
+			ParentID:    req.ParentID,
 		}
-		if req.Type != "" && !domain.IsValidTaskType(req.Type) {
-			writeErr(w, 400, domain.ErrInvalidInput)
-			return
+		if req.Title != nil {
+			p.Title = req.Title
 		}
-		if req.Status != "" && !domain.IsValidTaskStatus(req.Status) {
-			writeErr(w, 400, domain.ErrInvalidInput)
-			return
+		if req.Description != nil {
+			p.Description = req.Description
 		}
-		if req.Priority != "" && !domain.IsValidTaskPriority(req.Priority) {
-			writeErr(w, 400, domain.ErrInvalidInput)
-			return
+		if req.Type != nil {
+			s := string(*req.Type)
+			p.Type = &s
 		}
-		t, err := svc.Tasks.GetByID(r.Context(), tid, id)
+		if req.Status != nil {
+			s := string(*req.Status)
+			p.Status = &s
+		}
+		if req.Priority != nil {
+			s := string(*req.Priority)
+			p.Priority = &s
+		}
+
+		t, err := svc.Tasks.Patch(r.Context(), p)
 		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				writeErr(w, 404, err)
-				return
-			}
-			writeErr(w, 500, err)
-			return
-		}
-		if req.Title != "" {
-			t.Title = req.Title
-		}
-		if req.Description != "" {
-			t.Description = req.Description
-		}
-		if req.Type != "" {
-			t.Type = req.Type
-		}
-		if req.Status != "" {
-			t.Status = req.Status
-		}
-		if req.Priority != "" {
-			t.Priority = req.Priority
-		}
-		if req.AssigneeID.Set {
-			t.AssigneeID = req.AssigneeID.Value
-		}
-		if req.ReviewerID.Set {
-			t.ReviewerID = req.ReviewerID.Value
-		}
-		if req.StartDate.Set {
-			t.StartDate = req.StartDate.Value
-		}
-		if req.DueDate.Set {
-			t.DueDate = req.DueDate.Value
-		}
-		if req.EstimateMd != nil {
-			t.EstimateMd = *req.EstimateMd
-		}
-		if req.ActualMd != nil {
-			t.ActualMd = *req.ActualMd
-		}
-		if req.ProgressPct != nil {
-			t.ProgressPct = *req.ProgressPct
-		}
-		if req.SortOrder != nil {
-			t.SortOrder = *req.SortOrder
-		}
-		if req.Tags != nil {
-			t.Tags = req.Tags
-		}
-		if req.ParentID.Set {
-			t.ParentID = req.ParentID.Value
-		}
-		if t.ParentID != nil && *t.ParentID == t.ID {
-			writeErr(w, 400, domain.ErrInvalidInput)
-			return
-		}
-		if err := domain.ValidateTaskPlan(t.EstimateMd, t.ActualMd, t.ProgressPct, t.StartDate, t.DueDate); err != nil {
-			writeErr(w, 400, err)
-			return
-		}
-		t.Version = req.Version
-		if err := svc.Tasks.Update(r.Context(), t); err != nil {
 			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
 			case errors.Is(err, domain.ErrConflict):
 				writeErr(w, 409, err)
 			default:
@@ -750,12 +626,10 @@ func removeDependency(svc *service.Service) http.HandlerFunc {
 // --- Sprints ---
 
 type createSprintReq struct {
-	Name        string              `json:"name"`
-	Goal        string              `json:"goal,omitempty"`
-	Status      domain.SprintStatus `json:"status,omitempty"`
-	StartDate   *string             `json:"start_date,omitempty"`
-	EndDate     *string             `json:"end_date,omitempty"`
-	CapacityPts int                 `json:"capacity_pts,omitempty"`
+	Name        string               `json:"name"`
+	Goal        string               `json:"goal,omitempty"`
+	Status      domain.SprintStatus  `json:"status,omitempty"`
+	CapacityPts int                  `json:"capacity_pts,omitempty"`
 }
 
 func createSprint(svc *service.Service) http.HandlerFunc {
@@ -774,32 +648,12 @@ func createSprint(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		var startDate *time.Time
-		if req.StartDate != nil && *req.StartDate != "" {
-			parsed, err := parseDate(*req.StartDate)
-			if err != nil {
-				writeErr(w, 400, errors.New("invalid start_date"))
-				return
-			}
-			startDate = &parsed
-		}
-		var endDate *time.Time
-		if req.EndDate != nil && *req.EndDate != "" {
-			parsed, err := parseDate(*req.EndDate)
-			if err != nil {
-				writeErr(w, 400, errors.New("invalid end_date"))
-				return
-			}
-			endDate = &parsed
-		}
 		sp, err := svc.CreateSprint(r.Context(), service.CreateSprintInput{
 			TenantID:    tid,
 			ProjectID:   projectID,
 			Name:        req.Name,
 			Goal:        req.Goal,
 			Status:      req.Status,
-			StartDate:   startDate,
-			EndDate:     endDate,
 			CapacityPts: req.CapacityPts,
 		})
 		if err != nil {
@@ -881,10 +735,8 @@ func listSprints(svc *service.Service) http.HandlerFunc {
 
 type updateSprintReq struct {
 	Name        string              `json:"name,omitempty"`
-	Goal        string              `json:"goal,omitempty"`
+	Goal        *string             `json:"goal"`
 	Status      domain.SprintStatus `json:"status,omitempty"`
-	StartDate   optionalDate        `json:"start_date"`
-	EndDate     optionalDate        `json:"end_date"`
 	CapacityPts *int                `json:"capacity_pts,omitempty"`
 	Version     int                 `json:"version"`
 }
@@ -905,44 +757,22 @@ func updateSprint(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Version <= 0 {
-			writeErr(w, 400, errors.New("version is required"))
-			return
-		}
-		if req.Status != "" && !domain.IsValidSprintStatus(req.Status) {
-			writeErr(w, 400, domain.ErrInvalidInput)
-			return
-		}
 		sp, err := svc.Sprints.GetByID(r.Context(), tid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				writeErr(w, 404, err)
-				return
-			}
 			writeErr(w, 500, err)
 			return
 		}
 		if req.Name != "" {
 			sp.Name = req.Name
 		}
-		if req.Goal != "" {
-			sp.Goal = req.Goal
+		if req.Goal != nil {
+			sp.Goal = *req.Goal
 		}
 		if req.Status != "" {
 			sp.Status = req.Status
 		}
-		if req.StartDate.Set {
-			sp.StartDate = req.StartDate.Value
-		}
-		if req.EndDate.Set {
-			sp.EndDate = req.EndDate.Value
-		}
 		if req.CapacityPts != nil {
 			sp.CapacityPts = *req.CapacityPts
-		}
-		if err := domain.ValidateSprintPlan(sp.CapacityPts, sp.StartDate, sp.EndDate); err != nil {
-			writeErr(w, 400, err)
-			return
 		}
 		sp.Version = req.Version
 		if err := svc.Sprints.Update(r.Context(), sp); err != nil {
@@ -1015,3 +845,4 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 func writeErr(w http.ResponseWriter, code int, err error) {
 	writeJSON(w, code, map[string]string{"error": err.Error()})
 }
+

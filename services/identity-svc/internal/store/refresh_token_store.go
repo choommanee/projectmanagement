@@ -20,6 +20,13 @@ type RefreshTokens struct{ p *pgxpool.Pool }
 
 func NewRefreshTokens(p *pgxpool.Pool) *RefreshTokens { return &RefreshTokens{p: p} }
 
+// WithTenant starts a transaction, sets app.current_tenant, and delegates to fn.
+// Exported so service-layer callers can compose multiple store operations
+// (e.g. InsertTx + MarkRevokedTx) inside a single atomic transaction.
+func (s *RefreshTokens) WithTenant(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
+	return s.withTenant(ctx, tid, fn)
+}
+
 func (s *RefreshTokens) withTenant(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
 	tx, err := s.p.Begin(ctx)
 	if err != nil {
@@ -46,12 +53,28 @@ func (s *RefreshTokens) Insert(ctx context.Context, rt *domain.RefreshToken) err
 		rt.IssuedAt = time.Now().UTC()
 	}
 	return s.withTenant(ctx, rt.TenantID, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `
-            INSERT INTO refresh_token(id, tenant_id, user_id, token_hash, parent_id, family_id, issued_at, expires_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			rt.ID, rt.TenantID, rt.UserID, rt.TokenHash, rt.ParentID, rt.FamilyID, rt.IssuedAt, rt.ExpiresAt)
-		return err
+		return insertRefreshTokenTx(ctx, tx, rt)
 	})
+}
+
+// InsertTx is the transaction-aware variant of Insert. The caller must have
+// already set app.current_tenant for the transaction's tenant before calling.
+func (s *RefreshTokens) InsertTx(ctx context.Context, tx pgx.Tx, rt *domain.RefreshToken) error {
+	if rt.ID == uuid.Nil {
+		rt.ID = uuid.New()
+	}
+	if rt.IssuedAt.IsZero() {
+		rt.IssuedAt = time.Now().UTC()
+	}
+	return insertRefreshTokenTx(ctx, tx, rt)
+}
+
+func insertRefreshTokenTx(ctx context.Context, tx pgx.Tx, rt *domain.RefreshToken) error {
+	_, err := tx.Exec(ctx, `
+        INSERT INTO refresh_token(id, tenant_id, user_id, token_hash, parent_id, family_id, issued_at, expires_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		rt.ID, rt.TenantID, rt.UserID, rt.TokenHash, rt.ParentID, rt.FamilyID, rt.IssuedAt, rt.ExpiresAt)
+	return err
 }
 
 // FindByHash looks up a row by its token_hash. RLS would normally hide
@@ -87,12 +110,22 @@ func (s *RefreshTokens) FindByHash(ctx context.Context, hash []byte) (*domain.Re
 // an already-revoked row is a no-op (the existing revoked_at is preserved).
 func (s *RefreshTokens) MarkRevoked(ctx context.Context, tid, id uuid.UUID) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `
-            UPDATE refresh_token
-               SET revoked_at = COALESCE(revoked_at, now())
-             WHERE id = $1`, id)
-		return err
+		return markRevokedTx(ctx, tx, id)
 	})
+}
+
+// MarkRevokedTx is the transaction-aware variant of MarkRevoked. The caller
+// must have already set app.current_tenant for the transaction's tenant.
+func (s *RefreshTokens) MarkRevokedTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	return markRevokedTx(ctx, tx, id)
+}
+
+func markRevokedTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	_, err := tx.Exec(ctx, `
+        UPDATE refresh_token
+           SET revoked_at = COALESCE(revoked_at, now())
+         WHERE id = $1`, id)
+	return err
 }
 
 // RevokeAllForUser marks every live refresh_token row for (tenant, user)

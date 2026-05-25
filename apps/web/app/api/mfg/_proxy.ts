@@ -37,6 +37,9 @@ export async function proxyPatch(backendUrl: string, req: Request): Promise<Next
 export async function proxyDelete(backendUrl: string, req: Request): Promise<NextResponse> {
   const h = await makeHeaders();
   if (h instanceof NextResponse) return h;
+  // Forward the destructive confirmation header if present
+  const confirmHeader = req.headers.get("X-Confirm-Destructive");
+  if (confirmHeader) h.set("X-Confirm-Destructive", confirmHeader);
   const url = new URL(req.url);
   const r = await fetch(`${backendUrl}?${url.searchParams}`, { method: "DELETE", headers: h });
   return new NextResponse(r.status === 204 ? null : await r.text(), { status: r.status, headers: r.status !== 204 ? { "content-type": "application/json" } : {} });

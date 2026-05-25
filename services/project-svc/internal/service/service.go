@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -86,21 +85,16 @@ func (svc *Service) CreateProject(ctx context.Context, in CreateProjectInput) (*
 
 // UpdateProjectInput holds data for updating a project.
 type UpdateProjectInput struct {
-	TenantID     uuid.UUID
-	ID           uuid.UUID
-	Name         string
-	Description  string
-	Status       domain.ProjectStatus
-	OwnerID      *uuid.UUID
-	OwnerIDSet   bool
-	StartDate    *time.Time
-	StartDateSet bool
-	DueDate      *time.Time
-	DueDateSet   bool
-	ProgressPct  *int
-	Tags         []string
-	Version      int
-	UserID       string // caller, for notification routing
+	TenantID    uuid.UUID
+	ID          uuid.UUID
+	Name        string
+	Description string
+	Status      domain.ProjectStatus
+	OwnerID     *uuid.UUID
+	ProgressPct *int
+	Tags        []string
+	Version     int
+	UserID      string // caller, for notification routing
 }
 
 // UpdateProject applies a patch to an existing project and publishes a
@@ -119,23 +113,11 @@ func (svc *Service) UpdateProject(ctx context.Context, in UpdateProjectInput) (*
 	if in.Status != "" {
 		p.Status = in.Status
 	}
-	if in.OwnerIDSet {
+	if in.OwnerID != nil {
 		p.OwnerID = in.OwnerID
-	}
-	if in.StartDateSet {
-		p.StartDate = in.StartDate
-	}
-	if in.DueDateSet {
-		p.DueDate = in.DueDate
 	}
 	if in.ProgressPct != nil {
 		p.ProgressPct = *in.ProgressPct
-	}
-	if p.ProgressPct < 0 || p.ProgressPct > 100 {
-		return nil, domain.ErrInvalidInput
-	}
-	if p.StartDate != nil && p.DueDate != nil && p.DueDate.Before(*p.StartDate) {
-		return nil, domain.ErrInvalidInput
 	}
 	if in.Tags != nil {
 		p.Tags = in.Tags
@@ -166,14 +148,10 @@ type CreateTaskInput struct {
 	Code, Title         string
 	Description         string
 	Type                domain.TaskType
-	Status              domain.TaskStatus
 	Priority            domain.TaskPriority
 	AssigneeID          *uuid.UUID
 	ReviewerID          *uuid.UUID
 	EstimateMd          float64
-	StartDate           *time.Time
-	DueDate             *time.Time
-	Tags                []string
 }
 
 // CreateTask validates and creates a new task.
@@ -187,27 +165,8 @@ func (svc *Service) CreateTask(ctx context.Context, in CreateTaskInput) (*domain
 	if in.Type == "" {
 		in.Type = domain.TaskTypeTask
 	}
-	if !domain.IsValidTaskType(in.Type) {
-		return nil, domain.ErrInvalidInput
-	}
-	if in.Status == "" {
-		in.Status = domain.TaskTodo
-	}
-	if !domain.IsValidTaskStatus(in.Status) {
-		return nil, domain.ErrInvalidInput
-	}
 	if in.Priority == "" {
 		in.Priority = domain.PrioMed
-	}
-	if !domain.IsValidTaskPriority(in.Priority) {
-		return nil, domain.ErrInvalidInput
-	}
-	if err := domain.ValidateTaskPlan(in.EstimateMd, 0, 0, in.StartDate, in.DueDate); err != nil {
-		return nil, err
-	}
-	tags := in.Tags
-	if tags == nil {
-		tags = []string{}
 	}
 	t := &domain.Task{
 		ID:          uuid.New(),
@@ -218,14 +177,12 @@ func (svc *Service) CreateTask(ctx context.Context, in CreateTaskInput) (*domain
 		Title:       in.Title,
 		Description: in.Description,
 		Type:        in.Type,
-		Status:      in.Status,
+		Status:      domain.TaskTodo,
 		Priority:    in.Priority,
 		AssigneeID:  in.AssigneeID,
 		ReviewerID:  in.ReviewerID,
 		EstimateMd:  in.EstimateMd,
-		StartDate:   in.StartDate,
-		DueDate:     in.DueDate,
-		Tags:        tags,
+		Tags:        []string{},
 		Version:     1,
 	}
 	if err := svc.Tasks.Create(ctx, t); err != nil {
@@ -239,8 +196,6 @@ type CreateSprintInput struct {
 	TenantID, ProjectID uuid.UUID
 	Name, Goal          string
 	Status              domain.SprintStatus
-	StartDate           *time.Time
-	EndDate             *time.Time
 	CapacityPts         int
 }
 
@@ -252,12 +207,6 @@ func (svc *Service) CreateSprint(ctx context.Context, in CreateSprintInput) (*do
 	if in.Status == "" {
 		in.Status = domain.SprintPlanning
 	}
-	if !domain.IsValidSprintStatus(in.Status) {
-		return nil, domain.ErrInvalidInput
-	}
-	if err := domain.ValidateSprintPlan(in.CapacityPts, in.StartDate, in.EndDate); err != nil {
-		return nil, err
-	}
 	sp := &domain.Sprint{
 		ID:          uuid.New(),
 		TenantID:    in.TenantID,
@@ -265,8 +214,6 @@ func (svc *Service) CreateSprint(ctx context.Context, in CreateSprintInput) (*do
 		Name:        in.Name,
 		Goal:        in.Goal,
 		Status:      in.Status,
-		StartDate:   in.StartDate,
-		EndDate:     in.EndDate,
 		CapacityPts: in.CapacityPts,
 		Version:     1,
 	}

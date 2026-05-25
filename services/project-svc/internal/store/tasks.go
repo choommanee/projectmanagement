@@ -150,6 +150,129 @@ func (s *Tasks) Update(ctx context.Context, t *domain.Task) error {
 	})
 }
 
+// TaskPatch carries only the fields that a PATCH caller explicitly supplied.
+// Nil means "do not change"; a non-nil pointer means "set to this value"
+// (including empty string / zero-value, which is how fields get cleared).
+// This struct is consumed by Patch which issues a single atomic COALESCE
+// UPDATE — no separate read required, no TOCTOU risk.
+type TaskPatch struct {
+	TenantID    uuid.UUID
+	ID          uuid.UUID
+	Version     int // current client version (optimistic lock)
+	Title       *string
+	Description *string
+	Type        *string
+	Status      *string
+	Priority    *string
+	AssigneeID  **uuid.UUID // outer nil = don't change; inner nil = clear
+	ReviewerID  **uuid.UUID
+	EstimateMd  *float64
+	ActualMd    *float64
+	ProgressPct *int
+	SortOrder   *int
+	Tags        *[]string
+	ParentID    **uuid.UUID
+}
+
+// Patch applies only the non-nil fields in p to the task row identified by
+// (TenantID, ID, Version). It uses COALESCE so unset fields retain their
+// current database values, making it safe against concurrent patches with
+// different version numbers. If the row's version does not match p.Version
+// it returns domain.ErrConflict (HTTP 409).
+func (s *Tasks) Patch(ctx context.Context, p TaskPatch) (*domain.Task, error) {
+	var t domain.Task
+	err := s.withTenant(ctx, p.TenantID, func(tx pgx.Tx) error {
+		// Inline helper: dereference *string -> interface{} (nil when not set)
+		strArg := func(v *string) interface{} {
+			if v == nil {
+				return nil
+			}
+			return *v
+		}
+		float64Arg := func(v *float64) interface{} {
+			if v == nil {
+				return nil
+			}
+			return *v
+		}
+		intArg := func(v *int) interface{} {
+			if v == nil {
+				return nil
+			}
+			return *v
+		}
+		// For UUID pointer-of-pointer: outer nil = don't change; outer non-nil =
+		// set to inner value (which may itself be nil = clear the FK).
+		uuidArg := func(v **uuid.UUID) interface{} {
+			if v == nil {
+				return nil // COALESCE will keep old value
+			}
+			return *v // may be nil (clear FK) or a UUID value
+		}
+		tagsArg := func(v *[]string) interface{} {
+			if v == nil {
+				return nil
+			}
+			return *v
+		}
+
+		ct, err := tx.Exec(ctx, `
+			UPDATE task SET
+			  title        = COALESCE($3,  title),
+			  description  = COALESCE($4,  description),
+			  type         = COALESCE($5,  type),
+			  status       = COALESCE($6,  status),
+			  priority     = COALESCE($7,  priority),
+			  assignee_id  = CASE WHEN $8::uuid IS NOT DISTINCT FROM NULL AND $9 THEN NULL
+			                      WHEN $8::uuid IS NOT NULL THEN $8::uuid
+			                      ELSE assignee_id END,
+			  reviewer_id  = CASE WHEN $10::uuid IS NOT DISTINCT FROM NULL AND $11 THEN NULL
+			                      WHEN $10::uuid IS NOT NULL THEN $10::uuid
+			                      ELSE reviewer_id END,
+			  estimate_md  = COALESCE($12, estimate_md),
+			  actual_md    = COALESCE($13, actual_md),
+			  progress_pct = COALESCE($14, progress_pct),
+			  sort_order   = COALESCE($15, sort_order),
+			  tags         = COALESCE($16, tags),
+			  parent_id    = CASE WHEN $17::uuid IS NOT DISTINCT FROM NULL AND $18 THEN NULL
+			                      WHEN $17::uuid IS NOT NULL THEN $17::uuid
+			                      ELSE parent_id END,
+			  updated_at   = now(),
+			  version      = version + 1
+			WHERE id = $1 AND tenant_id = $2 AND version = $19 AND deleted_at IS NULL`,
+			p.ID, p.TenantID,
+			strArg(p.Title),       // $3
+			strArg(p.Description), // $4
+			strArg(p.Type),        // $5
+			strArg(p.Status),      // $6
+			strArg(p.Priority),    // $7
+			uuidArg(p.AssigneeID), // $8  uuid value or nil
+			p.AssigneeID != nil,   // $9  true = caller wants to set/clear assignee_id
+			uuidArg(p.ReviewerID), // $10
+			p.ReviewerID != nil,   // $11
+			float64Arg(p.EstimateMd),  // $12
+			float64Arg(p.ActualMd),    // $13
+			intArg(p.ProgressPct),     // $14
+			intArg(p.SortOrder),       // $15
+			tagsArg(p.Tags),           // $16
+			uuidArg(p.ParentID),       // $17
+			p.ParentID != nil,         // $18
+			p.Version,                 // $19
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrConflict
+		}
+		return scanTask(tx.QueryRow(ctx, taskSelect+" WHERE id = $1 AND deleted_at IS NULL", p.ID), &t)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (s *Tasks) SoftDelete(ctx context.Context, tid, id uuid.UUID, version int) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		ct, err := tx.Exec(ctx, `

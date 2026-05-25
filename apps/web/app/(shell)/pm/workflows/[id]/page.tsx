@@ -746,6 +746,7 @@ export default function WorkflowDetailPage() {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [dslSteps, setDslSteps] = useState<DslStep[]>([]);
   const dragTypeRef = useRef<string | null>(null);
+  const nodePositions = useRef<Record<string, { x: number; y: number }>>({});
 
   const [showRunModal, setShowRunModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -777,12 +778,28 @@ export default function WorkflowDetailPage() {
 
   // ── Sync DSL steps → React Flow nodes/edges ─────────────────────────────
 
+  // Effect 1: Rebuild nodes only when DSL steps change (not on selection)
   useEffect(() => {
-    const { nodes: n, edges: e } = dslToFlow(dslSteps, selectedStepId, setSelectedStepId);
-    setNodes(n);
+    const { nodes: rawNodes, edges: e } = dslToFlow(dslSteps, selectedStepId, setSelectedStepId);
+    const nodesWithPos = rawNodes.map((n) => ({
+      ...n,
+      position: nodePositions.current[n.id] ?? n.position,
+    }));
+    setNodes(nodesWithPos);
     setEdges(e);
+  // selectedStepId intentionally excluded — selection is handled by Effect 2
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dslSteps, selectedStepId]);
+  }, [dslSteps]);
+
+  // Effect 2: Update selection visual only — no position rebuild
+  useEffect(() => {
+    setNodes((ns) =>
+      ns.map((n) => ({
+        ...n,
+        data: { ...n.data, selected: n.id === selectedStepId },
+      })),
+    );
+  }, [selectedStepId, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -1010,7 +1027,14 @@ export default function WorkflowDetailPage() {
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
-                onNodesChange={onNodesChange}
+                onNodesChange={(changes) => {
+                  onNodesChange(changes);
+                  changes.forEach((c) => {
+                    if (c.type === "position" && c.position) {
+                      nodePositions.current[c.id] = c.position;
+                    }
+                  });
+                }}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 nodeTypes={nodeTypes}

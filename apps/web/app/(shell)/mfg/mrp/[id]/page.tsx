@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
@@ -32,7 +32,8 @@ export default function MrpRunDetailPage({ params }: { params: Promise<{ id: str
   const [actions, setActions] = useState<MrpAction[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
   const [tabErr, setTabErr] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<Set<ActiveTab>>(new Set());
+  const loaded = useRef<Set<ActiveTab>>(new Set());
+  const failed = useRef<Set<ActiveTab>>(new Set());
 
   const [itemMap, setItemMap] = useState<Map<string, Item>>(new Map());
   const [filterMsg, setFilterMsg] = useState("");
@@ -57,20 +58,22 @@ export default function MrpRunDetailPage({ params }: { params: Promise<{ id: str
   useEffect(() => { void load(); }, [load]);
 
   const loadTab = useCallback(async (t: ActiveTab) => {
-    if (loaded.has(t) || t === "params") return;
+    if (loaded.current.has(t) || t === "params") return;
+    failed.current.delete(t);
     setTabLoading(true);
     setTabErr(null);
     try {
       if (t === "actions") { const r = await listMrpActions(id); setActions(r); }
       if (t === "demands") { const r = await listMrpDemands(id); setDemands(r); }
       if (t === "supplies") { const r = await listMrpSupplies(id); setSupplies(r); }
-      setLoaded(prev => new Set([...prev, t]));
+      loaded.current.add(t);
     } catch (e) {
+      failed.current.add(t);
       setTabErr(e instanceof Error ? e.message : "Load failed");
     } finally {
       setTabLoading(false);
     }
-  }, [id, loaded]);
+  }, [id]);
 
   useEffect(() => { void loadTab(tab); }, [tab, loadTab]);
 
@@ -99,7 +102,7 @@ export default function MrpRunDetailPage({ params }: { params: Promise<{ id: str
       ]} />
       <CommandBar actions={[
         { id: "back", label: "Back to MRP", variant: "ghost", onClick: () => router.push("/mfg/mrp") },
-        { id: "refresh", label: "Refresh", variant: "ghost", onClick: () => { setLoaded(new Set()); void load(); } },
+        { id: "refresh", label: "Refresh", variant: "ghost", onClick: () => { loaded.current = new Set(); failed.current = new Set(); void load(); } },
       ]} />
 
       {/* Header card */}
@@ -127,7 +130,23 @@ export default function MrpRunDetailPage({ params }: { params: Promise<{ id: str
         ))}
       </div>
 
-      {tabErr && <div className="px-4 py-2 text-xs text-danger">{tabErr}</div>}
+      {tabErr && (
+        <div className="flex items-center gap-3 px-4 py-2 text-danger font-mono text-[11px]">
+          <span>{tabErr}</span>
+          <button
+            type="button"
+            className="rounded-sm border border-danger/40 px-2 py-1 hover:bg-danger/10"
+            onClick={() => {
+              failed.current.delete(tab);
+              loaded.current.delete(tab);
+              setTabErr(null);
+              void loadTab(tab);
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {tabLoading && <div className="px-4 py-3 text-sm text-ink-3">Loading…</div>}
 
       <div className="min-h-0 flex-1 overflow-auto">

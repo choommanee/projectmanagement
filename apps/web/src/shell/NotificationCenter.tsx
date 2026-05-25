@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
 import { Button } from "@pmplatform/ui-kit";
@@ -25,6 +25,18 @@ export function NotificationCenter({ items, onMarkRead, onMarkAllRead }: Notific
   const [open, setOpen] = useState(false);
   const unread = items.filter((n) => !n.readAt).length;
   const router = useRouter();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
 
   function handleNotifClick(n: AppNotification) {
     if (!n.readAt) onMarkRead(n.id);
@@ -33,7 +45,7 @@ export function NotificationCenter({ items, onMarkRead, onMarkAllRead }: Notific
   }
 
   return (
-    <div className="relative">
+    <div ref={panelRef} className="relative">
       <Button variant="ghost" size="sm" aria-label="Notifications" onClick={() => setOpen((v) => !v)}>
         <Bell size={16} />
         {unread > 0 && (

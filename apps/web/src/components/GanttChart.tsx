@@ -206,8 +206,8 @@ export function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
                     <div
                       className="absolute top-1/2 -translate-y-1/2 h-5 rounded-xs opacity-30 bg-white pointer-events-none"
                       style={{
-                        left: Math.max(0, barLeft) + barWidth * (task.progressPct / 100),
-                        width: barWidth * (1 - task.progressPct / 100),
+                        left: Math.max(Math.max(0, barLeft), barLeft + barWidth * ((task.progressPct ?? 0) / 100)),
+                        width: barWidth * (1 - (task.progressPct ?? 0) / 100),
                       }}
                     />
                   )}

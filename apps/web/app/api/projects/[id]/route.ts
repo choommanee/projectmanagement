@@ -31,6 +31,9 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   const { id } = await ctx.params;
   const h = await makeHeaders();
   if (h instanceof NextResponse) return h;
+  // Forward the destructive confirmation header if present
+  const confirmHeader = req.headers.get("X-Confirm-Destructive");
+  if (confirmHeader) h.set("X-Confirm-Destructive", confirmHeader);
   const url = new URL(req.url);
   const r = await fetch(`${SVC}/v1/projects/${id}?${url.searchParams}`, { method: "DELETE", headers: h });
   return new NextResponse(null, { status: r.status });

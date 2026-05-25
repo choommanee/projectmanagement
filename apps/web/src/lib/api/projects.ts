@@ -106,7 +106,10 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string, version: number): Promise<void> {
-  const r = await fetch(`${SVC}/${id}?version=${version}`, { method: "DELETE" });
+  const r = await fetch(`${SVC}/${id}?version=${version}`, {
+    method: "DELETE",
+    headers: { "X-Confirm-Destructive": "true" },
+  });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error((e as Record<string, string>).error ?? `delete failed: ${r.status}`);

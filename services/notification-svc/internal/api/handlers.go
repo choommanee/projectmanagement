@@ -34,15 +34,16 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.With(libauth.RequireAction(authz, "notif.read", `Notification::"*"`)).
 			Get("/notifications", listNotifications(svc))
 
-		// POST /v1/notifications/read-all — Cedar action notif.mark_all_read.
-		r.With(libauth.RequireAction(authz, "notif.mark_all_read", "*")).
-			Post("/notifications/read-all", markAllRead(svc))
+		// POST /v1/notifications/read-all — no Cedar guard; RLS + user_id claim
+		// from principalOr400 is the ownership gate (UPDATE WHERE tenant_id=$1
+		// AND user_id=$2). Cedar wildcard resource would never satisfy the
+		// resource.user_id == context.user_id attribute check → always 403.
+		r.Post("/notifications/read-all", markAllRead(svc))
 
-		// POST /v1/notifications/{id}/read — Cedar action notif.mark_read.
-		// Wildcard resource until a per-instance resource loader is added; the
-		// store enforces user_id + tenant_id ownership via RLS.
-		r.With(libauth.RequireAction(authz, "notif.mark_read", "*")).
-			Post("/notifications/{id}/read", markRead(svc))
+		// POST /v1/notifications/{id}/read — same reasoning as read-all.
+		// The store UPDATE uses tenant_id + user_id + id so only the owning
+		// user's row is touched; Cedar is redundant and broken for this route.
+		r.Post("/notifications/{id}/read", markRead(svc))
 	})
 
 	return r

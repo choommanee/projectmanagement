@@ -1,0 +1,42 @@
+{{- if gt (int .Values.identity.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-identity-svc-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: identity-svc
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- if gt (int .Values.project.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-project-svc-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: project-svc
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- if gt (int .Values.workflow.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-workflow-svc-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workflow-svc
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

@@ -29,7 +29,7 @@ import {
   type Sprint,
   type SprintStatus,
 } from "@/lib/api/sprints";
-import { listTasksForProject, updateTask, type Task, type TaskStatus } from "@/lib/api/tasks";
+import { listTasksForProject, updateTask, getTask, type Task, type TaskStatus } from "@/lib/api/tasks";
 import { statusTone, statusLabel, priorityTone, priorityLabel, toneBg } from "@/lib/api/taskTones";
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -490,8 +490,9 @@ export default function SprintDetailPage() {
     try {
       if (isFromBacklog && !isToBacklog) {
         await assignTaskToSprint(sprintId, taskId);
+        const refreshed = await getTask(taskId);
         const newStatus = toCol as TaskStatus;
-        await updateTask(taskId, { status: newStatus, version: task.version });
+        await updateTask(taskId, { status: newStatus, version: refreshed.version });
       } else if (!isFromBacklog && isToBacklog) {
         await unassignTaskFromSprint(sprintId, taskId);
       } else if (!isFromBacklog && !isToBacklog) {

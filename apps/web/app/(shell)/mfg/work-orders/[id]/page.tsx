@@ -159,6 +159,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
     setSaveError(null);
     try {
       const updated = await updateWorkOrder(id, {
+        work_center_id: form.workCenterId ?? null,
         priority: form.priority as WOPriority,
         due_date: form.dueDate ?? null,
         notes: form.notes,

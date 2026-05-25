@@ -527,7 +527,7 @@ export async function updateItem(id: string, patch: { name?: string; description
 }
 
 export async function deleteItem(id: string, version: number): Promise<void> {
-  const r = await apiFetch(`${SVC}/items/${id}?version=${version}`, { method: "DELETE" });
+  const r = await apiFetch(`${SVC}/items/${id}?version=${version}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteItem failed: ${r.status}`); }
 }
 
@@ -678,14 +678,14 @@ export async function getWorkOrder(id: string): Promise<WorkOrder> {
   return normWorkOrder(await r.json());
 }
 
-export async function updateWorkOrder(id: string, patch: { status?: WOStatus; priority?: WOPriority; due_date?: string | null; notes?: string; version: number }): Promise<WorkOrder> {
+export async function updateWorkOrder(id: string, patch: { status?: WOStatus; priority?: WOPriority; due_date?: string | null; notes?: string; work_center_id?: string | null; version: number }): Promise<WorkOrder> {
   const r = await apiFetch(`${SVC}/work-orders/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateWorkOrder failed: ${r.status}`); }
   return normWorkOrder(await r.json());
 }
 
 export async function deleteWorkOrder(id: string, version: number): Promise<void> {
-  const r = await apiFetch(`${SVC}/work-orders/${id}?version=${version}`, { method: "DELETE" });
+  const r = await apiFetch(`${SVC}/work-orders/${id}?version=${version}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteWorkOrder failed: ${r.status}`); }
 }
 

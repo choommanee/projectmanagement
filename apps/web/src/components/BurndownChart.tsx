@@ -66,7 +66,9 @@ export function BurndownChart({ sprint, tasks }: BurndownChartProps) {
     );
   }
 
-  const totalEstimate = tasks.reduce((s, t) => s + (t.estimateMd ?? 0), 0);
+  const totalEstimate = tasks
+    .filter((t) => t.status !== "cancelled")
+    .reduce((s, t) => s + (t.estimateMd ?? 0), 0);
   if (totalEstimate === 0) {
     return (
       <div className="flex items-center justify-center h-32 font-mono text-[11px] text-ink-3">
@@ -80,7 +82,7 @@ export function BurndownChart({ sprint, tasks }: BurndownChartProps) {
 
   // For each task, determine the date it moved to "done"
   const doneDates = tasks.map((t) => {
-    if (t.status === "done" || t.status === "cancelled") {
+    if (t.status === "done") {
       if (t.updatedAt) {
         const d = new Date(t.updatedAt);
         d.setHours(0, 0, 0, 0);

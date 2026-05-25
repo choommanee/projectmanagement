@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/log"
 
 	libauth "github.com/pmplatform/libs/go/auth"
@@ -115,7 +116,9 @@ func (r *Refresh) Rotate(ctx context.Context, presented string) (*TokenPair, err
 	}
 
 	// Mint and persist the new refresh row in the same family with parent
-	// pointing at the presented one, then revoke the presented row.
+	// pointing at the presented one, then revoke the presented row — both
+	// in a single transaction so a crash between the two ops can never leave
+	// two valid tokens alive simultaneously (BUG-10 fix).
 	plaintext, newHash, err := domain.MintRefreshToken()
 	if err != nil {
 		return nil, err
@@ -128,16 +131,13 @@ func (r *Refresh) Rotate(ctx context.Context, presented string) (*TokenPair, err
 		FamilyID:  row.FamilyID,
 		ExpiresAt: time.Now().Add(r.ttl),
 	}
-	if err := r.tokens.Insert(ctx, newRow); err != nil {
+	if err := r.tokens.WithTenant(ctx, row.TenantID, func(tx pgx.Tx) error {
+		if err := r.tokens.InsertTx(ctx, tx, newRow); err != nil {
+			return err
+		}
+		return r.tokens.MarkRevokedTx(ctx, tx, row.ID)
+	}); err != nil {
 		return nil, err
-	}
-	if err := r.tokens.MarkRevoked(ctx, row.TenantID, row.ID); err != nil {
-		// Best-effort: we already issued the new pair. Log and continue —
-		// the new row is the authoritative active token in the family.
-		log.Error().Err(err).
-			Str("tenant_id", row.TenantID.String()).
-			Str("revoke_id", row.ID.String()).
-			Msg("failed to revoke presented refresh token after rotation")
 	}
 
 	if r.aud != nil {

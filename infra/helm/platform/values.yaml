@@ -4,6 +4,15 @@ global:
   # or via `--set global.imageTag=<sha>` for digest-pinned production deploys.
   imageTag: 0.1.0
   tenancyTier: shared
+  # secretsBackend: "kubernetes" | "vault" | "external-secrets"
+  # When using external-secrets operator, set credentialsSecret to the name
+  # of the ExternalSecret or Secret that contains:
+  #   DATABASE_URL, JWT_SECRET, MFA_MASTER_KEY, SSO_MASTER_KEY,
+  #   SMTP_PASSWORD, WEBHOOK_SIGNING_KEY, NATS_URL
+  credentialsSecret: "platform-credentials"  # override with your secret name
+  externalSecretsEnabled: false   # set true when using External Secrets Operator
+  secretStore: vault-backend
+  vaultPath: secret/platform
 
 postgres:
   external: false
@@ -252,8 +261,8 @@ workflow:
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 8089
-    targetPort: 8089
+    port: 8090
+    targetPort: 8090
   env:
     DATABASE_URL: ""
     NATS_URL: "nats://nats:4222"
@@ -310,8 +319,8 @@ auditSvc:
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 8091
-    targetPort: 8091
+    port: 8089
+    targetPort: 8089
   env:
     DATABASE_URL: ""
     IDENTITY_JWKS_URL: "http://identity-svc:8082/.well-known/jwks.json"
@@ -329,6 +338,7 @@ auditSvc:
 # ---------------------------------------------------------------------------
 # audit-worker (NATS consumer; exposes /healthz on 8091)
 # ---------------------------------------------------------------------------
+# Note: audit-worker port is 8091; audit-svc port is 8089 — they differ.
 auditWorker:
   enabled: true
   replicas: 1
@@ -354,3 +364,15 @@ auditWorker:
     limits:
       cpu: 500m
       memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  host: platform.example.com   # override in production
+  annotations: {}
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod

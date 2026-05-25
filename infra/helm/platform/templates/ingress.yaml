@@ -1,0 +1,107 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+  annotations:
+    {{- if .Values.ingress.className }}
+    kubernetes.io/ingress.class: {{ .Values.ingress.className }}
+    {{- end }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | default "letsencrypt-prod" }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Release.Name }}-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # Web frontend (Next.js)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-web
+                port:
+                  number: 3000
+          # API gateway routing — each service at /api/<svc>/
+          - path: /api/identity
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-identity-svc
+                port:
+                  number: {{ .Values.identity.service.port }}
+          - path: /api/project
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-project-svc
+                port:
+                  number: {{ .Values.project.service.port }}
+          - path: /api/document
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-document-svc
+                port:
+                  number: {{ .Values.document.service.port }}
+          - path: /api/mfg
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-mfg-svc
+                port:
+                  number: {{ .Values.mfg.service.port }}
+          - path: /api/quality
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-quality-svc
+                port:
+                  number: {{ .Values.quality.service.port }}
+          - path: /api/workflow
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-workflow-svc
+                port:
+                  number: {{ .Values.workflow.service.port }}
+          - path: /api/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-notification-svc
+                port:
+                  number: {{ .Values.notification.service.port }}
+          - path: /api/reports
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-reports-svc
+                port:
+                  number: {{ .Values.reports.service.port }}
+          - path: /api/tenant
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-tenant-svc
+                port:
+                  number: {{ .Values.tenant.service.port }}
+{{- end }}
