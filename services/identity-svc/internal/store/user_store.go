@@ -177,6 +177,90 @@ func (s *Users) List(ctx context.Context, tid uuid.UUID, q string, limit int) ([
 	return out, rows.Err()
 }
 
+// Update rewrites display_name and bumps updated_at + version for the user.
+// RLS is scoped via SET LOCAL so only users in the calling tenant are
+// accessible. Returns domain.ErrNotFound when no row matched.
+func (s *Users) Update(ctx context.Context, tid, uid uuid.UUID, displayName string) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+            UPDATE app_user
+               SET display_name = $1,
+                   updated_at   = now(),
+                   version      = version + 1
+             WHERE id = $2 AND tenant_id = $3 AND deleted_at IS NULL`,
+			displayName, uid, tid)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// Deactivate soft-deletes the user by setting deleted_at to now() so they
+// can no longer log in. Idempotent: already-deleted rows are a no-op.
+func (s *Users) Deactivate(ctx context.Context, tid, uid uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+            UPDATE app_user
+               SET deleted_at  = now(),
+                   updated_at  = now(),
+                   version     = version + 1
+             WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+			uid, tid)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// SetRoles replaces all tenant-scoped role_assignment rows for the user with
+// the supplied role names. Roles that do not exist in the `role` table are
+// created as non-system roles. All work happens inside a single transaction so
+// the switch is atomic.
+func (s *Users) SetRoles(ctx context.Context, tid, uid uuid.UUID, roles []string) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		// Delete existing tenant-scoped assignments for this user.
+		if _, err := tx.Exec(ctx, `
+            DELETE FROM role_assignment
+             WHERE tenant_id = $1 AND user_id = $2 AND scope_type = 'tenant'`,
+			tid, uid); err != nil {
+			return err
+		}
+		for _, name := range roles {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			// Upsert the role row so callers don't have to pre-seed roles.
+			var roleID uuid.UUID
+			if err := tx.QueryRow(ctx, `
+                INSERT INTO role(id, tenant_id, name, is_system)
+                VALUES (gen_random_uuid(), $1, $2, false)
+                ON CONFLICT (tenant_id, name) DO UPDATE SET name = EXCLUDED.name
+                RETURNING id`,
+				tid, name).Scan(&roleID); err != nil {
+				return fmt.Errorf("upsert role %q: %w", name, err)
+			}
+			// Insert the assignment (idempotent via ON CONFLICT).
+			if _, err := tx.Exec(ctx, `
+                INSERT INTO role_assignment(id, tenant_id, user_id, role_id, scope_type)
+                VALUES (gen_random_uuid(), $1, $2, $3, 'tenant')
+                ON CONFLICT (tenant_id, user_id, role_id, scope_type, scope_id) DO NOTHING`,
+				tid, uid, roleID); err != nil {
+				return fmt.Errorf("assign role %q: %w", name, err)
+			}
+		}
+		return nil
+	})
+}
+
 func (s *Users) FindByEmail(ctx context.Context, tid uuid.UUID, email string) (*domain.User, error) {
 	var u domain.User
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {

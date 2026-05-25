@@ -351,8 +351,9 @@ func jwksHandler(kp *sjwt.KeyPair, store *sjwt.Store) http.HandlerFunc {
 	}
 }
 
-// WithUserList layers GET /v1/users (tenant member search) onto an existing
-// router without changing any constructor signatures. Called from main.go.
+// WithUserList layers GET /v1/users (tenant member search) and the user
+// management write endpoints onto an existing router without changing any
+// constructor signatures. Called from main.go.
 func WithUserList(h http.Handler, jwtStore *sjwt.Store, issuer string, users *store.Users) http.Handler {
 	if jwtStore == nil || issuer == "" || users == nil {
 		return h
@@ -361,6 +362,9 @@ func WithUserList(h http.Handler, jwtStore *sjwt.Store, issuer string, users *st
 	mux.Group(func(pr chi.Router) {
 		pr.Use(requireBearerDynamic(jwtStore, issuer))
 		pr.Get("/v1/users", listUsers(users))
+		pr.Post("/v1/users", inviteUser(users))
+		pr.Patch("/v1/users/{id}", updateUser(users))
+		pr.Delete("/v1/users/{id}", deactivateUser(users))
 	})
 	return mux
 }
@@ -390,6 +394,198 @@ func listUsers(users *store.Users) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"users": list})
+	}
+}
+
+// isTenantAdmin returns true when the caller's roles include "tenant-admin"
+// or "platform-admin". Used as a fallback guard on write endpoints while the
+// Cedar bundle does not yet declare identity.user.* actions.
+func isTenantAdmin(roles []string) bool {
+	for _, r := range roles {
+		if r == "tenant-admin" || r == "platform-admin" {
+			return true
+		}
+	}
+	return false
+}
+
+type inviteUserReq struct {
+	Email       string   `json:"email"`
+	DisplayName string   `json:"display_name"`
+	Password    string   `json:"password"`
+	Roles       []string `json:"roles"`
+}
+
+// inviteUser handles POST /v1/users. Creates a new user in the caller's
+// tenant with a bcrypt-hashed password and optional role assignments. Requires
+// tenant-admin or platform-admin role.
+func inviteUser(users *store.Users) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("unauthenticated"))
+			return
+		}
+		if !isTenantAdmin(claims.Roles) {
+			writeErr(w, http.StatusForbidden, errors.New("tenant-admin role required"))
+			return
+		}
+		tid, err := uuid.Parse(claims.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad tenant in claims"))
+			return
+		}
+		var in inviteUserReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if in.Email == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("email required"))
+			return
+		}
+		if in.Password == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("password required"))
+			return
+		}
+		hash, err := domain.HashPassword(in.Password)
+		if err != nil {
+			if errors.Is(err, domain.ErrPasswordWeak) {
+				writeErr(w, http.StatusBadRequest, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		displayName := in.DisplayName
+		if displayName == "" {
+			displayName = in.Email
+		}
+		u := &domain.User{
+			ID:           uuid.New(),
+			TenantID:     tid,
+			Email:        in.Email,
+			DisplayName:  displayName,
+			Status:       domain.StatusInvited,
+			PasswordHash: hash,
+			Version:      1,
+		}
+		if err := users.Create(r.Context(), u); err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		if len(in.Roles) > 0 {
+			if err := users.SetRoles(r.Context(), tid, u.ID, in.Roles); err != nil {
+				writeErr(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"id":           u.ID,
+			"tenant_id":    u.TenantID,
+			"email":        u.Email,
+			"display_name": u.DisplayName,
+			"status":       u.Status,
+			"roles":        in.Roles,
+		})
+	}
+}
+
+type updateUserReq struct {
+	DisplayName *string  `json:"display_name,omitempty"`
+	Roles       []string `json:"roles,omitempty"`
+}
+
+// updateUser handles PATCH /v1/users/:id. Updates display_name and/or roles
+// for the user identified by {id}. The target user must be in the same tenant
+// as the caller. Requires tenant-admin or platform-admin role.
+func updateUser(users *store.Users) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("unauthenticated"))
+			return
+		}
+		if !isTenantAdmin(claims.Roles) {
+			writeErr(w, http.StatusForbidden, errors.New("tenant-admin role required"))
+			return
+		}
+		tid, err := uuid.Parse(claims.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad tenant in claims"))
+			return
+		}
+		uid, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad user id"))
+			return
+		}
+		var in updateUserReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if in.DisplayName != nil && *in.DisplayName != "" {
+			if err := users.Update(r.Context(), tid, uid, *in.DisplayName); err != nil {
+				if errors.Is(err, domain.ErrNotFound) {
+					writeErr(w, http.StatusNotFound, err)
+					return
+				}
+				writeErr(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+		if in.Roles != nil {
+			if err := users.SetRoles(r.Context(), tid, uid, in.Roles); err != nil {
+				if errors.Is(err, domain.ErrNotFound) {
+					writeErr(w, http.StatusNotFound, err)
+					return
+				}
+				writeErr(w, http.StatusInternalServerError, err)
+				return
+			}
+		}
+		roles, _ := users.RolesForUser(r.Context(), tid, uid)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id":    uid,
+			"roles": roles,
+		})
+	}
+}
+
+// deactivateUser handles DELETE /v1/users/:id. Soft-deletes the user (sets
+// deleted_at) so they can no longer authenticate. Returns 204 on success.
+// Requires tenant-admin or platform-admin role.
+func deactivateUser(users *store.Users) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("unauthenticated"))
+			return
+		}
+		if !isTenantAdmin(claims.Roles) {
+			writeErr(w, http.StatusForbidden, errors.New("tenant-admin role required"))
+			return
+		}
+		tid, err := uuid.Parse(claims.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad tenant in claims"))
+			return
+		}
+		uid, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad user id"))
+			return
+		}
+		if err := users.Deactivate(r.Context(), tid, uid); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, http.StatusNotFound, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
