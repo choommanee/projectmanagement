@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BurndownChart } from "@/components/BurndownChart";
+import { VelocityChart } from "@/components/VelocityChart";
 import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
@@ -26,6 +28,7 @@ import {
   assignTaskToSprint,
   unassignTaskFromSprint,
   listSprintTasks,
+  listSprintsForProject,
   type Sprint,
   type SprintStatus,
 } from "@/lib/api/sprints";
@@ -391,6 +394,7 @@ export default function SprintDetailPage() {
   const [error, setError] = useState("");
   const [dragError, setDragError] = useState("");
 
+  const [chartTab, setChartTab] = useState<"burndown" | "velocity">("burndown");
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -401,6 +405,13 @@ export default function SprintDetailPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  // Fetch all sprints for the same project (used by VelocityChart)
+  const { data: allSprints } = useQuery({
+    queryKey: ["sprints-for-project", sprint?.projectId],
+    queryFn: () => (sprint ? listSprintsForProject(sprint.projectId) : Promise.resolve([])),
+    enabled: !!sprint?.projectId,
+  });
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -628,7 +639,39 @@ export default function SprintDetailPage() {
 
         {sprint && (
           <div className="mt-2">
-            <BurndownChart sprint={sprint} tasks={sprintTasks} />
+            {/* Chart tabs */}
+            <div className="flex border-b border-line mb-2">
+              {(["burndown", "velocity"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setChartTab(tab)}
+                  className={`px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.08em] border-b-2 transition-colors
+                    ${chartTab === tab
+                      ? "border-accent text-ink"
+                      : "border-transparent text-ink-3 hover:text-ink-2"}`}
+                >
+                  {tab === "burndown" ? "Burndown" : "Velocity"}
+                </button>
+              ))}
+            </div>
+            {chartTab === "burndown" && (
+              <BurndownChart sprint={sprint} tasks={sprintTasks} />
+            )}
+            {chartTab === "velocity" && (
+              <VelocityChart
+                data={(allSprints ?? [sprint]).map((s) => ({
+                  sprintName: s.name,
+                  // For the current sprint use the loaded task data; other sprints show 0 until loaded
+                  planned: s.id === sprint.id
+                    ? sprintTasks.reduce((sum, t) => sum + (t.estimateMd ?? 0), 0)
+                    : 0,
+                  actual: s.id === sprint.id
+                    ? sprintTasks.reduce((sum, t) => sum + (t.actualMd ?? 0), 0)
+                    : 0,
+                }))}
+              />
+            )}
           </div>
         )}
       </div>
