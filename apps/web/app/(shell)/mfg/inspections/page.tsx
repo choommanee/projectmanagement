@@ -260,7 +260,11 @@ export default function InspectionsPage() {
       <div className="min-h-0 flex-1 overflow-auto">
         {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
         {loading && !inspections.length ? (
-          <div className="flex h-32 items-center justify-center text-sm text-ink-3">Loading…</div>
+          <div className="space-y-px">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+            ))}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -298,7 +302,14 @@ export default function InspectionsPage() {
                 );
               })}
               {!loading && inspections.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-ink-3">No inspections found.</td></tr>
+                <tr>
+                  <td colSpan={6}>
+                    <div className="flex flex-col items-center gap-2 py-16 text-fgMuted">
+                      <p className="text-sm text-ink-3">No inspections found.</p>
+                      <Button size="sm" variant="ghost" onClick={() => setShowNew(true)}>+ New Inspection</Button>
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

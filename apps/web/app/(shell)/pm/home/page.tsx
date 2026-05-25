@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
+import { RefreshCw } from "lucide-react";
 import { DashboardGrid } from "@/primitives/dashboard/DashboardGrid";
 import type { DashboardDef } from "@/primitives/dashboard/dashboard.types";
+import { Breadcrumb } from "@/shell/Breadcrumb";
+import { CommandBar } from "@/shell/CommandBar";
 import { listProjects, type Project } from "@/lib/api/projects";
 import { listAllTasks } from "@/lib/api/tasks";
 
@@ -81,21 +84,35 @@ export default function PMHome() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-4">
-        <h1 className="font-mono text-[11px] uppercase tracking-wider text-ink-3">Dashboard</h1>
-        <p className="mt-1 text-xl font-semibold text-ink">PM Home</p>
-      </div>
-      {error && (
-        <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
-          {error}
+    <div className="flex h-full flex-col">
+      <Breadcrumb items={[{ label: "PM Hub", href: "/pm/home" }, { label: "Home" }]} />
+      <CommandBar actions={[
+        { id: "refresh", label: "Refresh", variant: "ghost", icon: <RefreshCw size={13} />, onClick: () => window.location.reload() },
+      ]} />
+      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-4">
+          <h1 className="font-mono text-[11px] uppercase tracking-wider text-ink-3">Dashboard</h1>
+          <p className="mt-1 text-xl font-semibold text-ink">PM Home</p>
         </div>
-      )}
-      {loading ? (
-        <div className="font-mono text-[11px] text-ink-3">Loading dashboard…</div>
-      ) : (
-        <DashboardGrid def={def} />
-      )}
+        {error && (
+          <p className="mb-4 text-sm text-danger">{error}</p>
+        )}
+        {loading ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-20 animate-pulse rounded-lg border border-border bg-surface-2" />
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2 h-48 animate-pulse rounded-lg border border-border bg-surface-2" />
+              <div className="h-48 animate-pulse rounded-lg border border-border bg-surface-2" />
+            </div>
+          </div>
+        ) : (
+          <DashboardGrid def={def} />
+        )}
+      </div>
     </div>
   );
 }

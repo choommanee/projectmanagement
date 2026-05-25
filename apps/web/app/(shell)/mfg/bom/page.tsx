@@ -146,7 +146,11 @@ export default function BomExplorerPage() {
             </div>
             {bomsErr && <p className="px-3 py-2 text-xs text-danger">{bomsErr}</p>}
             {bomsLoading ? (
-              <div className="flex flex-1 items-center justify-center text-xs text-ink-3">Loading…</div>
+              <div className="space-y-px p-1">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-14 animate-pulse rounded border-b border-border bg-surface-2" />
+                ))}
+              </div>
             ) : boms.length === 0 ? (
               <div className="flex flex-1 items-center justify-center p-4 text-center text-xs text-ink-3">
                 No BOMs. Create one with &quot;+ New&quot;.
@@ -181,7 +185,11 @@ export default function BomExplorerPage() {
               </div>
             )}
             {selectedBom && bomDetailLoading && (
-              <div className="flex h-full items-center justify-center text-sm text-ink-3">Loading BOM…</div>
+              <div className="space-y-2">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="h-8 animate-pulse rounded border border-border bg-surface-2" />
+                ))}
+              </div>
             )}
             {selectedBomFull && !bomDetailLoading && (
               <BomTree

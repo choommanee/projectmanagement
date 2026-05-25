@@ -276,7 +276,11 @@ export default function InboxPage() {
         </div>
 
         {loading && (
-          <div className="flex flex-1 items-center justify-center text-sm text-ink-3">Loading…</div>
+          <div className="space-y-px">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+            ))}
+          </div>
         )}
 
         {!loading && (

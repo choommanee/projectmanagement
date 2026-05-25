@@ -283,7 +283,11 @@ export default function ControlPlansPage() {
       <div className="min-h-0 flex-1 overflow-auto">
         {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
         {loading && !plans.length ? (
-          <div className="flex h-32 items-center justify-center text-sm text-ink-3">Loading…</div>
+          <div className="space-y-px">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+            ))}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -310,7 +314,14 @@ export default function ControlPlansPage() {
                 );
               })}
               {!loading && plans.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-3">No control plans found.</td></tr>
+                <tr>
+                  <td colSpan={4}>
+                    <div className="flex flex-col items-center gap-2 py-16 text-fgMuted">
+                      <p className="text-sm text-ink-3">No control plans found.</p>
+                      <Button size="sm" variant="ghost" onClick={() => setShowNew(true)}>+ New Control Plan</Button>
+                    </div>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

@@ -233,7 +233,11 @@ export default function TraceabilityPage() {
               </div>
             )}
             {selectedItem && lotsLoading && (
-              <div className="flex h-20 items-center justify-center text-xs text-ink-3">Loading lots…</div>
+              <div className="space-y-px p-1">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-12 animate-pulse border-b border-border bg-surface-2" />
+                ))}
+              </div>
             )}
             {selectedItem && !lotsLoading && lots.length === 0 && (
               <div className="p-4 text-center text-xs text-ink-3">No lots found for this item.</div>
@@ -285,7 +289,11 @@ export default function TraceabilityPage() {
               </div>
             )}
             {traceLoading && (
-              <div className="flex h-32 items-center justify-center text-sm text-ink-3">Loading trace…</div>
+              <div className="space-y-px p-4">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+                ))}
+              </div>
             )}
             {traceError && (
               <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{traceError}</div>

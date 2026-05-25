@@ -196,7 +196,11 @@ export default function ItemsPage() {
       <div className="min-h-0 flex-1 overflow-auto">
         {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
         {loading && !items.length ? (
-          <div className="flex h-32 items-center justify-center text-sm text-ink-3">Loading…</div>
+          <div className="space-y-px">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+            ))}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
