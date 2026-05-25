@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Trash2, Plus } from "lucide-react";
 import { Button, Input, Tag, TextArea } from "@pmplatform/ui-kit";
+import { WorklogPanel } from "@/components/WorklogPanel";
 import {
   getTask,
   updateTask,
@@ -96,6 +97,7 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
 
   const [showDelete, setShowDelete] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [activeTab, setActiveTab] = useState<"details" | "time">("details");
 
   // Dependencies
   const [deps, setDeps] = useState<Dependency[]>([]);
@@ -265,6 +267,23 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
           </div>
         </div>
 
+        {/* Tab bar */}
+        <div className="shrink-0 flex border-b border-line bg-paper px-5">
+          {(["details", "time"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] border-b-2 transition-colors
+                ${activeTab === tab
+                  ? "border-accent text-ink"
+                  : "border-transparent text-ink-3 hover:text-ink-2"}`}
+            >
+              {tab === "details" ? "Details" : "Time"}
+            </button>
+          ))}
+        </div>
+
         {/* Sheet body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading && (
@@ -281,7 +300,15 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
             </div>
           )}
 
-          {!loading && !loadError && form && task && (
+          {!loading && !loadError && form && task && activeTab === "time" && (
+            <WorklogPanel
+              taskId={task.id}
+              estimateMd={task.estimateMd}
+              actualMd={task.actualMd}
+            />
+          )}
+
+          {!loading && !loadError && form && task && activeTab === "details" && (
             <div className="space-y-4">
               {/* Error banners */}
               {saveError && (
