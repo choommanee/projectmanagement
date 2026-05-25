@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentTenantId, currentAccessToken } from "@/lib/auth/serverTenant";
 
-const SVC = process.env.WORKFLOW_URL ?? "http://localhost:8089";
+const SVC = process.env.WORKFLOW_URL ?? "http://localhost:8090";
 
 function methodHandler(method: string) {
   return async function (req: Request, ctx: { params: Promise<{ path: string[] }> }) {

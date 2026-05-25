@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -197,6 +198,7 @@ type CreateSprintInput struct {
 	TenantID, ProjectID uuid.UUID
 	Name, Goal          string
 	Status              domain.SprintStatus
+	StartDate, EndDate  *time.Time
 	CapacityPts         int
 }
 
@@ -215,6 +217,8 @@ func (svc *Service) CreateSprint(ctx context.Context, in CreateSprintInput) (*do
 		Name:        in.Name,
 		Goal:        in.Goal,
 		Status:      in.Status,
+		StartDate:   in.StartDate,
+		EndDate:     in.EndDate,
 		CapacityPts: in.CapacityPts,
 		Version:     1,
 	}

@@ -711,6 +711,8 @@ type createSprintReq struct {
 	Name        string               `json:"name"`
 	Goal        string               `json:"goal,omitempty"`
 	Status      domain.SprintStatus  `json:"status,omitempty"`
+	StartDate   *time.Time           `json:"start_date,omitempty"`
+	EndDate     *time.Time           `json:"end_date,omitempty"`
 	CapacityPts int                  `json:"capacity_pts,omitempty"`
 }
 
@@ -736,6 +738,8 @@ func createSprint(svc *service.Service) http.HandlerFunc {
 			Name:        req.Name,
 			Goal:        req.Goal,
 			Status:      req.Status,
+			StartDate:   req.StartDate,
+			EndDate:     req.EndDate,
 			CapacityPts: req.CapacityPts,
 		})
 		if err != nil {
