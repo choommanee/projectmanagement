@@ -49,6 +49,7 @@ func seedTestTenant(t *testing.T, p *pgxpool.Pool) uuid.UUID {
 func newTestServer(t *testing.T, p *pgxpool.Pool) http.Handler {
 	t.Helper()
 	svc := service.New(store.NewProjects(p), store.NewTasks(p), store.NewSprints(p))
+	svc.Worklog = store.NewWorklogStore(p)
 	// Pass nil authz so RequireAction becomes a no-op (libs/go/auth contract)
 	// and legacy tests keep working without minting JWT claims. The real
 	// Cedar allow/deny grid is exercised in cedar_create_test.go.
@@ -333,6 +334,90 @@ func TestListSprintTasksHTTP(t *testing.T) {
 	_ = json.Unmarshal(rr.Body.Bytes(), &listResp)
 	if int(listResp["total"].(float64)) != 1 {
 		t.Fatalf("expected 1 task after assign, got %v", listResp["total"])
+	}
+}
+
+func TestListWorklogs(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Create project + task
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "WL-P001", "name": "Worklog Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "WL-T001", "title": "Worklog Task"}, headers)
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+
+	// POST a worklog entry
+	userID := uuid.New().String()
+	wlBody := map[string]any{
+		"user_id":   userID,
+		"logged_md": 0.5,
+		"work_date": "2026-05-25",
+		"note":      "half day review",
+	}
+	rr = doJSON(t, h, "POST", "/v1/tasks/"+taskID+"/worklogs", wlBody, headers)
+	if rr.Code != 201 {
+		t.Fatalf("POST worklog: expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var entry map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &entry)
+	if entry["ID"] == nil || entry["ID"] == "" {
+		t.Fatalf("expected ID in worklog response, got %v", entry)
+	}
+
+	// GET /tasks/{id}/worklogs
+	rr = doJSON(t, h, "GET", "/v1/tasks/"+taskID+"/worklogs", nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("GET worklogs: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var listResp map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &listResp)
+	if int(listResp["total"].(float64)) < 1 {
+		t.Fatalf("expected at least 1 worklog entry, got total=%v", listResp["total"])
+	}
+}
+
+func TestCreateWorklog_InvalidLoggedMd(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Create project + task
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "WLV-P01", "name": "Worklog Val Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "WLV-T01", "title": "Worklog Val Task"}, headers)
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["ID"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+
+	// POST with logged_md = -1 → 400
+	userID := uuid.New().String()
+	wlBody := map[string]any{
+		"user_id":   userID,
+		"logged_md": -1.0,
+		"work_date": "2026-05-25",
+		"note":      "invalid",
+	}
+	rr = doJSON(t, h, "POST", "/v1/tasks/"+taskID+"/worklogs", wlBody, headers)
+	if rr.Code != 400 {
+		t.Fatalf("expected 400 for negative logged_md, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

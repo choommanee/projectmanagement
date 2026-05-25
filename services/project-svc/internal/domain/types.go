@@ -143,3 +143,22 @@ func ValidateCode(c string) error {
 	}
 	return nil
 }
+
+type WorklogEntry struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	TaskID    uuid.UUID
+	UserID    uuid.UUID
+	LoggedMd  float64
+	WorkDate  time.Time
+	Note      string
+	CreatedAt time.Time
+}
+
+type CreateWorklogParams struct {
+	TaskID   uuid.UUID
+	UserID   uuid.UUID
+	LoggedMd float64
+	WorkDate time.Time
+	Note     string
+}

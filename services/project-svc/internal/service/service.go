@@ -16,6 +16,7 @@ type Service struct {
 	Projects *store.Projects
 	Tasks    *store.Tasks
 	Sprints  *store.Sprints
+	Worklog  *store.WorklogStore
 	notif    notiflib.Publisher
 }
 

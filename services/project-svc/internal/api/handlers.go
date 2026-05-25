@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -80,6 +81,11 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).Patch("/tasks/{id}", updateTask(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.delete", "Task::{:id}", loaderOpts...)).Delete("/tasks/{id}", deleteTask(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.add_dependency", "Task::{:id}", loaderOpts...)).Post("/tasks/{id}/dependencies", addDependency(svc))
+
+		// Worklogs
+		r.Get("/tasks/{id}/worklogs", listWorklogs(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).
+			Post("/tasks/{id}/worklogs", createWorklog(svc))
 
 		// Dependencies — the row is keyed on the dependency id, which the
 		// loader doesn't model; keep RequireAction with "*" until a
@@ -560,6 +566,82 @@ func deleteTask(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(204)
+	}
+}
+
+// --- Worklogs ---
+
+// GET /tasks/{id}/worklogs
+func listWorklogs(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		taskID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		entries, err := svc.Worklog.List(r.Context(), tid, taskID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if entries == nil {
+			entries = []domain.WorklogEntry{}
+		}
+		writeJSON(w, 200, map[string]any{"items": entries, "total": len(entries)})
+	}
+}
+
+// POST /tasks/{id}/worklogs
+func createWorklog(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		taskID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req struct {
+			UserID   string  `json:"user_id"`
+			LoggedMd float64 `json:"logged_md"`
+			WorkDate string  `json:"work_date"`
+			Note     string  `json:"note"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.LoggedMd <= 0 {
+			writeErr(w, 400, errors.New("invalid body: logged_md must be > 0"))
+			return
+		}
+		userID, err := uuid.Parse(req.UserID)
+		if err != nil {
+			writeErr(w, 400, errors.New("invalid user_id"))
+			return
+		}
+		workDate := time.Now()
+		if req.WorkDate != "" {
+			workDate, err = time.Parse("2006-01-02", req.WorkDate)
+			if err != nil {
+				writeErr(w, 400, errors.New("invalid work_date, expected YYYY-MM-DD"))
+				return
+			}
+		}
+		entry, err := svc.Worklog.Create(r.Context(), tid, domain.CreateWorklogParams{
+			TaskID:   taskID,
+			UserID:   userID,
+			LoggedMd: req.LoggedMd,
+			WorkDate: workDate,
+			Note:     req.Note,
+		})
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 201, entry)
 	}
 }
 

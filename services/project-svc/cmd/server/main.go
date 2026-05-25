@@ -57,6 +57,7 @@ func main() {
 
 	svc := service.New(store.NewProjects(p), store.NewTasks(p), store.NewSprints(p)).
 		WithNotifPublisher(notifPub)
+	svc.Worklog = store.NewWorklogStore(p)
 	// Plan #6 Task 6 — pass the Cedar resource loader so scoped authz can
 	// attach per-instance attrs (tenant_id, owner_user) to each decision.
 	loader := api.NewCedarLoader(p)
