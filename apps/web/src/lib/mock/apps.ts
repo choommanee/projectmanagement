@@ -33,6 +33,10 @@ export const mockApps: AppDef[] = [
           { id: "reports",       name: "Reports & BI",     href: "/pm/reports",         icon: "dashboard" },
           { id: "dash-builder",  name: "Dashboard Builder",href: "/pm/reports/dashboard", icon: "dashboard" },
         ]},
+        { id: "a2", name: "Sales", subareas: [
+          { id: "customers",    name: "Customers",    href: "/pm/customers",    icon: "people" },
+          { id: "sales-orders", name: "Sales Orders", href: "/pm/sales-orders", icon: "tasks"  },
+        ]},
       ]},
     ],
   },
@@ -46,12 +50,15 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "prod", name: "Production", groups: [
         { id: "g1", name: "Orders", subareas: [
-          { id: "wo",  name: "Work Orders", href: "/mfg/work-orders", icon: "factory", count: 6 },
-          { id: "bom", name: "BOM",         href: "/mfg/bom",         icon: "bom"               },
-          { id: "mrp", name: "MRP Run",     href: "/mfg/mrp",         icon: "workflow"           },
+          { id: "wo",             name: "Work Orders",    href: "/mfg/work-orders",   icon: "factory",  count: 6 },
+          { id: "purchase-orders",name: "Purchase Orders",href: "/mfg/purchase-orders",icon: "tasks"           },
+          { id: "bom",            name: "BOM",            href: "/mfg/bom",           icon: "bom"              },
+          { id: "mrp",            name: "MRP Run",        href: "/mfg/mrp",           icon: "workflow"         },
+          { id: "scheduling",     name: "Scheduling Board",href: "/mfg/scheduling",  icon: "workflow"         },
         ]},
         { id: "g2", name: "Master Data", subareas: [
           { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"   },
+          { id: "suppliers",   name: "Suppliers",    href: "/mfg/suppliers",    icon: "factory"   },
           { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow"  },
           { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"     },
           { id: "inventory",   name: "Inventory",    href: "/mfg/inventory",    icon: "warehouse" },

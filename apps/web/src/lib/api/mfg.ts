@@ -187,7 +187,31 @@ export interface Lot {
   qtyOnHand: number;
   status: LotStatus;
   sourceWoId?: string | null;
+  notes?: string;
   createdAt: string;
+}
+
+export interface LotGenealogyComponent {
+  lotId: string;
+  lotNumber: string;
+  itemId: string;
+  qty: number;
+}
+
+export interface LotTraceNode {
+  lot_id: string;
+  lot_no: string;
+  lotNo?: string;
+  lotNumber?: string;
+  lot_number?: string;
+  item_id: string;
+  itemId?: string;
+  item_code: string;
+  qty: number;
+  status: LotStatus;
+  depth: number;
+  children?: LotTraceNode[];
+  Children?: LotTraceNode[];
 }
 
 export interface MrpRun {
@@ -416,6 +440,7 @@ function normLot(r: Record<string, unknown>): Lot {
     qtyOnHand: Number(gid(r, "qtyOnHand", "qty_on_hand") ?? 0),
     status: (g(r, "status") ?? "released") as LotStatus,
     sourceWoId: (gid(r, "sourceWoId", "source_wo_id") ?? r["SourceWOID"] ?? null) as string | null,
+    notes: (g(r, "notes") ?? undefined) as string | undefined,
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
   };
 }
@@ -711,6 +736,48 @@ export async function listWoMaterials(id: string): Promise<WOMaterial[]> {
 
 // ─── Lots ─────────────────────────────────────────────────────────────────
 
+export async function getLot(id: string): Promise<Lot> {
+  const r = await apiFetch(`${SVC}/lots/${id}`);
+  if (!r.ok) throw new Error(`getLot failed: ${r.status}`);
+  return normLot(await r.json());
+}
+
+export async function updateLot(id: string, patch: { status?: LotStatus; notes?: string; qty_on_hand?: number }): Promise<Lot> {
+  const r = await apiFetch(`${SVC}/lots/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateLot failed: ${r.status}`); }
+  return normLot(await r.json());
+}
+
+export async function getLotGenealogy(id: string): Promise<{ components: LotGenealogyComponent[] }> {
+  const r = await apiFetch(`${SVC}/lots/${id}/genealogy`);
+  if (!r.ok) throw new Error(`getLotGenealogy failed: ${r.status}`);
+  const body = await r.json() as { components?: Record<string, unknown>[] } | Record<string, unknown>[];
+  const arr = Array.isArray(body) ? body : ((body as { components?: Record<string, unknown>[] }).components ?? []);
+  return {
+    components: arr.map(x => ({
+      lotId: String((x as Record<string, unknown>).lot_id ?? ""),
+      lotNumber: String((x as Record<string, unknown>).lot_no ?? (x as Record<string, unknown>).lot_number ?? ""),
+      itemId: String((x as Record<string, unknown>).item_id ?? ""),
+      qty: Number((x as Record<string, unknown>).qty ?? 0),
+    })),
+  };
+}
+
+export async function getLotTrace(id: string): Promise<LotTraceNode> {
+  const r = await apiFetch(`${SVC}/lots/${id}/trace?direction=forward&max_depth=10`);
+  if (!r.ok) throw new Error(`getLotTrace failed: ${r.status}`);
+  const body = await r.json() as Record<string, unknown>;
+  return (body.root ?? body) as LotTraceNode;
+}
+
+export async function listRoutingOperations(routingId: string): Promise<RoutingOperation[]> {
+  const r = await apiFetch(`${SVC}/routings/${routingId}/operations`);
+  if (!r.ok) throw new Error(`listRoutingOperations failed: ${r.status}`);
+  const body = await r.json() as { items?: Record<string, unknown>[] } | Record<string, unknown>[];
+  const arr = Array.isArray(body) ? body : ((body as { items?: Record<string, unknown>[] }).items ?? []);
+  return arr.map(normRoutingOperation);
+}
+
 export async function createLot(input: { item_id: string; lot_no: string; qty_on_hand: number; status?: LotStatus; source_wo_id?: string }): Promise<Lot> {
   const r = await apiFetch(`${SVC}/lots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createLot failed: ${r.status}`); }
@@ -778,6 +845,153 @@ export async function listMrpActions(runId: string): Promise<MrpAction[]> {
   if (!r.ok) throw new Error(`listMrpActions failed: ${r.status}`);
   const body = await r.json();
   return ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normMrpAction);
+}
+
+// ─── Suppliers ───────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  id: string;
+  code: string;
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  leadTimeDays: number;
+  active: boolean;
+}
+
+function normSupplier(r: Record<string, unknown>): Supplier {
+  return {
+    id: String(g(r, "id") ?? r["ID"] ?? ""),
+    code: String(g(r, "code") ?? ""),
+    name: String(g(r, "name") ?? ""),
+    contact: String(g(r, "contact") ?? ""),
+    email: String(g(r, "email") ?? ""),
+    phone: String(g(r, "phone") ?? ""),
+    leadTimeDays: Number(gid(r, "leadTimeDays", "lead_time_days") ?? r["LeadTimeDays"] ?? 0),
+    active: Boolean(g(r, "active") ?? true),
+  };
+}
+
+export async function listSuppliers(): Promise<Supplier[]> {
+  const r = await apiFetch(`${SVC}/suppliers`);
+  if (!r.ok) throw new Error(`listSuppliers failed: ${r.status}`);
+  const body = await r.json();
+  return ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normSupplier);
+}
+
+export async function createSupplier(input: { code: string; name: string; contact?: string; email?: string; phone?: string; lead_time_days?: number; active?: boolean }): Promise<Supplier> {
+  const r = await apiFetch(`${SVC}/suppliers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createSupplier failed: ${r.status}`); }
+  return normSupplier(await r.json());
+}
+
+export async function updateSupplier(id: string, patch: Partial<{ code: string; name: string; contact: string; email: string; phone: string; lead_time_days: number; active: boolean }>): Promise<Supplier> {
+  const r = await apiFetch(`${SVC}/suppliers/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateSupplier failed: ${r.status}`); }
+  return normSupplier(await r.json());
+}
+
+export async function deleteSupplier(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/suppliers/${id}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteSupplier failed: ${r.status}`); }
+}
+
+// ─── Purchase Orders ──────────────────────────────────────────────────────────
+
+export interface POLine {
+  id: string;
+  itemId: string;
+  lineNo: number;
+  qtyOrdered: number;
+  qtyReceived: number;
+  unitPrice: number;
+  notes: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  supplierId: string;
+  status: string;
+  orderDate: string;
+  expectedDate: string | null;
+  notes: string;
+  lines: POLine[];
+}
+
+export type POStatus = "draft" | "submitted" | "approved" | "received" | "cancelled";
+
+function normPOLine(r: Record<string, unknown>): POLine {
+  return {
+    id: String(g(r, "id") ?? r["ID"] ?? ""),
+    itemId: String(gid(r, "itemId", "item_id") ?? r["ItemID"] ?? ""),
+    lineNo: Number(gid(r, "lineNo", "line_no") ?? r["LineNo"] ?? 0),
+    qtyOrdered: Number(gid(r, "qtyOrdered", "qty_ordered") ?? 0),
+    qtyReceived: Number(gid(r, "qtyReceived", "qty_received") ?? 0),
+    unitPrice: Number(gid(r, "unitPrice", "unit_price") ?? 0),
+    notes: String(g(r, "notes") ?? ""),
+  };
+}
+
+function normPurchaseOrder(r: Record<string, unknown>): PurchaseOrder {
+  return {
+    id: String(g(r, "id") ?? r["ID"] ?? ""),
+    poNumber: String(gid(r, "poNumber", "po_number") ?? r["PONumber"] ?? ""),
+    supplierId: String(gid(r, "supplierId", "supplier_id") ?? r["SupplierID"] ?? ""),
+    status: String(g(r, "status") ?? "draft"),
+    orderDate: String(gid(r, "orderDate", "order_date") ?? r["OrderDate"] ?? ""),
+    expectedDate: (gid(r, "expectedDate", "expected_date") ?? r["ExpectedDate"] ?? null) as string | null,
+    notes: String(g(r, "notes") ?? ""),
+    lines: Array.isArray(r["lines"]) ? (r["lines"] as Record<string, unknown>[]).map(normPOLine) : [],
+  };
+}
+
+export async function listPurchaseOrders(params: { status?: string; q?: string; limit?: number; offset?: number } = {}): Promise<{ items: PurchaseOrder[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.q) qs.set("q", params.q);
+  qs.set("limit", String(params.limit ?? 50));
+  qs.set("offset", String(params.offset ?? 0));
+  const r = await apiFetch(`${SVC}/purchase-orders?${qs}`);
+  if (!r.ok) throw new Error(`listPurchaseOrders failed: ${r.status}`);
+  const body = await r.json();
+  return { items: ((body.items ?? []) as Record<string, unknown>[]).map(normPurchaseOrder), total: body.total ?? 0 };
+}
+
+export async function createPurchaseOrder(input: { supplier_id: string; order_date?: string; expected_date?: string; notes?: string }): Promise<PurchaseOrder> {
+  const r = await apiFetch(`${SVC}/purchase-orders`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createPurchaseOrder failed: ${r.status}`); }
+  return normPurchaseOrder(await r.json());
+}
+
+export async function getPurchaseOrder(id: string): Promise<PurchaseOrder> {
+  const r = await apiFetch(`${SVC}/purchase-orders/${id}`);
+  if (!r.ok) throw new Error(`getPurchaseOrder failed: ${r.status}`);
+  return normPurchaseOrder(await r.json());
+}
+
+export async function updatePurchaseOrder(id: string, patch: { status?: POStatus; expected_date?: string | null; notes?: string }): Promise<PurchaseOrder> {
+  const r = await apiFetch(`${SVC}/purchase-orders/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updatePurchaseOrder failed: ${r.status}`); }
+  return normPurchaseOrder(await r.json());
+}
+
+export async function addPOLine(poId: string, line: { item_id: string; qty_ordered: number; unit_price?: number; notes?: string }): Promise<POLine> {
+  const r = await apiFetch(`${SVC}/purchase-orders/${poId}/lines`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(line) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `addPOLine failed: ${r.status}`); }
+  return normPOLine(await r.json());
+}
+
+export async function updatePOLine(poId: string, lineId: string, patch: { qty_ordered?: number; unit_price?: number; notes?: string }): Promise<POLine> {
+  const r = await apiFetch(`${SVC}/purchase-orders/${poId}/lines/${lineId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updatePOLine failed: ${r.status}`); }
+  return normPOLine(await r.json());
+}
+
+export async function deletePOLine(poId: string, lineId: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/purchase-orders/${poId}/lines/${lineId}`, { method: "DELETE" });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deletePOLine failed: ${r.status}`); }
 }
 
 // ─── Lot genealogy / traceability ─────────────────────────────────────────
