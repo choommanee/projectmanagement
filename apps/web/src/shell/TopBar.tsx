@@ -10,6 +10,7 @@ import { useNotifications } from "./useNotifications";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import Link from "next/link";
+import { GlobalSearch, useGlobalSearch } from "./GlobalSearch";
 
 interface AppMeta { id: string; name: string }
 
@@ -40,6 +41,7 @@ export function TopBar({
     cozy: t("densityCozy"),
     comfortable: t("densityComfortable"),
   };
+  const { openPalette } = useGlobalSearch();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -74,16 +76,22 @@ export function TopBar({
         />
       </div>
 
-      {/* Center: search */}
-      <div className="mx-auto flex w-105 items-center gap-2 rounded-sm bg-surface-2 border border-transparent hover:border-line h-9 px-2.5 text-sm transition-colors">
+      {/* Center: search trigger — opens global command palette */}
+      <button
+        type="button"
+        onClick={openPalette}
+        aria-label={t("search")}
+        className="mx-auto flex w-105 items-center gap-2 rounded-sm bg-surface-2 border border-transparent hover:border-line h-9 px-2.5 text-sm transition-colors cursor-pointer"
+      >
         <Search size={14} className="text-ink-3 shrink-0" />
-        <input
-          aria-label={t("search")}
-          className="flex-1 bg-transparent text-ink placeholder:text-ink-3 outline-none"
-          placeholder={t("searchPlaceholder")}
-        />
+        <span className="flex-1 text-left text-ink-3 font-mono text-sm">
+          {t("searchPlaceholder")}
+        </span>
         <Kbd>⌘K</Kbd>
-      </div>
+      </button>
+
+      {/* Global search palette — manages its own open state */}
+      <GlobalSearch />
 
       {/* Right: notifications, theme toggle, user */}
       <div className="ml-auto flex items-center gap-1">
