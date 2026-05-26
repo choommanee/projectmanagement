@@ -655,6 +655,12 @@ export async function updatePerformanceReview(
   return normReview(await r.json());
 }
 
+export async function getPerformanceReview(id: string): Promise<PerformanceReview> {
+  const r = await apiFetch(`${SVC}/performance-reviews/${id}`);
+  if (!r.ok) throw new Error(`getPerformanceReview: ${r.status}`);
+  return normReview(await r.json());
+}
+
 // ─── Recruitment ────────────────────────────────────────────────────────────
 
 export type JobStatus = "open" | "closed" | "draft" | "on_hold";

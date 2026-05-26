@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar, type CommandAction } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -270,6 +271,7 @@ function RejectDialog({
 }
 
 export default function LeaveRequestsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<LeaveRequest[]>([]);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | "">("");
@@ -416,7 +418,8 @@ export default function LeaveRequestsPage() {
               items.map((lr) => (
                 <tr
                   key={lr.id}
-                  className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                  className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
+                  onClick={() => router.push('/hr/leave-requests/' + lr.id)}
                 >
                   <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)] max-w-[160px] truncate">
                     {lr.employee_id}
@@ -437,7 +440,7 @@ export default function LeaveRequestsPage() {
                       {lr.status.charAt(0).toUpperCase() + lr.status.slice(1)}
                     </Tag>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     {lr.status === "pending" && (
                       <div className="flex gap-1">
                         <Button
