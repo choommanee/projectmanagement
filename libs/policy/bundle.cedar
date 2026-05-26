@@ -535,3 +535,70 @@ permit (
 when {
   context.user_id != ""
 };
+
+// --- sales-svc ---
+
+permit (
+  principal,
+  action in [
+    Action::"sales.customer.create",
+    Action::"sales.customer.update",
+    Action::"sales.customer.delete",
+    Action::"sales.order.create",
+    Action::"sales.order.update",
+    Action::"sales.order.delete"
+  ],
+  resource
+)
+when {
+  context.roles.contains("project-manager") ||
+  context.roles.contains("tenant-admin")
+};
+
+// Prevent cross-tenant mutation
+forbid (principal, action in [Action::"sales.customer.update", Action::"sales.customer.delete", Action::"sales.order.update", Action::"sales.order.delete"], resource)
+when { resource has tenant_id && resource.tenant_id != context.tenant_id };
+
+// --- accounting-svc ---
+
+permit (
+  principal,
+  action in [
+    Action::"accounting.account.create",
+    Action::"accounting.account.update",
+    Action::"accounting.account.delete",
+    Action::"accounting.je.create",
+    Action::"accounting.je.update",
+    Action::"accounting.je.post",
+    Action::"accounting.invoice.create",
+    Action::"accounting.invoice.update",
+    Action::"accounting.invoice.delete"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("project-manager")
+};
+
+// --- hr-svc ---
+
+permit (
+  principal,
+  action in [
+    Action::"hr.department.create",
+    Action::"hr.department.update",
+    Action::"hr.department.delete",
+    Action::"hr.position.create",
+    Action::"hr.position.update",
+    Action::"hr.position.delete",
+    Action::"hr.employee.create",
+    Action::"hr.employee.update",
+    Action::"hr.employee.terminate"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("project-manager")
+};
