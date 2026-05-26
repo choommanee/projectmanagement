@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Breadcrumb } from "@/shell/Breadcrumb";
-import { Tag } from "@pmplatform/ui-kit";
+import { Button, Tag } from "@pmplatform/ui-kit";
 import {
   listAccounts,
   listJournalEntries,
@@ -12,6 +12,21 @@ import {
   type ChartOfAccount,
   type JournalEntry,
 } from "@/lib/api/accounting";
+
+// ─── CSV export ────────────────────────────────────────────────────────────
+
+function exportCSV(filename: string, rows: string[][]): void {
+  const csv = rows
+    .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ─── constants ─────────────────────────────────────────────────────────────
 
@@ -504,10 +519,61 @@ export default function FinancialReportsPage() {
             {TAB_LABELS[t]}
           </button>
         ))}
-        <div className="ml-auto flex items-center px-4">
+        <div className="ml-auto flex items-center gap-3 px-4">
           <span className="font-mono text-xs text-ink-3">
             {filteredEntries.length} posted entries
           </span>
+          {tab === "trial-balance" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const rows: string[][] = [["Code", "Account Name", "Type", "Debit", "Credit", "Balance"]];
+                for (const a of accounts) {
+                  const { debits, credits } = balanceMap.get(a.id) ?? { debits: 0, credits: 0 };
+                  const balance = NORMAL_SIDE[a.type] === "debit" ? debits - credits : credits - debits;
+                  rows.push([a.code, a.name, a.type, String(debits), String(credits), String(balance)]);
+                }
+                exportCSV("trial-balance.csv", rows);
+              }}
+            >
+              Export CSV
+            </Button>
+          )}
+          {tab === "balance-sheet" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const rows: string[][] = [["Code", "Account Name", "Type", "Balance"]];
+                for (const a of accounts.filter((x) => ["asset", "liability", "equity"].includes(x.type))) {
+                  const { debits, credits } = balanceMap.get(a.id) ?? { debits: 0, credits: 0 };
+                  const balance = NORMAL_SIDE[a.type] === "debit" ? debits - credits : credits - debits;
+                  rows.push([a.code, a.name, a.type, String(balance)]);
+                }
+                exportCSV("balance-sheet.csv", rows);
+              }}
+            >
+              Export CSV
+            </Button>
+          )}
+          {tab === "pnl" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const rows: string[][] = [["Code", "Account Name", "Type", "Amount"]];
+                for (const a of accounts.filter((x) => ["revenue", "expense"].includes(x.type))) {
+                  const { debits, credits } = balanceMap.get(a.id) ?? { debits: 0, credits: 0 };
+                  const balance = NORMAL_SIDE[a.type] === "debit" ? debits - credits : credits - debits;
+                  rows.push([a.code, a.name, a.type, String(balance)]);
+                }
+                exportCSV("profit-and-loss.csv", rows);
+              }}
+            >
+              Export CSV
+            </Button>
+          )}
         </div>
       </div>
 
