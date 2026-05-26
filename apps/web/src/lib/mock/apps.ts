@@ -53,6 +53,7 @@ export const mockApps: AppDef[] = [
           { id: "bom",            name: "BOM",            href: "/mfg/bom",           icon: "bom"              },
           { id: "mrp",            name: "MRP Run",        href: "/mfg/mrp",           icon: "workflow"         },
           { id: "scheduling",     name: "Scheduling Board",href: "/mfg/scheduling",  icon: "workflow"         },
+          { id: "capacity",       name: "Capacity Planning",href: "/mfg/capacity",   icon: "dashboard"        },
           { id: "oee",            name: "OEE Dashboard",  href: "/mfg/oee",           icon: "dashboard"        },
           { id: "shift-report",   name: "Shift Report",   href: "/mfg/shift-report",  icon: "dashboard"        },
         ]},
@@ -93,6 +94,7 @@ export const mockApps: AppDef[] = [
           { id: "coa",     name: "Chart of Accounts", href: "/accounting/accounts",        icon: "dashboard" },
           { id: "je",      name: "Journal Entries",   href: "/accounting/journal-entries", icon: "tasks"     },
           { id: "trial-balance", name: "Trial Balance",    href: "/accounting/reports",         icon: "dashboard" },
+          { id: "budget",        name: "Budget",           href: "/accounting/budget",           icon: "dollar-sign" },
         ]},
       ]},
       { id: "billing", name: "Billing", groups: [
@@ -112,10 +114,11 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "org", name: "Organization", groups: [
         { id: "o1", name: "Structure", subareas: [
-          { id: "depts",    name: "Departments",     href: "/hr/departments", icon: "people"    },
-          { id: "pos",      name: "Positions",       href: "/hr/positions",   icon: "people"    },
-          { id: "emps",     name: "Employees",       href: "/hr/employees",   icon: "people"    },
-          { id: "training", name: "Training Records", href: "/hr/training",    icon: "knowledge" },
+          { id: "depts",     name: "Departments",     href: "/hr/departments", icon: "people"    },
+          { id: "pos",       name: "Positions",       href: "/hr/positions",   icon: "people"    },
+          { id: "emps",      name: "Employees",       href: "/hr/employees",   icon: "people"    },
+          { id: "org-chart", name: "Org Chart",       href: "/hr/org-chart",   icon: "users"     },
+          { id: "training",  name: "Training Records", href: "/hr/training",   icon: "knowledge" },
         ]},
       ]},
       { id: "payroll-area", name: "Payroll", groups: [
@@ -161,6 +164,7 @@ export const mockApps: AppDef[] = [
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
           { id: "invoices",     name: "Invoices",     href: "/sales/invoices",     icon: "tasks"  },
+          { id: "shipments",    name: "Shipments",    href: "/sales/shipments",    icon: "tasks"  },
         ]},
       ]},
     ],
