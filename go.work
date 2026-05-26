@@ -15,13 +15,15 @@ use (
 	./services/audit-svc
 	./services/audit-worker
 	./services/document-svc
+	./services/hr-svc
 	./services/identity-svc
 	./services/mfg-svc
 	./services/notification-svc
 	./services/project-svc
 	./services/quality-svc
-	./services/sales-svc
 	./services/reports-svc
+	./services/accounting-svc
+	./services/sales-svc
 	./services/tenant-svc
 	./services/workflow-svc
 )
