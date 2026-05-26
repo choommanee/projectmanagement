@@ -54,6 +54,7 @@ export const mockApps: AppDef[] = [
           { id: "mrp",            name: "MRP Run",        href: "/mfg/mrp",           icon: "workflow"         },
           { id: "scheduling",     name: "Scheduling Board",href: "/mfg/scheduling",  icon: "workflow"         },
           { id: "oee",            name: "OEE Dashboard",  href: "/mfg/oee",           icon: "dashboard"        },
+          { id: "shift-report",   name: "Shift Report",   href: "/mfg/shift-report",  icon: "dashboard"        },
         ]},
         { id: "g2", name: "Master Data", subareas: [
           { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"   },
@@ -117,6 +118,7 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "payroll-area", name: "Payroll", groups: [
         { id: "pay1", name: "Pay", subareas: [
+          { id: "payroll-run",  name: "Payroll Run",    href: "/hr/payroll-run",    icon: "tasks" },
           { id: "payroll",      name: "Payslips",       href: "/hr/payroll",        icon: "tasks" },
           { id: "leave",        name: "Leave Requests", href: "/hr/leave-requests", icon: "tasks" },
         ]},
@@ -134,6 +136,7 @@ export const mockApps: AppDef[] = [
       { id: "purchasing", name: "Purchasing", groups: [
         { id: "p1", name: "Orders", subareas: [
           { id: "purchase-orders", name: "Purchase Orders", href: "/procurement/purchase-orders", icon: "tasks" },
+          { id: "goods-receipts", name: "Goods Receipts", href: "/procurement/goods-receipts", icon: "warehouse" },
         ]},
         { id: "p2", name: "Vendors", subareas: [
           { id: "suppliers", name: "Suppliers", href: "/procurement/suppliers", icon: "people" },

@@ -1076,3 +1076,32 @@ export async function deleteLot(id: string): Promise<void> {
   const r = await apiFetch(`${SVC}/lots/${id}`, { method: "DELETE" });
   if (!r.ok) throw new Error(`delete lot failed: ${r.status}`);
 }
+
+// ─── Goods Receipts ──────────────────────────────────────────────────────────
+
+export interface GoodsReceipt {
+  id: string;
+  po_id: string;
+  po_code?: string;
+  supplier_name?: string;
+  received_at: string;
+  lines: Array<{ item_id: string; item_name?: string; qty_ordered: number; qty_received: number }>;
+  status: "draft" | "confirmed";
+  notes?: string;
+}
+
+export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
+  const r = await apiFetch(`${SVC}/goods-receipts`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return Array.isArray(d) ? d : d?.receipts ?? [];
+}
+
+export async function receivePO(poId: string, body: { lines: Array<{ line_id: string; qty_received: number }>; notes?: string }): Promise<void> {
+  const r = await apiFetch(`/api/mfg/purchase-orders/${poId}/receive`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
