@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือผู้ใช้งาน — PM Platform ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050b14;
+  --surface:#0a1628;
+  --surface2:#0f1f38;
+  --border:rgba(255,255,255,0.06);
+  --border-accent:rgba(14,165,233,0.22);
+  --text:#e2e8f0;
+  --muted:#64748b;
+  --dim:#94a3b8;
+  --sky:#0ea5e9;
+  --sky-glow:rgba(14,165,233,0.12);
+  --gold:#f59e0b;
+  --green:#10b981;
+  --violet:#8b5cf6;
+  --red:#ef4444;
+  --fd:'Cormorant Garamond',Georgia,serif;
+  --fm:'IBM Plex Mono','Courier New',monospace;
+  --fb:'IBM Plex Sans Thai','Helvetica Neue',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--fb);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;font-size:15px}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 2.5rem;
+  background:rgba(5,11,20,0.92);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{font-family:var(--fm);font-size:.78rem;font-weight:500;color:var(--sky);letter-spacing:.18em}
+.nav-logo em{color:var(--muted);font-style:normal}
+.nav-badge{font-family:var(--fm);font-size:.6rem;letter-spacing:.1em;color:var(--bg);background:var(--sky);padding:.22rem .7rem;margin-left:.8rem}
+
+/* ── SIDEBAR ── */
+.layout{display:flex;min-height:100vh;padding-top:60px}
+.sidebar{
+  position:fixed;top:60px;left:0;bottom:0;width:260px;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;padding:1.5rem 0;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-section{margin-bottom:.25rem}
+.sb-head{
+  font-family:var(--fm);font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);padding:.8rem 1.5rem .35rem;
+}
+.sb-link{
+  display:flex;align-items:center;gap:.6rem;
+  padding:.5rem 1.5rem;font-size:.84rem;color:var(--dim);
+  text-decoration:none;transition:color .15s,background .15s;
+  border-left:2px solid transparent;
+}
+.sb-link:hover{color:var(--text);background:rgba(14,165,233,.05)}
+.sb-link.active{color:var(--sky);border-left-color:var(--sky);background:rgba(14,165,233,.07)}
+.sb-link .dot{width:5px;height:5px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sb-link.active .dot{background:var(--sky)}
+
+/* ── MAIN CONTENT ── */
+.main{margin-left:260px;flex:1;padding:3rem 4rem 6rem;max-width:900px}
+
+/* ── PAGE HERO ── */
+.page-hero{margin-bottom:3.5rem;padding-bottom:2.5rem;border-bottom:1px solid var(--border)}
+.eyebrow{font-family:var(--fm);font-size:.63rem;letter-spacing:.24em;text-transform:uppercase;color:var(--sky);margin-bottom:1.2rem;display:flex;align-items:center;gap:.8rem}
+.eyebrow::before{content:'';display:block;width:1.5rem;height:1px;background:var(--sky)}
+.page-hero h1{font-family:var(--fd);font-size:clamp(2.4rem,5vw,3.8rem);font-weight:400;line-height:1.06;margin-bottom:1rem}
+.page-hero h1 em{font-style:italic;color:var(--sky)}
+.hero-desc{font-size:.95rem;color:var(--dim);max-width:560px;line-height:1.9}
+
+/* ── SECTIONS ── */
+.doc-section{margin-bottom:4rem;padding-bottom:4rem;border-bottom:1px solid var(--border)}
+.doc-section:last-child{border-bottom:none}
+
+.section-tag{font-family:var(--fm);font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--sky);margin-bottom:.6rem;display:flex;align-items:center;gap:.7rem}
+.section-tag::before{content:'';display:inline-block;width:1.2rem;height:1px;background:currentColor}
+.section-tag.gold{color:var(--gold)}
+.section-tag.gold::before{background:var(--gold)}
+.section-tag.green{color:var(--green)}
+.section-tag.green::before{background:var(--green)}
+.section-tag.violet{color:var(--violet)}
+.section-tag.violet::before{background:var(--violet)}
+
+h2{font-family:var(--fd);font-size:clamp(1.6rem,3vw,2.4rem);font-weight:400;line-height:1.15;margin-bottom:.7rem}
+h3{font-size:1.05rem;font-weight:600;margin-bottom:.7rem;color:var(--text)}
+h4{font-family:var(--fm);font-size:.78rem;letter-spacing:.08em;color:var(--sky);margin:1.4rem 0 .5rem;text-transform:uppercase}
+p{color:var(--dim);margin-bottom:1rem;line-height:1.9}
+
+/* ── CARDS ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);margin:1.5rem 0}
+.card{background:var(--surface);padding:1.8rem;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:opacity .2s}
+.card:hover::before{opacity:1}
+.card.sky::before{background:var(--sky)}
+.card.gold::before{background:var(--gold)}
+.card.green::before{background:var(--green)}
+.card.violet::before{background:var(--violet)}
+.card:hover{background:var(--surface2)}
+.card-icon{font-size:1.4rem;margin-bottom:.9rem}
+.card-title{font-size:.94rem;font-weight:600;margin-bottom:.4rem;color:var(--text)}
+.card-desc{font-size:.8rem;color:var(--muted);line-height:1.65}
+
+/* ── STEPS ── */
+.steps{list-style:none;display:flex;flex-direction:column;gap:0;margin:1.5rem 0;border:1px solid var(--border);background:var(--border)}
+.step{display:flex;gap:1rem;padding:1.2rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.step-num{font-family:var(--fm);font-size:.7rem;font-weight:500;color:var(--sky);min-width:1.8rem;padding-top:.1rem;flex-shrink:0}
+.step-body h4{margin:0 0 .3rem;font-family:var(--fb);font-size:.88rem;font-weight:600;color:var(--text);text-transform:none;letter-spacing:0}
+.step-body p{margin:0;font-size:.82rem;color:var(--muted);line-height:1.65}
+
+/* ── CODE / PATH ── */
+.path{
+  font-family:var(--fm);font-size:.72rem;letter-spacing:.04em;
+  background:rgba(14,165,233,.08);border:1px solid var(--border-accent);
+  color:var(--sky);padding:.18rem .55rem;display:inline;
+}
+
+/* ── TABLE ── */
+.doc-table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.83rem}
+.doc-table th{font-family:var(--fm);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:left;padding:.7rem 1rem;border-bottom:1px solid var(--border);background:var(--surface)}
+.doc-table td{padding:.75rem 1rem;border-bottom:1px solid var(--border);color:var(--dim);vertical-align:top;line-height:1.6}
+.doc-table tr:hover td{background:rgba(14,165,233,.03)}
+
+/* ── ALERT ── */
+.alert{display:flex;gap:.9rem;padding:1rem 1.2rem;margin:1.2rem 0;border:1px solid;border-radius:1px}
+.alert.info{background:rgba(14,165,233,.07);border-color:rgba(14,165,233,.22)}
+.alert.warn{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.22)}
+.alert.tip{background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.22)}
+.alert-icon{flex-shrink:0;font-size:1rem;margin-top:.05rem}
+.alert-body{font-size:.83rem;color:var(--dim);line-height:1.7}
+.alert-body strong{color:var(--text)}
+.alert.info .alert-icon{color:var(--sky)}
+.alert.warn .alert-icon{color:var(--gold)}
+.alert.tip .alert-icon{color:var(--green)}
+
+/* ── ROLE BADGE ── */
+.role{font-family:var(--fm);font-size:.62rem;padding:.2rem .6rem;border:1px solid;display:inline-block;margin:.1rem .15rem}
+.role.admin{border-color:rgba(239,68,68,.35);color:#ef4444}
+.role.pm{border-color:rgba(14,165,233,.35);color:var(--sky)}
+.role.mfg{border-color:rgba(245,158,11,.35);color:var(--gold)}
+.role.qa{border-color:rgba(16,185,129,.35);color:var(--green)}
+
+/* ── WORKFLOW ── */
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+.flow-node{font-family:var(--fm);font-size:.7rem;padding:.3rem .85rem;border:1px solid var(--border);color:var(--dim);white-space:nowrap}
+.flow-node.start{border-color:rgba(14,165,233,.35);color:var(--sky);background:rgba(14,165,233,.07)}
+.flow-node.end{border-color:rgba(16,185,129,.35);color:var(--green);background:rgba(16,185,129,.07)}
+.flow-node.warn{border-color:rgba(245,158,11,.35);color:var(--gold)}
+.flow-arrow{color:var(--muted);font-size:.8rem}
+
+/* ── TOC ── */
+.toc{border:1px solid var(--border);background:var(--surface);padding:1.5rem;margin-bottom:3rem}
+.toc-title{font-family:var(--fm);font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem}
+.toc-list{list-style:none;display:flex;flex-direction:column;gap:.3rem}
+.toc-list li a{font-size:.84rem;color:var(--dim);text-decoration:none;display:flex;align-items:baseline;gap:.5rem;transition:color .15s}
+.toc-list li a:hover{color:var(--sky)}
+.toc-list li a .toc-num{font-family:var(--fm);font-size:.65rem;color:var(--muted);min-width:1.5rem}
+
+/* ── RESPONSIVE ── */
+@media(max-width:860px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:2rem 1.5rem 4rem}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div style="display:flex;align-items:center">
+    <span class="nav-logo">PM<em>/</em>Platform</span>
+    <span class="nav-badge">คู่มือผู้ใช้งาน</span>
+  </div>
+  <span style="font-family:var(--fm);font-size:.65rem;color:var(--muted)">v2026.05 · TH</span>
+</nav>
+
+<!-- SIDEBAR -->
+<div class="layout">
+<aside class="sidebar">
+  <div class="sb-section">
+    <div class="sb-head">เริ่มต้นใช้งาน</div>
+    <a class="sb-link active" href="#overview"><span class="dot"></span>ภาพรวมระบบ</a>
+    <a class="sb-link" href="#login"><span class="dot"></span>การเข้าสู่ระบบ</a>
+    <a class="sb-link" href="#navigation"><span class="dot"></span>การนำทาง</a>
+    <a class="sb-link" href="#roles"><span class="dot"></span>บทบาทผู้ใช้งาน</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">การจัดการโครงการ</div>
+    <a class="sb-link" href="#projects"><span class="dot"></span>โครงการ</a>
+    <a class="sb-link" href="#tasks"><span class="dot"></span>งาน &amp; Sprint</a>
+    <a class="sb-link" href="#workflows"><span class="dot"></span>Workflow</a>
+    <a class="sb-link" href="#users-mgmt"><span class="dot"></span>จัดการผู้ใช้งาน</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">การผลิต</div>
+    <a class="sb-link" href="#items"><span class="dot"></span>รายการสินค้า</a>
+    <a class="sb-link" href="#bom"><span class="dot"></span>BOM &amp; Routing</a>
+    <a class="sb-link" href="#work-orders"><span class="dot"></span>Work Orders</a>
+    <a class="sb-link" href="#lots"><span class="dot"></span>Lot &amp; ตรวจสอบย้อนหลัง</a>
+    <a class="sb-link" href="#mrp"><span class="dot"></span>MRP</a>
+    <a class="sb-link" href="#scheduling"><span class="dot"></span>ตารางการผลิต</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">การจัดซื้อ</div>
+    <a class="sb-link" href="#suppliers"><span class="dot"></span>ผู้จัดจำหน่าย</a>
+    <a class="sb-link" href="#purchase-orders"><span class="dot"></span>ใบสั่งซื้อ</a>
+    <a class="sb-link" href="#inventory"><span class="dot"></span>คลังสินค้า</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">การขาย</div>
+    <a class="sb-link" href="#customers"><span class="dot"></span>ลูกค้า</a>
+    <a class="sb-link" href="#sales-orders"><span class="dot"></span>ใบสั่งขาย</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">คุณภาพ</div>
+    <a class="sb-link" href="#quality"><span class="dot"></span>APQP/PPAP/FMEA</a>
+    <a class="sb-link" href="#ncr"><span class="dot"></span>NCR &amp; CAPA</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-head">รายงาน</div>
+    <a class="sb-link" href="#reports"><span class="dot"></span>BI &amp; Dashboard</a>
+    <a class="sb-link" href="#audit"><span class="dot"></span>Audit Log</a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- HERO -->
+  <div class="page-hero">
+    <div class="eyebrow">คู่มือผู้ใช้งานฉบับสมบูรณ์</div>
+    <h1>PM Platform<br><em>ERP สำหรับองค์กร</em></h1>
+    <p class="hero-desc">ระบบบริหารจัดการองค์กรแบบครบวงจร รองรับทั้งการจัดการโครงการ การผลิต การจัดซื้อ การขาย และการควบคุมคุณภาพมาตรฐาน IATF 16949</p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <div class="toc-title">สารบัญ</div>
+    <ul class="toc-list">
+      <li><a href="#overview"><span class="toc-num">01</span>ภาพรวมระบบ</a></li>
+      <li><a href="#login"><span class="toc-num">02</span>การเข้าสู่ระบบและบทบาทผู้ใช้งาน</a></li>
+      <li><a href="#projects"><span class="toc-num">03</span>การจัดการโครงการ (PM Hub)</a></li>
+      <li><a href="#manufacturing"><span class="toc-num">04</span>การผลิต (Manufacturing Hub)</a></li>
+      <li><a href="#procurement"><span class="toc-num">05</span>การจัดซื้อ</a></li>
+      <li><a href="#sales"><span class="toc-num">06</span>การขาย</a></li>
+      <li><a href="#quality"><span class="toc-num">07</span>การควบคุมคุณภาพ</a></li>
+      <li><a href="#reports"><span class="toc-num">08</span>รายงานและ Dashboard</a></li>
+    </ul>
+  </div>
+
+  <!-- ── 01 OVERVIEW ── -->
+  <section class="doc-section" id="overview">
+    <div class="section-tag">01 — ภาพรวม</div>
+    <h2>ระบบทำอะไรได้บ้าง?</h2>
+    <p>PM Platform เป็น ERP แบบ Multi-tenant รองรับหลายบริษัทในระบบเดียวกัน แบ่งออกเป็น 2 โมดูลหลัก</p>
+
+    <div class="card-grid">
+      <div class="card sky">
+        <div class="card-icon">📋</div>
+        <div class="card-title">PM Hub — การจัดการโครงการ</div>
+        <div class="card-desc">โครงการ งาน Sprint Backlog Workflow อัตโนมัติ รายงาน BI และ Workspace สำหรับ BA/SA</div>
+      </div>
+      <div class="card gold">
+        <div class="card-icon">🏭</div>
+        <div class="card-title">Manufacturing Hub — การผลิต</div>
+        <div class="card-desc">Work Order BOM Routing MRP คลังสินค้า Lot ตรวจสอบย้อนหลัง ตารางการผลิต และคุณภาพ IATF 16949</div>
+      </div>
+    </div>
+
+    <div class="alert info">
+      <span class="alert-icon">ℹ</span>
+      <div class="alert-body"><strong>Multi-tenant:</strong> ข้อมูลของแต่ละบริษัทถูกแยกอย่างสมบูรณ์ผ่าน Row-Level Security คุณจะเห็นเฉพาะข้อมูลขององค์กรที่คุณสังกัดเท่านั้น</div>
+    </div>
+  </section>
+
+  <!-- ── 02 LOGIN ── -->
+  <section class="doc-section" id="login">
+    <div class="section-tag">02 — การเข้าสู่ระบบ</div>
+    <h2>เข้าสู่ระบบ &amp; บทบาท</h2>
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>เปิดเบราว์เซอร์และไปที่ระบบ</h4>
+          <p>เปิด URL ที่ผู้ดูแลระบบให้มา ใส่อีเมลและรหัสผ่านที่ได้รับจาก Invite Email</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>เลือกองค์กร (Tenant)</h4>
+          <p>หากบัญชีของคุณสังกัดหลายองค์กร ระบบจะให้คุณเลือกองค์กรก่อนเข้าสู่หน้าหลัก</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <h4>เข้าสู่หน้า Dashboard</h4>
+          <p>ระบบแสดงเมนูและฟีเจอร์ตามบทบาทที่ได้รับ บางเมนูอาจซ่อนอยู่หากบทบาทไม่มีสิทธิ์</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3 id="roles">บทบาทผู้ใช้งาน</h3>
+    <table class="doc-table">
+      <thead>
+        <tr>
+          <th>บทบาท</th>
+          <th>สิทธิ์หลัก</th>
+          <th>โมดูลที่เข้าถึงได้</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="role admin">tenant-admin</span></td>
+          <td>จัดการผู้ใช้งาน ตั้งค่าระบบ สิทธิ์เต็ม</td>
+          <td>ทุกโมดูล</td>
+        </tr>
+        <tr>
+          <td><span class="role pm">project-manager</span></td>
+          <td>สร้าง/แก้ไขโครงการ Sprint งาน มอบหมายงาน</td>
+          <td>PM Hub ทั้งหมด</td>
+        </tr>
+        <tr>
+          <td><span class="role mfg">mfg-operator</span></td>
+          <td>Work Order BOM MRP คลัง Supplier PO</td>
+          <td>Manufacturing Hub</td>
+        </tr>
+        <tr>
+          <td><span class="role qa">quality-engineer</span></td>
+          <td>APQP PPAP FMEA NCR CAPA Inspection</td>
+          <td>Quality (MFG Hub)</td>
+        </tr>
+        <tr>
+          <td><span class="role pm">workflow-author</span></td>
+          <td>สร้างและแก้ไข Workflow Definition</td>
+          <td>PM Hub → Workflows</td>
+        </tr>
+        <tr>
+          <td><span class="role pm">bi-author</span></td>
+          <td>สร้าง Dashboard และ Report</td>
+          <td>PM Hub → Reports</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── 03 PM ── -->
+  <section class="doc-section" id="projects">
+    <div class="section-tag sky">03 — PM Hub</div>
+    <h2>การจัดการโครงการ</h2>
+
+    <h3 id="projects-create">สร้างโครงการใหม่</h3>
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>ไปที่ <span class="path">/pm/projects</span></h4>
+          <p>คลิก "Active Projects" ในเมนู Projects ฝั่งซ้าย</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>คลิก "+ New Project"</h4>
+          <p>กรอกชื่อโครงการ วันกำหนดเสร็จ และคำอธิบาย แล้วกด Create</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <h4>ตั้งค่าโครงการ</h4>
+          <p>เพิ่มสมาชิก กำหนด Custom Field และเชื่อมโยง Workflow ที่ต้องการ</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3 id="tasks">งานและ Sprint</h3>
+    <p>แต่ละโครงการสามารถแบ่งงานเป็น Sprint ได้ Sprint มีวันเริ่มและสิ้นสุด และมี Burndown Chart ให้ติดตามความคืบหน้า</p>
+
+    <div class="card-grid">
+      <div class="card sky">
+        <div class="card-title">Task Backlog</div>
+        <div class="card-desc">งานที่ยังไม่ได้จัดเข้า Sprint มองเห็นได้ที่ <span class="path">/pm/backlog</span></div>
+      </div>
+      <div class="card sky">
+        <div class="card-title">Sprint Board</div>
+        <div class="card-desc">ดู Sprint ปัจจุบันที่ <span class="path">/pm/sprints</span> พร้อม Burndown Chart</div>
+      </div>
+      <div class="card sky">
+        <div class="card-title">My Tasks</div>
+        <div class="card-desc">งานที่มอบหมายให้คุณดูได้ที่ <span class="path">/pm/tasks</span></div>
+      </div>
+    </div>
+
+    <h3 id="workflows">Workflow อัตโนมัติ</h3>
+    <p>Workflow ช่วยกำหนดกระบวนการทำงานอัตโนมัติ เช่น อนุมัติเอกสาร แจ้งเตือนเมื่องานเสร็จ หรือสร้างงานต่อเนื่องโดยอัตโนมัติ</p>
+
+    <div class="flow">
+      <span class="flow-node start">กำหนด Definition</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">สร้าง Instance</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">กำหนด Human Task</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">ผู้ใช้ดำเนินการ</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node end">เสร็จสิ้น</span>
+    </div>
+
+    <div class="alert tip">
+      <span class="alert-icon">✓</span>
+      <div class="alert-body"><strong>เคล็ดลับ:</strong> Human Task ที่รอดำเนินการจะแสดงใน <span class="path">/pm/inbox</span> ของผู้ใช้ที่ได้รับมอบหมาย</div>
+    </div>
+
+    <h3 id="users-mgmt">จัดการผู้ใช้งาน</h3>
+    <p>เฉพาะ <span class="role admin">tenant-admin</span> เท่านั้นที่เข้าถึง <span class="path">/pm/users</span> ได้</p>
+
+    <table class="doc-table">
+      <thead><tr><th>การกระทำ</th><th>วิธีดำเนินการ</th></tr></thead>
+      <tbody>
+        <tr><td>เชิญผู้ใช้ใหม่</td><td>คลิก "Invite User" → กรอกอีเมล ชื่อ รหัสผ่านชั่วคราว และเลือก Roles</td></tr>
+        <tr><td>แก้ไข Roles</td><td>คลิก "Edit roles" ในแถวผู้ใช้ที่ต้องการ</td></tr>
+        <tr><td>ปิดใช้งานบัญชี</td><td>คลิก "Deactivate" ในแถวผู้ใช้ บัญชีจะถูกระงับทันที</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── 04 MANUFACTURING ── -->
+  <section class="doc-section" id="manufacturing">
+    <div class="section-tag gold">04 — Manufacturing Hub</div>
+    <h2>การผลิต</h2>
+
+    <h3 id="items">รายการสินค้า (Items)</h3>
+    <p>Item คือรายการสินค้าทุกชนิดในระบบ ทั้งวัตถุดิบ ชิ้นส่วน และสินค้าสำเร็จรูป</p>
+
+    <table class="doc-table">
+      <thead><tr><th>ประเภท Item</th><th>ความหมาย</th></tr></thead>
+      <tbody>
+        <tr><td><span class="path">raw</span></td><td>วัตถุดิบ — ซื้อมาจากภายนอก</td></tr>
+        <tr><td><span class="path">component</span></td><td>ชิ้นส่วน — ใช้ประกอบใน BOM</td></tr>
+        <tr><td><span class="path">assembly</span></td><td>ชุดประกอบ — ผลิตจากหลาย Component</td></tr>
+        <tr><td><span class="path">finished</span></td><td>สินค้าสำเร็จรูป — พร้อมขาย</td></tr>
+        <tr><td><span class="path">consumable</span></td><td>วัสดุสิ้นเปลือง</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="bom">BOM และ Routing</h3>
+    <p><strong>BOM (Bill of Materials)</strong> คือสูตรการผลิต ระบุว่าใช้ชิ้นส่วนอะไร จำนวนเท่าใด<br>
+    <strong>Routing</strong> คือลำดับขั้นตอนการผลิต ระบุ Work Center และเวลาที่ใช้ในแต่ละขั้นตอน</p>
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>สร้าง BOM สำหรับ Item</h4>
+          <p>ไปที่ <span class="path">/mfg/bom</span> → เลือก Item → "+ New BOM" → เพิ่ม BOM Lines (ชิ้นส่วนที่ใช้)</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>Activate BOM</h4>
+          <p>BOM ที่สร้างใหม่จะอยู่ในสถานะ Draft กด "Activate" เพื่อเปิดใช้งานกับ Work Order</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <h4>สร้าง Routing</h4>
+          <p>ไปที่ <span class="path">/mfg/routings</span> → เลือก Item → "+ New Routing" → เพิ่ม Operations ตามลำดับ</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3 id="work-orders">Work Orders</h3>
+    <p>Work Order คือคำสั่งผลิต ระบุ Item ที่ต้องผลิต จำนวน วันกำหนดส่ง และ Work Center</p>
+
+    <div class="flow">
+      <span class="flow-node start">planned</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node warn">released</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">in_progress</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node end">completed</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">closed</span>
+    </div>
+
+    <div class="alert warn">
+      <span class="alert-icon">⚠</span>
+      <div class="alert-body"><strong>สำคัญ:</strong> การ Release Work Order ต้องการสิทธิ์ <span class="role mfg">mfg-operator</span> และระบบจะส่ง Notification ให้ทีมโดยอัตโนมัติ</div>
+    </div>
+
+    <h3 id="lots">Lot และการตรวจสอบย้อนหลัง</h3>
+    <p>ระบบรองรับการติดตาม Lot ทุก Lot สามารถดูสายการผลิตย้อนหลัง (Genealogy) และตรวจสอบ Traceability ได้</p>
+
+    <div class="card-grid">
+      <div class="card gold">
+        <div class="card-title">Genealogy</div>
+        <div class="card-desc">แสดงชิ้นส่วน (Component Lots) ที่ใช้ในการผลิต Lot นั้น</div>
+      </div>
+      <div class="card gold">
+        <div class="card-title">Traceability</div>
+        <div class="card-desc">ติดตามว่า Lot นี้ถูกนำไปใช้ที่ไหนบ้าง (Forward) หรือมาจากไหน (Backward)</div>
+      </div>
+    </div>
+
+    <h3 id="mrp">MRP — การวางแผนความต้องการวัสดุ</h3>
+    <p>MRP Run คำนวณความต้องการวัสดุจาก Sales Order, Work Order และ Forecast เพื่อแนะนำว่าควรสั่งซื้อหรือผลิตอะไรเพิ่ม</p>
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>สร้าง MRP Run ใหม่</h4>
+          <p>ไปที่ <span class="path">/mfg/mrp</span> → "+ New Run" → ตั้งชื่อแล้วกด Run</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>ตรวจสอบ Actions</h4>
+          <p>ระบบแสดง Action แนะนำ เช่น "Release WO", "Reschedule", "Cancel" — ตรวจสอบแล้วดำเนินการตามที่เหมาะสม</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3 id="scheduling">ตารางการผลิต (Scheduling Board)</h3>
+    <p>ดูที่ <span class="path">/mfg/scheduling</span> — แสดง Gantt Board แบบ Work Center × วันที่ พร้อม Unscheduled sidebar สำหรับ Work Order ที่ยังไม่ได้กำหนด Work Center</p>
+  </section>
+
+  <!-- ── 05 PROCUREMENT ── -->
+  <section class="doc-section" id="procurement">
+    <div class="section-tag gold">05 — การจัดซื้อ</div>
+    <h2>Supplier และ Purchase Order</h2>
+
+    <h3 id="suppliers">ผู้จัดจำหน่าย (Suppliers)</h3>
+    <p>บริหารข้อมูลผู้จัดจำหน่ายที่ <span class="path">/mfg/suppliers</span> รองรับการค้นหา เพิ่ม แก้ไข และปิดใช้งาน</p>
+
+    <table class="doc-table">
+      <thead><tr><th>ฟิลด์</th><th>คำอธิบาย</th></tr></thead>
+      <tbody>
+        <tr><td>Code</td><td>รหัสผู้จัดจำหน่าย (ต้องไม่ซ้ำในองค์กร)</td></tr>
+        <tr><td>Name</td><td>ชื่อบริษัท/ผู้จัดจำหน่าย</td></tr>
+        <tr><td>Lead Time Days</td><td>ระยะเวลานำ (วัน) ใช้ในการคำนวณ MRP</td></tr>
+        <tr><td>Active</td><td>ปิด/เปิดการใช้งาน — Supplier ที่ปิดไม่สามารถเลือกใน PO ใหม่ได้</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="purchase-orders">ใบสั่งซื้อ (Purchase Orders)</h3>
+    <p>บริหาร PO ที่ <span class="path">/mfg/purchase-orders</span> — หน้าต่างแบ่งซ้าย (รายการ PO) และขวา (รายละเอียด + Line Items)</p>
+
+    <div class="flow">
+      <span class="flow-node start">draft</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">submitted</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node warn">approved</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">partially_received</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node end">received</span>
+    </div>
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>สร้าง PO ใหม่</h4>
+          <p>คลิก "+ New PO" → เลือก Supplier → ระบุวันที่คาดว่าจะรับของ → Create</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>เพิ่ม Line Items</h4>
+          <p>ในหน้ารายละเอียด PO → "+ Add Line" → เลือก Item จำนวน และราคาต่อหน่วย</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <h4>Submit และติดตามสถานะ</h4>
+          <p>กด "Submit" เพื่อส่ง PO ให้ Supplier ระบบจะอัปเดตสถานะเมื่อรับสินค้า</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3 id="inventory">คลังสินค้า</h3>
+    <p>ดูยอดคงเหลือและประวัติการเคลื่อนไหวของสต็อกที่ <span class="path">/mfg/inventory</span></p>
+  </section>
+
+  <!-- ── 06 SALES ── -->
+  <section class="doc-section" id="sales">
+    <div class="section-tag green">06 — การขาย</div>
+    <h2>ลูกค้าและใบสั่งขาย</h2>
+
+    <h3 id="customers">ลูกค้า (Customers)</h3>
+    <p>บริหารข้อมูลลูกค้าที่ <span class="path">/pm/customers</span> รองรับการค้นหา เพิ่ม แก้ไข และปิดใช้งาน</p>
+
+    <div class="alert tip">
+      <span class="alert-icon">✓</span>
+      <div class="alert-body"><strong>เคล็ดลับ:</strong> ฟิลด์ Billing Address ใช้สำหรับออกเอกสาร ควรกรอกให้ครบถ้วน</div>
+    </div>
+
+    <h3 id="sales-orders">ใบสั่งขาย (Sales Orders)</h3>
+    <p>บริหาร SO ที่ <span class="path">/pm/sales-orders</span> — layout เหมือน PO แบ่งซ้าย-ขวา</p>
+
+    <div class="flow">
+      <span class="flow-node start">draft</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node warn">confirmed</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">shipped</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node end">invoiced</span>
+    </div>
+
+    <div class="alert info">
+      <span class="alert-icon">ℹ</span>
+      <div class="alert-body"><strong>การเชื่อมโยงกับ MRP:</strong> SO ที่ Confirmed จะถูกนำไปคำนวณใน MRP Run เพื่อวางแผนการผลิตอัตโนมัติ</div>
+    </div>
+  </section>
+
+  <!-- ── 07 QUALITY ── -->
+  <section class="doc-section" id="quality">
+    <div class="section-tag green">07 — คุณภาพ IATF 16949</div>
+    <h2>การควบคุมคุณภาพ</h2>
+    <p>ระบบรองรับมาตรฐาน IATF 16949 ครบชุด</p>
+
+    <div class="card-grid">
+      <div class="card green">
+        <div class="card-icon">📐</div>
+        <div class="card-title">APQP</div>
+        <div class="card-desc">Advanced Product Quality Planning — วางแผนคุณภาพก่อนเริ่มผลิต</div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">📋</div>
+        <div class="card-title">PPAP</div>
+        <div class="card-desc">Production Part Approval Process — อนุมัติชิ้นส่วนก่อนผลิตจริง</div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">🔍</div>
+        <div class="card-title">FMEA</div>
+        <div class="card-desc">Failure Mode &amp; Effects Analysis — วิเคราะห์ความเสี่ยงกระบวนการผลิต</div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">📊</div>
+        <div class="card-title">Control Plan</div>
+        <div class="card-desc">แผนควบคุมคุณภาพแต่ละจุดในกระบวนการผลิต</div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">⚠️</div>
+        <div class="card-title">NCR / CAPA</div>
+        <div class="card-desc">Non-Conformance Report &amp; Corrective Action — บันทึกและแก้ไขปัญหาคุณภาพ</div>
+      </div>
+      <div class="card green">
+        <div class="card-icon">🔬</div>
+        <div class="card-title">Inspections</div>
+        <div class="card-desc">การตรวจรับสินค้า ตรวจระหว่างผลิต และตรวจก่อนส่ง</div>
+      </div>
+    </div>
+
+    <h3 id="ncr">NCR และ CAPA</h3>
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <h4>เปิด NCR</h4>
+          <p>ไปที่ <span class="path">/mfg/ncrs</span> → "+ New NCR" → ระบุปัญหา ชิ้นส่วนที่เกี่ยวข้อง และความรุนแรง</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <h4>กำหนด Root Cause</h4>
+          <p>วิเคราะห์สาเหตุรากเหง้า (5-Why หรือ Fishbone) และบันทึกลงในระบบ</p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <h4>CAPA Action Plan</h4>
+          <p>กำหนดมาตรการแก้ไข ผู้รับผิดชอบ และวันกำหนดเสร็จ ระบบจะส่ง Reminder อัตโนมัติ</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ── 08 REPORTS ── -->
+  <section class="doc-section" id="reports">
+    <div class="section-tag violet">08 — รายงานและ Dashboard</div>
+    <h2>BI &amp; Dashboard</h2>
+
+    <p>ระบบมี Dashboard Builder ให้สร้าง Dashboard แบบ drag-and-drop ได้เอง ไม่ต้องเขียนโค้ด</p>
+
+    <div class="card-grid">
+      <div class="card violet">
+        <div class="card-title">Reports &amp; BI</div>
+        <div class="card-desc">รายงานสำเร็จรูป เช่น สถานะ Work Order สต็อกคงเหลือ ยอดขาย <span class="path">/pm/reports</span></div>
+      </div>
+      <div class="card violet">
+        <div class="card-title">Dashboard Builder</div>
+        <div class="card-desc">สร้าง Dashboard เองที่ <span class="path">/pm/reports/dashboard</span> เลือก Widget และ Data Source</div>
+      </div>
+    </div>
+
+    <h3 id="audit">Audit Log</h3>
+    <p>ทุกการกระทำในระบบถูกบันทึกไว้ใน Audit Log ดูได้ที่ <span class="path">/pm/audit</span> รองรับการกรองตามผู้ใช้ เวลา และประเภทการกระทำ</p>
+
+    <div class="alert info">
+      <span class="alert-icon">ℹ</span>
+      <div class="alert-body"><strong>ความปลอดภัย:</strong> Audit Log ไม่สามารถแก้ไขหรือลบได้ ข้อมูลถูกเก็บถาวรเพื่อการตรวจสอบ</div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <div style="margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-family:var(--fm);font-size:.65rem;color:var(--muted)">PM Platform · คู่มือผู้ใช้งาน v2026.05</span>
+    <span style="font-family:var(--fm);font-size:.65rem;color:var(--muted)">© 2026 PM Platform. สงวนลิขสิทธิ์</span>
+  </div>
+
+</main>
+</div>
+
+<script>
+// Highlight active sidebar link on scroll
+const links = document.querySelectorAll('.sb-link');
+const sections = document.querySelectorAll('.doc-section, .page-hero');
+function onScroll() {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 120) current = s.id || '';
+  });
+  links.forEach(l => {
+    l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+  });
+}
+window.addEventListener('scroll', onScroll, {passive: true});
+onScroll();
+</script>
+</body>
+</html>

@@ -5,8 +5,8 @@ const SALES_URL = process.env.SALES_URL ?? "http://localhost:8094";
 
 async function makeHeaders(): Promise<Headers | NextResponse> {
   const h = await proxyHeaders();
-  if (h instanceof Headers) return h;
-  return NextResponse.json({ error: h.error }, { status: h.status });
+  if (!(h instanceof Headers)) return NextResponse.json({ error: h.error }, { status: h.status });
+  return h;
 }
 
 export async function GET(req: Request) {
