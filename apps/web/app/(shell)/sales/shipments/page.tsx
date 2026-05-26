@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import {
   listShipments,
@@ -139,6 +140,7 @@ function NewShipmentDialog({
 // ── main page ───────────────────────────────────────────────────────────────
 
 export default function ShipmentsPage() {
+  const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [activeTab, setActiveTab] = useState<ShipmentStatus | "">("");
@@ -252,7 +254,7 @@ export default function ShipmentsPage() {
                   : "—";
 
                 return (
-                  <tr key={s.id} className="hover:bg-zinc-800/40 transition-colors">
+                  <tr key={s.id} className="hover:bg-zinc-800/40 transition-colors cursor-pointer" onClick={() => router.push('/sales/shipments/' + s.id)}>
                     <td className="border border-zinc-700 px-4 py-2 font-mono text-zinc-100">
                       {s.shipmentNumber || s.id.slice(0, 8)}
                     </td>
@@ -272,7 +274,7 @@ export default function ShipmentsPage() {
                     <td className="border border-zinc-700 px-4 py-2 text-zinc-400 font-mono text-xs">
                       {createdDate}
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-center">
+                    <td className="border border-zinc-700 px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                       {nextStatus && actionLabel ? (
                         <button
                           onClick={() => handleAction(s)}
