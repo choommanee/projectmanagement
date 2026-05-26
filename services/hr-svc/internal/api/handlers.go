@@ -57,6 +57,13 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.Get("/employees/{id}", getEmployee(svc))
 		r.With(libauth.RequireAction(authz, "hr.employee.update", "*")).Patch("/employees/{id}", updateEmployee(svc))
 		r.With(libauth.RequireAction(authz, "hr.employee.terminate", "*")).Post("/employees/{id}/terminate", terminateEmployee(svc))
+
+		// Payslips
+		r.Get("/payslips", listPayslips(svc))
+		r.With(libauth.RequireAction(authz, "hr.payslip.create", "*")).Post("/payslips", createPayslip(svc))
+		r.Get("/payslips/{id}", getPayslip(svc))
+		r.With(libauth.RequireAction(authz, "hr.payslip.approve", "*")).Post("/payslips/{id}/approve", approvePayslip(svc))
+		r.With(libauth.RequireAction(authz, "hr.payslip.pay", "*")).Post("/payslips/{id}/mark-paid", markPayslipPaid(svc))
 	})
 
 	return r
@@ -654,6 +661,176 @@ func terminateEmployee(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, e)
+	}
+}
+
+// ---- Payslips ----
+
+type createPayslipReq struct {
+	EmployeeID  string  `json:"employee_id"`
+	PeriodStart string  `json:"period_start"`
+	PeriodEnd   string  `json:"period_end"`
+	BaseSalary  float64 `json:"base_salary"`
+	Allowances  float64 `json:"allowances"`
+	Deductions  float64 `json:"deductions"`
+	Currency    string  `json:"currency"`
+}
+
+func createPayslip(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		var req createPayslipReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		empID, err := uuid.Parse(req.EmployeeID)
+		if err != nil {
+			writeErr(w, 400, errors.New("employee_id must be a valid UUID"))
+			return
+		}
+		periodStart, err := time.Parse("2006-01-02", req.PeriodStart)
+		if err != nil {
+			writeErr(w, 400, errors.New("period_start must be YYYY-MM-DD"))
+			return
+		}
+		periodEnd, err := time.Parse("2006-01-02", req.PeriodEnd)
+		if err != nil {
+			writeErr(w, 400, errors.New("period_end must be YYYY-MM-DD"))
+			return
+		}
+		inp := domain.CreatePayslipInput{
+			EmployeeID:  empID,
+			PeriodStart: periodStart,
+			PeriodEnd:   periodEnd,
+			BaseSalary:  req.BaseSalary,
+			Allowances:  req.Allowances,
+			Deductions:  req.Deductions,
+			Currency:    req.Currency,
+		}
+		ps, err := svc.Payslips.Create(r.Context(), tid, inp)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 201, ps)
+	}
+}
+
+func getPayslip(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		ps, err := svc.Payslips.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, ps)
+	}
+}
+
+func listPayslips(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		var employeeID *uuid.UUID
+		if s := r.URL.Query().Get("employee_id"); s != "" {
+			if id, err := uuid.Parse(s); err == nil {
+				employeeID = &id
+			}
+		}
+		var status *domain.PayslipStatus
+		if s := r.URL.Query().Get("status"); s != "" {
+			v := domain.PayslipStatus(s)
+			status = &v
+		}
+		limit := atoiOr(r.URL.Query().Get("limit"), 100)
+		offset := atoiOr(r.URL.Query().Get("offset"), 0)
+		items, total, err := svc.Payslips.List(r.Context(), tid, employeeID, status, limit, offset)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
+	}
+}
+
+func approvePayslip(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var approvedBy *uuid.UUID
+		if claims, ok := libauth.FromCtx(r.Context()); ok {
+			if uid, err := uuid.Parse(claims.Subject); err == nil {
+				approvedBy = &uid
+			}
+		}
+		if err := svc.Payslips.UpdateStatus(r.Context(), tid, id, domain.PayslipApproved, approvedBy); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		ps, err := svc.Payslips.GetByID(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, ps)
+	}
+}
+
+func markPayslipPaid(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Payslips.UpdateStatus(r.Context(), tid, id, domain.PayslipPaid, nil); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		ps, err := svc.Payslips.GetByID(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, ps)
 	}
 }
 

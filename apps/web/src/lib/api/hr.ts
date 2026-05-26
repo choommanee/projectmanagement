@@ -276,3 +276,103 @@ export async function terminateEmployee(id: string, termination_date: string): P
   if (!r.ok) throw new Error(`terminateEmployee: ${r.status}`);
   return normalizeEmployee(await r.json() as Record<string, unknown>);
 }
+
+// ─── payroll ───────────────────────────────────────────────────────────────
+
+export type PayslipStatus = "draft" | "approved" | "paid";
+
+export interface Payslip {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  base_salary: number;
+  allowances: number;
+  deductions: number;
+  net_pay: number;
+  currency: string;
+  status: PayslipStatus;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function normalizePayslip(r: Record<string, unknown>): Payslip {
+  return {
+    id: String(r.id ?? ""),
+    tenant_id: String(gid(r, "tenantId", "tenant_id") ?? ""),
+    employee_id: String(gid(r, "employeeId", "employee_id") ?? ""),
+    period_start: String(gid(r, "periodStart", "period_start") ?? ""),
+    period_end: String(gid(r, "periodEnd", "period_end") ?? ""),
+    base_salary: Number(gid(r, "baseSalary", "base_salary") ?? 0),
+    allowances: Number(g(r, "allowances") ?? 0),
+    deductions: Number(g(r, "deductions") ?? 0),
+    net_pay: Number(gid(r, "netPay", "net_pay") ?? 0),
+    currency: String(g(r, "currency") ?? "THB"),
+    status: (g(r, "status") ?? "draft") as PayslipStatus,
+    approved_by: (gid(r, "approvedBy", "approved_by") as string | null) ?? null,
+    approved_at: (gid(r, "approvedAt", "approved_at") as string | null) ?? null,
+    paid_at: (gid(r, "paidAt", "paid_at") as string | null) ?? null,
+    created_at: String(gid(r, "createdAt", "created_at") ?? ""),
+    updated_at: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listPayslips(params?: {
+  employee_id?: string;
+  status?: PayslipStatus | "";
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: Payslip[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params?.employee_id) sp.set("employee_id", params.employee_id);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const r = await apiFetch(`${SVC}/payslips${sp.toString() ? `?${sp}` : ""}`);
+  if (!r.ok) throw new Error(`listPayslips: ${r.status}`);
+  const data = await r.json() as unknown;
+  if (Array.isArray(data)) return { items: (data as Record<string, unknown>[]).map(normalizePayslip), total: data.length };
+  const obj = data as Record<string, unknown>;
+  const items = Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]).map(normalizePayslip) : [];
+  return { items, total: Number(obj.total ?? items.length) };
+}
+
+export async function createPayslip(input: {
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  base_salary: number;
+  allowances: number;
+  deductions: number;
+  currency?: string;
+}): Promise<Payslip> {
+  const r = await apiFetch(`${SVC}/payslips`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`createPayslip: ${r.status}`);
+  return normalizePayslip(await r.json() as Record<string, unknown>);
+}
+
+export async function getPayslip(id: string): Promise<Payslip> {
+  const r = await apiFetch(`${SVC}/payslips/${id}`);
+  if (!r.ok) throw new Error(`getPayslip: ${r.status}`);
+  return normalizePayslip(await r.json() as Record<string, unknown>);
+}
+
+export async function approvePayslip(id: string): Promise<Payslip> {
+  const r = await apiFetch(`${SVC}/payslips/${id}/approve`, { method: "POST" });
+  if (!r.ok) throw new Error(`approvePayslip: ${r.status}`);
+  return normalizePayslip(await r.json() as Record<string, unknown>);
+}
+
+export async function markPayslipPaid(id: string): Promise<Payslip> {
+  const r = await apiFetch(`${SVC}/payslips/${id}/mark-paid`, { method: "POST" });
+  if (!r.ok) throw new Error(`markPayslipPaid: ${r.status}`);
+  return normalizePayslip(await r.json() as Record<string, unknown>);
+}

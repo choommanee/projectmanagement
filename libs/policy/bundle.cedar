@@ -602,3 +602,20 @@ when {
   context.roles.contains("tenant-admin") ||
   context.roles.contains("project-manager")
 };
+
+// Payroll: only tenant-admin and platform-admin may create, approve, or pay
+// payslips. platform-admin is already covered by the super-permit at the top,
+// but these explicit blocks document the intent and satisfy RequireAction checks.
+permit (
+  principal,
+  action in [
+    Action::"hr.payslip.create",
+    Action::"hr.payslip.approve",
+    Action::"hr.payslip.pay"
+  ],
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("platform-admin")
+};

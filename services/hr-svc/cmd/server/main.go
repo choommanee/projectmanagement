@@ -42,8 +42,9 @@ func main() {
 	depts := store.NewDepartmentStore(p)
 	positions := store.NewPositionStore(p)
 	employees := store.NewEmployeeStore(p)
+	payslips := store.NewPayslipStore(p)
 
-	svc := service.New(depts, positions, employees)
+	svc := service.New(depts, positions, employees, payslips)
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

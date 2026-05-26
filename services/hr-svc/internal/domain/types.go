@@ -69,3 +69,52 @@ type Employee struct {
 	UpdatedAt       time.Time
 	Version         int
 }
+
+// ---- Payroll ----
+
+type PayslipStatus string
+
+const (
+	PayslipDraft    PayslipStatus = "draft"
+	PayslipApproved PayslipStatus = "approved"
+	PayslipPaid     PayslipStatus = "paid"
+)
+
+type PayGrade struct {
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Name      string    `json:"name"`
+	MinSalary float64   `json:"min_salary"`
+	MaxSalary float64   `json:"max_salary"`
+	Currency  string    `json:"currency"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Payslip struct {
+	ID          uuid.UUID     `json:"id"`
+	TenantID    uuid.UUID     `json:"tenant_id"`
+	EmployeeID  uuid.UUID     `json:"employee_id"`
+	PeriodStart time.Time     `json:"period_start"`
+	PeriodEnd   time.Time     `json:"period_end"`
+	BaseSalary  float64       `json:"base_salary"`
+	Allowances  float64       `json:"allowances"`
+	Deductions  float64       `json:"deductions"`
+	NetPay      float64       `json:"net_pay"`
+	Currency    string        `json:"currency"`
+	Status      PayslipStatus `json:"status"`
+	ApprovedBy  *uuid.UUID    `json:"approved_by,omitempty"`
+	ApprovedAt  *time.Time    `json:"approved_at,omitempty"`
+	PaidAt      *time.Time    `json:"paid_at,omitempty"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+}
+
+type CreatePayslipInput struct {
+	EmployeeID  uuid.UUID `json:"employee_id"`
+	PeriodStart time.Time `json:"period_start"`
+	PeriodEnd   time.Time `json:"period_end"`
+	BaseSalary  float64   `json:"base_salary"`
+	Allowances  float64   `json:"allowances"`
+	Deductions  float64   `json:"deductions"`
+	Currency    string    `json:"currency"`
+}

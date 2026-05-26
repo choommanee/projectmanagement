@@ -9,12 +9,14 @@ type Service struct {
 	Departments *store.DepartmentStore
 	Positions   *store.PositionStore
 	Employees   *store.EmployeeStore
+	Payslips    *store.PayslipStore
 }
 
-func New(depts *store.DepartmentStore, positions *store.PositionStore, employees *store.EmployeeStore) *Service {
+func New(depts *store.DepartmentStore, positions *store.PositionStore, employees *store.EmployeeStore, payslips *store.PayslipStore) *Service {
 	return &Service{
 		Departments: depts,
 		Positions:   positions,
 		Employees:   employees,
+		Payslips:    payslips,
 	}
 }

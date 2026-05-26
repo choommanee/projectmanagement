@@ -107,9 +107,10 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "org", name: "Organization", groups: [
         { id: "o1", name: "Structure", subareas: [
-          { id: "depts", name: "Departments", href: "/hr/departments", icon: "people"  },
-          { id: "pos",   name: "Positions",   href: "/hr/positions",   icon: "people"  },
-          { id: "emps",  name: "Employees",   href: "/hr/employees",   icon: "people"  },
+          { id: "depts",   name: "Departments", href: "/hr/departments", icon: "people"  },
+          { id: "pos",     name: "Positions",   href: "/hr/positions",   icon: "people"  },
+          { id: "emps",    name: "Employees",   href: "/hr/employees",   icon: "people"  },
+          { id: "payroll", name: "Payroll",     href: "/hr/payroll",     icon: "tasks"   },
         ]},
       ]},
     ],
