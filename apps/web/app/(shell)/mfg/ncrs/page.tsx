@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Tag } from "@pmplatform/ui-kit";
@@ -329,6 +330,7 @@ function NcrDetailPane({ ncr, itemMap, onClose, onUpdated }: {
 }
 
 export default function NcrsPage() {
+  const router = useRouter();
   const [ncrs, setNcrs] = useState<NCR[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -398,7 +400,7 @@ export default function NcrsPage() {
               {ncrs.map(n => {
                 const item = itemMap.get(n.itemId);
                 return (
-                  <tr key={n.id} onClick={() => setSelected(n)}
+                  <tr key={n.id} onClick={() => router.push('/quality/ncrs/' + n.id)}
                     className="cursor-pointer border-b border-line hover:bg-surface-2">
                     <td className="px-4 py-2 font-mono text-xs text-ink-3">{n.id.slice(0, 8)}</td>
                     <td className="px-4 py-2">
