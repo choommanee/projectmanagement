@@ -331,6 +331,12 @@ export async function listInvoices(params?: {
   return { items, total: Number(obj.total ?? items.length) };
 }
 
+export async function getInvoice(id: string): Promise<Invoice> {
+  const r = await apiFetch(`${SVC}/invoices/${id}`);
+  if (!r.ok) throw new Error(`getInvoice: ${r.status}`);
+  return normalizeInvoice(await r.json() as Record<string, unknown>);
+}
+
 export async function createInvoice(input: {
   inv_type: InvType;
   counterparty: string;

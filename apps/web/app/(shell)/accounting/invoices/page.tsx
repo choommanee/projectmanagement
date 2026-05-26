@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -134,6 +135,7 @@ function InvoiceDialog({
 }
 
 export default function InvoicesPage() {
+  const router = useRouter();
   const [invType, setInvType] = useState<InvType>("AR");
   const [statusFilter, setStatusFilter] = useState<InvStatus | "">("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -240,7 +242,7 @@ export default function InvoicesPage() {
             </thead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-line hover:bg-surface-2">
+                <tr key={inv.id} className="border-b border-line hover:bg-surface-2 cursor-pointer" onClick={() => router.push('/accounting/invoices/' + inv.id)}>
                   <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{inv.invNo || inv.id.slice(0, 8)}</td>
                   <td className="px-4 py-2 font-medium text-ink">{inv.counterparty}</td>
                   <td className="px-4 py-2 text-right font-mono text-xs text-ink">
@@ -256,7 +258,7 @@ export default function InvoicesPage() {
                   <td className="px-4 py-2 text-xs text-ink-2">
                     {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       {inv.status === "draft" && (
                         <button
