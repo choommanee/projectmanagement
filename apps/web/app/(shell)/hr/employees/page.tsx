@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -233,6 +234,7 @@ function TerminateDialog({
 }
 
 export default function EmployeesPage() {
+  const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -340,7 +342,7 @@ export default function EmployeesPage() {
                 const dept = emp.departmentId ? deptMap.get(emp.departmentId) : null;
                 const pos = emp.positionId ? posMap.get(emp.positionId) : null;
                 return (
-                  <tr key={emp.id} className="border-b border-line hover:bg-surface-2">
+                  <tr key={emp.id} onClick={() => router.push('/hr/employees/' + emp.id)} className="cursor-pointer border-b border-line hover:bg-surface-2">
                     <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{emp.empNo}</td>
                     <td className="px-4 py-2 font-medium text-ink">
                       {emp.firstName} {emp.lastName}
