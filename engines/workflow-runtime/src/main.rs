@@ -6,7 +6,7 @@ async fn main() {
                 .add_directive(tracing::Level::INFO.into()),
         )
         .init();
-    let port = std::env::var("PORT").unwrap_or_else(|_| "8090".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "19090".to_string());
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     tracing::info!("workflow-runtime listening on {}", addr);
