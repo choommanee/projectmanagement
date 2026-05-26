@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
@@ -158,6 +159,7 @@ function NewTrainingDialog({
 }
 
 export default function HRTrainingPage() {
+  const router = useRouter();
   const [records, setRecords] = useState<TrainingRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,7 +250,8 @@ export default function HRTrainingPage() {
                   return (
                     <tr
                       key={rec.id}
-                      className={`hover:bg-surface-2/50 ${expiring ? "bg-warning/5" : ""}`}
+                      onClick={() => router.push('/hr/training/' + rec.id)}
+                      className={`hover:bg-surface-2/50 cursor-pointer ${expiring ? "bg-warning/5" : ""}`}
                     >
                       <td className="px-4 py-2 font-medium">
                         {rec.employee_name ?? rec.employee_id}

@@ -531,6 +531,12 @@ export async function listTrainingRecords(params?: { employee_id?: string; statu
   return Array.isArray(d) ? (d as TrainingRecord[]) : ((d as Record<string, unknown>)?.records as TrainingRecord[] ?? []);
 }
 
+export async function getTrainingRecord(id: string): Promise<TrainingRecord> {
+  const r = await apiFetch(`${SVC}/training/${id}`);
+  if (!r.ok) throw new Error(`getTrainingRecord: ${r.status}`);
+  return r.json() as Promise<TrainingRecord>;
+}
+
 export async function createTrainingRecord(body: Omit<TrainingRecord, "id" | "employee_name">): Promise<TrainingRecord> {
   const r = await apiFetch(`${SVC}/training`, {
     method: "POST",
