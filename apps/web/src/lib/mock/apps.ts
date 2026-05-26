@@ -151,6 +151,7 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "crm", name: "CRM", groups: [
         { id: "c1", name: "Accounts", subareas: [
+          { id: "quotations",   name: "Quotations",   href: "/sales/quotations",   icon: "tasks"  },
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
         ]},

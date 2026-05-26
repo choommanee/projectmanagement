@@ -164,3 +164,49 @@ export async function addSOLine(soId: string, line: { item_id?: string; item_des
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `addSOLine failed: ${r.status}`); }
   return normSOLine(await r.json());
 }
+
+// ─── Quotations ────────────────────────────────────────────────────────────
+
+export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
+
+export interface Quote {
+  id: string;
+  code?: string;
+  customer_id: string;
+  customer_name?: string;
+  title?: string;
+  valid_until?: string;
+  status: QuoteStatus;
+  total_amount?: number;
+  notes?: string;
+  created_at?: string;
+}
+
+export async function listQuotes(params?: { status?: string; customer_id?: string }): Promise<Quote[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.customer_id) q.set("customer_id", params.customer_id);
+  const r = await apiFetch(`${SVC}/quotations?${q}`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return Array.isArray(d) ? d : d?.quotes ?? [];
+}
+
+export async function createQuote(body: Omit<Quote, "id" | "code" | "customer_name">): Promise<Quote> {
+  const r = await apiFetch("/api/sales/quotations", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+  const r = await apiFetch(`/api/sales/quotations/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
