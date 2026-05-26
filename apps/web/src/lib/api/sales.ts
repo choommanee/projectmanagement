@@ -273,3 +273,57 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
   });
   if (!r.ok) throw new Error(await r.text());
 }
+
+// ─── Shipments ─────────────────────────────────────────────────────────────
+
+export type ShipmentStatus = "pending" | "packed" | "shipped" | "delivered" | "returned";
+
+export interface Shipment {
+  id: string;
+  shipmentNumber: string;
+  soId: string;
+  soNumber?: string;
+  customerId?: string;
+  customerName?: string;
+  status: ShipmentStatus;
+  createdAt: string;
+  updatedAt?: string;
+  notes?: string;
+}
+
+function normShipment(r: Record<string, unknown>): Shipment {
+  return {
+    id: String(g(r, "id") ?? r["ID"] ?? ""),
+    shipmentNumber: String(gid(r, "shipmentNumber", "shipment_number") ?? r["ShipmentNumber"] ?? ""),
+    soId: String(gid(r, "soId", "so_id") ?? r["SOID"] ?? r["SoID"] ?? ""),
+    soNumber: String(gid(r, "soNumber", "so_number") ?? r["SONumber"] ?? ""),
+    customerId: String(gid(r, "customerId", "customer_id") ?? r["CustomerID"] ?? ""),
+    customerName: String(gid(r, "customerName", "customer_name") ?? r["CustomerName"] ?? ""),
+    status: (g(r, "status") ?? "pending") as ShipmentStatus,
+    createdAt: String(gid(r, "createdAt", "created_at") ?? r["CreatedAt"] ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? r["UpdatedAt"] ?? ""),
+    notes: String(g(r, "notes") ?? ""),
+  };
+}
+
+export async function listShipments(params: { status?: string; limit?: number; offset?: number } = {}): Promise<{ items: Shipment[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  qs.set("limit", String(params.limit ?? 50));
+  qs.set("offset", String(params.offset ?? 0));
+  const r = await apiFetch(`${SVC}/shipments?${qs}`);
+  if (!r.ok) throw new Error(`listShipments failed: ${r.status}`);
+  const body = await r.json();
+  return { items: ((body.items ?? body ?? []) as Record<string, unknown>[]).map(normShipment), total: body.total ?? 0 };
+}
+
+export async function createShipment(input: { so_id: string; notes?: string }): Promise<Shipment> {
+  const r = await apiFetch(`${SVC}/shipments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createShipment failed: ${r.status}`); }
+  return normShipment(await r.json());
+}
+
+export async function updateShipmentStatus(id: string, status: ShipmentStatus): Promise<void> {
+  const r = await apiFetch(`${SVC}/shipments/${id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateShipmentStatus failed: ${r.status}`); }
+}
