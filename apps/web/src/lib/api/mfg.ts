@@ -1105,3 +1105,88 @@ export async function receivePO(poId: string, body: { lines: Array<{ line_id: st
   });
   if (!r.ok) throw new Error(await r.text());
 }
+
+// ─── RFQ ─────────────────────────────────────────────────────────────────────
+
+export type RFQStatus = "draft" | "sent" | "received" | "closed";
+
+export interface RFQLine {
+  id: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  qtyRequested: number;
+  quotedPrice: number | null;
+  quotedLeadDays: number | null;
+  notes: string;
+}
+
+export interface RFQ {
+  id: string;
+  rfqNumber: string;
+  supplierId: string;
+  supplierName: string;
+  status: RFQStatus;
+  sentAt: string | null;
+  responseDeadline: string | null;
+  lines: RFQLine[];
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normRFQLine(r: Record<string, unknown>): RFQLine {
+  return {
+    id: String(r.id ?? ""),
+    itemId: String(gid(r, "itemId", "item_id") ?? ""),
+    itemCode: String(gid(r, "itemCode", "item_code") ?? ""),
+    itemName: String(gid(r, "itemName", "item_name") ?? ""),
+    qtyRequested: Number(gid(r, "qtyRequested", "qty_requested") ?? 0),
+    quotedPrice: (gid(r, "quotedPrice", "quoted_price") as number | null) ?? null,
+    quotedLeadDays: (gid(r, "quotedLeadDays", "quoted_lead_days") as number | null) ?? null,
+    notes: String(g(r, "notes") ?? ""),
+  };
+}
+
+function normRFQ(r: Record<string, unknown>): RFQ {
+  return {
+    id: String(r.id ?? ""),
+    rfqNumber: String(gid(r, "rfqNumber", "rfq_number") ?? r["RFQNumber"] ?? ""),
+    supplierId: String(gid(r, "supplierId", "supplier_id") ?? r["SupplierID"] ?? ""),
+    supplierName: String(gid(r, "supplierName", "supplier_name") ?? ""),
+    status: (g(r, "status") ?? "draft") as RFQStatus,
+    sentAt: (gid(r, "sentAt", "sent_at") as string | null) ?? null,
+    responseDeadline: (gid(r, "responseDeadline", "response_deadline") as string | null) ?? null,
+    lines: Array.isArray(r.lines) ? (r.lines as Record<string, unknown>[]).map(normRFQLine) : [],
+    notes: String(g(r, "notes") ?? ""),
+    createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listRFQs(params: { status?: RFQStatus; limit?: number; offset?: number } = {}): Promise<{ items: RFQ[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params.status) sp.set("status", params.status);
+  if (params.limit) sp.set("limit", String(params.limit));
+  if (params.offset) sp.set("offset", String(params.offset));
+  const r = await apiFetch(`${SVC}/rfqs?${sp}`);
+  if (!r.ok) throw new Error(`listRFQs failed: ${r.status}`);
+  const body = await r.json() as Record<string, unknown>;
+  return { items: ((body.items ?? body ?? []) as Record<string, unknown>[]).map(normRFQ), total: Number(body.total ?? 0) };
+}
+
+export async function createRFQ(input: { supplier_id: string; response_deadline?: string; notes?: string }): Promise<RFQ> {
+  const r = await apiFetch(`${SVC}/rfqs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createRFQ failed: ${r.status}`); }
+  return normRFQ(await r.json());
+}
+
+export async function sendRFQ(id: string): Promise<RFQ> {
+  const r = await apiFetch(`${SVC}/rfqs/${id}/send`, { method: "POST" });
+  if (!r.ok) throw new Error(`sendRFQ failed: ${r.status}`);
+  return normRFQ(await r.json());
+}
