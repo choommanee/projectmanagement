@@ -19,30 +19,37 @@ function relTime(iso: string): string {
 
 export default function PMHome() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [activeProjectsTotal, setActiveProjectsTotal] = useState(0);
   const [openCount, setOpenCount] = useState(0);
   const [inProgressCount, setInProgressCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
+  const [blockedCount, setBlockedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       listProjects({ limit: 100 }),
+      listProjects({ status: "active", limit: 1 }),
       listAllTasks({ status: "todo", limit: 200 }),
       listAllTasks({ status: "in_progress", limit: 200 }),
       listAllTasks({ status: "done", limit: 200 }),
+      listAllTasks({ status: "blocked", limit: 1 }),
     ])
-      .then(([p, open, inProg, done]) => {
+      .then(([p, activeP, open, inProg, done, blocked]) => {
         setProjects(p.items);
+        setTotalProjects(p.total);
+        setActiveProjectsTotal(activeP.total);
         setOpenCount(open.total);
         setInProgressCount(inProg.total);
         setDoneCount(done.total);
+        setBlockedCount(blocked.total);
       })
       .catch((e: unknown) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, []);
 
-  const activeProjects = projects.filter(p => p.status === "active");
   const totalTasks = openCount + inProgressCount + doneCount;
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
   const recent5 = [...projects]
@@ -55,26 +62,34 @@ export default function PMHome() {
     widgets: [
       {
         id: "k1", kind: "kpi", x: 0, y: 0, w: 3, h: 2,
-        config: { title: "Active Projects", value: activeProjects.length, sub: "projects", spark: Array(7).fill(activeProjects.length) },
+        config: { title: "Total Projects", value: totalProjects, sub: "all projects", spark: Array(7).fill(totalProjects) },
       },
       {
         id: "k2", kind: "kpi", x: 3, y: 0, w: 3, h: 2,
-        config: { title: "Open Tasks", value: openCount, sub: "needs attention", spark: Array(7).fill(openCount) },
+        config: { title: "Active Projects", value: activeProjectsTotal, sub: "in execution", spark: Array(7).fill(activeProjectsTotal) },
       },
       {
         id: "k3", kind: "kpi", x: 6, y: 0, w: 3, h: 2,
-        config: { title: "In Progress", value: inProgressCount, sub: "active work", spark: Array(7).fill(inProgressCount) },
+        config: { title: "Open Tasks", value: openCount, sub: "needs attention", spark: Array(7).fill(openCount) },
       },
       {
         id: "k4", kind: "kpi", x: 9, y: 0, w: 3, h: 2,
+        config: { title: "In Progress", value: inProgressCount, sub: "active work", spark: Array(7).fill(inProgressCount) },
+      },
+      {
+        id: "k5", kind: "kpi", x: 0, y: 2, w: 3, h: 2,
+        config: { title: "Blocked Tasks", value: blockedCount, sub: "needs unblocking", spark: Array(7).fill(blockedCount) },
+      },
+      {
+        id: "k6", kind: "kpi", x: 3, y: 2, w: 3, h: 2,
         config: { title: "Completion", value: `${completionPct}%`, sub: "of all tasks", spark: Array(7).fill(completionPct) },
       },
       {
-        id: "c1", kind: "chart", x: 0, y: 2, w: 8, h: 4,
+        id: "c1", kind: "chart", x: 0, y: 4, w: 8, h: 4,
         config: { title: "Task Status Distribution" },
       },
       {
-        id: "l1", kind: "list", x: 8, y: 2, w: 4, h: 4,
+        id: "l1", kind: "list", x: 8, y: 4, w: 4, h: 4,
         config: {
           title: "Recently Updated Projects",
           items: recent5.map(p => ({ label: p.name, meta: relTime(p.updatedAt) })),

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { DashboardGrid } from "@/primitives/dashboard/DashboardGrid";
 import type { DashboardDef } from "@/primitives/dashboard/dashboard.types";
-import { listWorkOrders, type WorkOrder } from "@/lib/api/mfg";
+import { listWorkOrders, listItems, listLots, listSuppliers, type WorkOrder } from "@/lib/api/mfg";
 import { listNCRs } from "@/lib/api/quality";
 
 function relTime(iso: string): string {
@@ -18,6 +18,9 @@ export default function MfgHome() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [openNcrs, setOpenNcrs] = useState<number | null>(null);
+  const [totalItems, setTotalItems] = useState<number | null>(null);
+  const [quarantineLots, setQuarantineLots] = useState<number | null>(null);
+  const [activeSuppliers, setActiveSuppliers] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +29,17 @@ export default function MfgHome() {
       listWorkOrders({ limit: 200 }),
       listWorkOrders({ status: "completed", limit: 200 }),
       listNCRs({ status: "open", limit: 200 }).catch(() => null),
+      listItems({ limit: 1 }).catch(() => null),
+      listLots({ status: "quarantine", limit: 1 }).catch(() => null),
+      listSuppliers().catch(() => null),
     ])
-      .then(([all, completed, ncrs]) => {
+      .then(([all, completed, ncrs, items, qLots, suppliers]) => {
         setWorkOrders(all.items);
         setCompletedCount(completed.total);
         setOpenNcrs(ncrs ? ncrs.length : null);
+        setTotalItems(items ? items.total : null);
+        setQuarantineLots(qLots ? qLots.total : null);
+        setActiveSuppliers(suppliers ? suppliers.filter(s => s.active).length : null);
       })
       .catch((e: unknown) => setError((e as Error).message))
       .finally(() => setLoading(false));
@@ -65,11 +74,23 @@ export default function MfgHome() {
         config: { title: "Open NCRs", value: openNcrs !== null ? openNcrs : "—", sub: "needs CAPA", spark: openNcrs !== null ? Array(7).fill(openNcrs) : Array(7).fill(0) },
       },
       {
-        id: "c1", kind: "chart", x: 0, y: 2, w: 8, h: 4,
+        id: "k5", kind: "kpi", x: 0, y: 2, w: 3, h: 2,
+        config: { title: "Total Items", value: totalItems !== null ? totalItems : "—", sub: "catalog entries", spark: totalItems !== null ? Array(7).fill(totalItems) : Array(7).fill(0) },
+      },
+      {
+        id: "k6", kind: "kpi", x: 3, y: 2, w: 3, h: 2,
+        config: { title: "Lots in Quarantine", value: quarantineLots !== null ? quarantineLots : "—", sub: "hold / quarantine", spark: quarantineLots !== null ? Array(7).fill(quarantineLots) : Array(7).fill(0) },
+      },
+      {
+        id: "k7", kind: "kpi", x: 6, y: 2, w: 3, h: 2,
+        config: { title: "Active Suppliers", value: activeSuppliers !== null ? activeSuppliers : "—", sub: "approved vendors", spark: activeSuppliers !== null ? Array(7).fill(activeSuppliers) : Array(7).fill(0) },
+      },
+      {
+        id: "c1", kind: "chart", x: 0, y: 4, w: 8, h: 4,
         config: { title: "Production by Work Center" },
       },
       {
-        id: "l1", kind: "list", x: 8, y: 2, w: 4, h: 4,
+        id: "l1", kind: "list", x: 8, y: 4, w: 4, h: 4,
         config: {
           title: "Recent Work Orders",
           items: recent5.map(wo => ({ label: wo.code, meta: `${wo.status} · ${relTime(wo.updatedAt)}` })),
