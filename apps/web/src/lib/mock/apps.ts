@@ -33,6 +33,7 @@ export const mockApps: AppDef[] = [
           { id: "reports",       name: "Reports & BI",     href: "/pm/reports",         icon: "dashboard" },
           { id: "dash-builder",  name: "Dashboard Builder",href: "/pm/reports/dashboard", icon: "dashboard" },
           { id: "integration",   name: "Order Integration", href: "/pm/integration",       icon: "workflow"  },
+          { id: "notif-prefs",   name: "Notifications",     href: "/pm/notifications",     icon: "settings"  },
         ]},
       ]},
     ],
@@ -147,6 +148,23 @@ export const mockApps: AppDef[] = [
         { id: "c1", name: "Accounts", subareas: [
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
+        ]},
+      ]},
+    ],
+  },
+  {
+    id: "docs", name: "Document Hub",
+    areas: [
+      { id: "home", name: "Home", groups: [
+        { id: "h1", name: "Overview", subareas: [
+          { id: "dash", name: "Dashboard", href: "/docs/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "content", name: "Content", groups: [
+        { id: "c1", name: "Documents", subareas: [
+          { id: "all-docs",   name: "All Documents",  href: "/docs/documents",  icon: "tasks"  },
+          { id: "workspaces", name: "Workspaces",     href: "/docs/workspaces", icon: "folder" },
+          { id: "templates",  name: "Templates",      href: "/docs/templates",  icon: "tasks"  },
         ]},
       ]},
     ],

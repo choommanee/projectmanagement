@@ -9,6 +9,7 @@ import {
   Package,
   TrendingUp,
   ShieldCheck,
+  FileText,
   LayoutGrid,
   ChevronDown,
   type LucideIcon,
@@ -23,6 +24,7 @@ const APP_ICONS: Record<string, LucideIcon> = {
   hr:          Users,
   procurement: Package,
   sales:       TrendingUp,
+  docs:        FileText,
   quality:     ShieldCheck,
 };
 

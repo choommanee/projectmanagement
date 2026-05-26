@@ -166,6 +166,16 @@ function normTemplate(r: Record<string, unknown>): Template {
 }
 
 // Workspaces
+export async function listAllWorkspaces(params?: { kind?: WorkspaceKind; limit?: number; offset?: number }): Promise<{ items: Workspace[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined) qs.set(k, String(v));
+  const r = await fetch(`/api/workspaces?${qs}`);
+  if (!r.ok) throw new Error(`list all ws failed: ${r.status}`);
+  const body = await r.json();
+  const arr = (body.items ?? body) as Record<string, unknown>[] | null;
+  return { items: (arr ?? []).map(normWs), total: body.total ?? (arr ?? []).length };
+}
+
 export async function listWorkspaces(projectId: string): Promise<Workspace[]> {
   const r = await fetch(`/api/workspaces?project_id=${projectId}`);
   if (!r.ok) throw new Error(`list ws failed: ${r.status}`);
