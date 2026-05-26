@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
@@ -136,6 +137,7 @@ function NewInvoiceDialog({
 }
 
 export default function SalesInvoicesPage() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,7 +231,7 @@ export default function SalesInvoicesPage() {
                 </tr>
               ) : (
                 invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-surface-2/50">
+                  <tr key={inv.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/sales/invoices/' + inv.id)}>
                     <td className="px-4 py-2 font-mono text-xs">{inv.code ?? inv.id.slice(0, 8)}</td>
                     <td className="px-4 py-2 font-medium">
                       {inv.customer_name ?? inv.customer_id}
@@ -248,7 +250,7 @@ export default function SalesInvoicesPage() {
                         {inv.status}
                       </Tag>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
                         {inv.status === "draft" && (
                           <Button

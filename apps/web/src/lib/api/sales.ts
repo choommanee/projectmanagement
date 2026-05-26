@@ -292,6 +292,12 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
   if (!r.ok) throw new Error(await r.text());
 }
 
+export async function getSalesInvoice(id: string): Promise<SalesInvoice> {
+  const r = await apiFetch(`${SVC}/invoices/${id}`);
+  if (!r.ok) throw new Error(`getSalesInvoice: ${r.status}`);
+  return r.json();
+}
+
 // ─── Shipments ─────────────────────────────────────────────────────────────
 
 export type ShipmentStatus = "pending" | "packed" | "shipped" | "delivered" | "returned";
@@ -344,6 +350,12 @@ export async function createShipment(input: { so_id: string; notes?: string }): 
 export async function updateShipmentStatus(id: string, status: ShipmentStatus): Promise<void> {
   const r = await apiFetch(`${SVC}/shipments/${id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateShipmentStatus failed: ${r.status}`); }
+}
+
+export async function getShipment(id: string): Promise<Shipment> {
+  const r = await apiFetch(`${SVC}/shipments/${id}`);
+  if (!r.ok) throw new Error(`getShipment: ${r.status}`);
+  return normShipment(await r.json());
 }
 
 // ─── CRM Pipeline ──────────────────────────────────────────────────────────
