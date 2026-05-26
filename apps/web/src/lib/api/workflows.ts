@@ -383,6 +383,25 @@ export async function resumeInstance(
   return normInstance(await r.json());
 }
 
+export async function listAllInstances(params?: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: WorkflowInstance[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.limit != null) qs.set("limit", String(params.limit));
+  if (params?.offset != null) qs.set("offset", String(params.offset));
+  const r = await apiFetch(`${SVC}/instances?${qs}`);
+  if (!r.ok) throw new Error(`listAllInstances failed: ${r.status}`);
+  const body = await r.json();
+  const arr = (body.items ?? body.instances ?? body ?? []) as Record<string, unknown>[];
+  return {
+    items: Array.isArray(arr) ? arr.map(normInstance) : [],
+    total: Number(body.total ?? body.Total ?? arr.length),
+  };
+}
+
 export async function cancelInstance(id: string): Promise<void> {
   const r = await apiFetch(`${SVC}/instances/${id}/cancel`, {
     method: "POST",

@@ -6,7 +6,7 @@ import { Button, Tag, TextArea } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import {
-  listHumanTasks, completeHumanTask, getInstance,
+  listHumanTasks, completeHumanTask, getInstance, listAllInstances,
   type HumanTask, type WorkflowInstance,
 } from "@/lib/api/workflows";
 import { useAuth } from "@/lib/auth/AuthProvider";
@@ -18,14 +18,11 @@ function fmtDate(d?: string | null) {
   return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function readUserMeta(): { id?: string } {
-  try {
-    const raw = document.cookie.split(";").find((c) => c.trim().startsWith("user_meta="))?.split("=")[1];
-    if (!raw) return {};
-    return JSON.parse(atob(raw));
-  } catch {
-    return {};
-  }
+function instanceStatusTone(s: string): "neutral" | "info" | "success" | "danger" {
+  if (s === "running") return "info";
+  if (s === "completed") return "success";
+  if (s === "failed") return "danger";
+  return "neutral";
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -188,8 +185,10 @@ function CompleteSheet({ task, instanceInfo, onClose, onCompleted }: CompleteShe
 
 export default function InboxPage() {
   const { user } = useAuth();
+  const [tab, setTab] = useState<"tasks" | "instances">("tasks");
   const [tasks, setTasks] = useState<HumanTask[]>([]);
   const [total, setTotal] = useState(0);
+  const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [myTasksOnly, setMyTasksOnly] = useState(false);
@@ -208,9 +207,17 @@ export default function InboxPage() {
       if (myTasksOnly && user?.id) {
         params.assignee_id = user.id;
       }
-      const { items, total: t } = await listHumanTasks(params);
-      setTasks(items);
-      setTotal(t);
+      const [taskResult, instanceResult] = await Promise.allSettled([
+        listHumanTasks(params),
+        listAllInstances({ limit: 100 }),
+      ]);
+      if (taskResult.status === "fulfilled") {
+        setTasks(taskResult.value.items);
+        setTotal(taskResult.value.total);
+      }
+      if (instanceResult.status === "fulfilled") {
+        setInstances(instanceResult.value.items);
+      }
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, [myTasksOnly, user]);
@@ -252,88 +259,161 @@ export default function InboxPage() {
             {error}
           </div>
         )}
-        {/* Filter toggle */}
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex rounded-md border border-line overflow-hidden text-xs">
+
+        {/* Tab bar */}
+        <div className="mb-4 flex gap-1 border-b border-line">
+          {([
+            { key: "tasks" as const,     label: `My Tasks (${total})` },
+            { key: "instances" as const, label: `All Instances (${instances.length})` },
+          ]).map(({ key, label }) => (
             <button
+              key={key}
               type="button"
-              onClick={() => setMyTasksOnly(false)}
-              className={`px-3 py-1.5 font-medium transition-colors
-                ${!myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
+              onClick={() => setTab(key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                tab === key
+                  ? "border-accent text-accent"
+                  : "border-transparent text-ink-3 hover:text-ink"
+              }`}
             >
-              All Open Tasks
+              {label}
             </button>
-            <button
-              type="button"
-              onClick={() => setMyTasksOnly(true)}
-              className={`px-3 py-1.5 font-medium transition-colors border-l border-line
-                ${myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
-            >
-              My Tasks
-            </button>
-          </div>
-          <span className="text-xs text-ink-3">{total} open task{total !== 1 ? "s" : ""}</span>
+          ))}
         </div>
 
-        {loading && (
-          <div className="space-y-px">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
-            ))}
-          </div>
+        {tab === "tasks" && (
+          <>
+            {/* Filter toggle */}
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex rounded-md border border-line overflow-hidden text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMyTasksOnly(false)}
+                  className={`px-3 py-1.5 font-medium transition-colors
+                    ${!myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
+                >
+                  All Open Tasks
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyTasksOnly(true)}
+                  className={`px-3 py-1.5 font-medium transition-colors border-l border-line
+                    ${myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
+                >
+                  My Tasks
+                </button>
+              </div>
+              <span className="text-xs text-ink-3">{total} open task{total !== 1 ? "s" : ""}</span>
+            </div>
+
+            {loading && (
+              <div className="space-y-px">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
+                ))}
+              </div>
+            )}
+
+            {!loading && (
+              <div className="overflow-auto rounded-md border border-line">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
+                      <th className="px-4 py-2 text-left">Step</th>
+                      <th className="px-4 py-2 text-left">Prompt</th>
+                      <th className="px-4 py-2 text-left">SLA Deadline</th>
+                      <th className="px-4 py-2 text-left">Created</th>
+                      <th className="px-4 py-2 text-left"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-12 text-center text-ink-3">
+                          <CheckCircle size={32} className="mx-auto mb-2 opacity-30" />
+                          <p>No pending tasks. You&apos;re all caught up.</p>
+                        </td>
+                      </tr>
+                    )}
+                    {tasks.map((task) => {
+                      const overdue = isOverdue(task);
+                      return (
+                        <tr
+                          key={task.id}
+                          className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                          onClick={() => handleRowClick(task)}
+                        >
+                          <td className="px-4 py-2.5">
+                            <span className="font-mono text-xs text-ink">{task.stepId}</span>
+                          </td>
+                          <td className="max-w-xs truncate px-4 py-2.5 text-xs text-ink-2">
+                            {String(task.form?.prompt ?? "—")}
+                          </td>
+                          <td className={`px-4 py-2.5 text-xs ${overdue ? "text-danger font-medium" : "text-ink-3"}`}>
+                            {fmtDate(task.slaDeadline)}
+                            {overdue && <span className="ml-1">(overdue)</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(task.createdAt)}</td>
+                          <td className="px-4 py-2.5">
+                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleRowClick(task); }}>
+                              Complete
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
-        {!loading && (
-          <div className="overflow-auto rounded-md border border-line">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2 text-left">Step</th>
-                  <th className="px-4 py-2 text-left">Prompt</th>
-                  <th className="px-4 py-2 text-left">SLA Deadline</th>
-                  <th className="px-4 py-2 text-left">Created</th>
-                  <th className="px-4 py-2 text-left"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-12 text-center text-ink-3">
-                      <CheckCircle size={32} className="mx-auto mb-2 opacity-30" />
-                      <p>No pending tasks. You&apos;re all caught up.</p>
-                    </td>
-                  </tr>
-                )}
-                {tasks.map((task) => {
-                  const overdue = isOverdue(task);
-                  return (
-                    <tr
-                      key={task.id}
-                      className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
-                      onClick={() => handleRowClick(task)}
-                    >
-                      <td className="px-4 py-2.5">
-                        <span className="font-mono text-xs text-ink">{task.stepId}</span>
-                      </td>
-                      <td className="max-w-xs truncate px-4 py-2.5 text-xs text-ink-2">
-                        {String(task.form?.prompt ?? "—")}
-                      </td>
-                      <td className={`px-4 py-2.5 text-xs ${overdue ? "text-danger font-medium" : "text-ink-3"}`}>
-                        {fmtDate(task.slaDeadline)}
-                        {overdue && <span className="ml-1">(overdue)</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(task.createdAt)}</td>
-                      <td className="px-4 py-2.5">
-                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleRowClick(task); }}>
-                          Complete
-                        </Button>
-                      </td>
+        {tab === "instances" && (
+          <>
+            {loading && (
+              <div className="space-y-px">
+                {[1,2,3,4,5].map(i => (
+                  <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
+                ))}
+              </div>
+            )}
+
+            {!loading && (
+              <div className="overflow-x-auto rounded-lg border border-line">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-2 text-ink-3">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium">Instance ID</th>
+                      <th className="px-4 py-2 text-left font-medium">Definition</th>
+                      <th className="px-4 py-2 text-left font-medium">Status</th>
+                      <th className="px-4 py-2 text-left font-medium">Started</th>
+                      <th className="px-4 py-2 text-left font-medium">Completed</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {instances.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-ink-3">
+                          No workflow instances found.
+                        </td>
+                      </tr>
+                    ) : instances.map((inst) => (
+                      <tr key={inst.id} className="hover:bg-surface-2/50">
+                        <td className="px-4 py-2 font-mono text-xs text-ink-3">{inst.id.slice(0, 12)}…</td>
+                        <td className="px-4 py-2 font-mono text-xs text-ink-3">{inst.definitionId.slice(0, 12)}…</td>
+                        <td className="px-4 py-2">
+                          <Tag tone={instanceStatusTone(inst.status)} size="sm">{inst.status}</Tag>
+                        </td>
+                        <td className="px-4 py-2 text-ink-3">{fmtDate(inst.startedAt)}</td>
+                        <td className="px-4 py-2 text-ink-3">{fmtDate(inst.endedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 
