@@ -549,3 +549,102 @@ export async function updateTrainingStatus(id: string, status: TrainingStatus, c
   });
   if (!r.ok) throw new Error(await r.text());
 }
+
+// ─── Performance Reviews ────────────────────────────────────────────────────
+
+export type ReviewStatus = "draft" | "self_review" | "manager_review" | "completed";
+export type ReviewRating = 1 | 2 | 3 | 4 | 5;
+
+export interface PerformanceGoal {
+  id: string;
+  description: string;
+  weight: number;
+  selfRating: ReviewRating | null;
+  managerRating: ReviewRating | null;
+}
+
+export interface PerformanceReview {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  reviewPeriod: string;
+  status: ReviewStatus;
+  overallRating: ReviewRating | null;
+  goals: PerformanceGoal[];
+  managerComments: string;
+  selfComments: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normGoal(r: Record<string, unknown>): PerformanceGoal {
+  return {
+    id: String(r.id ?? ""),
+    description: String(g(r, "description") ?? ""),
+    weight: Number(g(r, "weight") ?? 0),
+    selfRating: (gid(r, "selfRating", "self_rating") as ReviewRating | null) ?? null,
+    managerRating: (gid(r, "managerRating", "manager_rating") as ReviewRating | null) ?? null,
+  };
+}
+
+function normReview(r: Record<string, unknown>): PerformanceReview {
+  return {
+    id: String(r.id ?? ""),
+    employeeId: String(gid(r, "employeeId", "employee_id") ?? ""),
+    employeeName: String(gid(r, "employeeName", "employee_name") ?? ""),
+    reviewPeriod: String(gid(r, "reviewPeriod", "review_period") ?? ""),
+    status: (g(r, "status") ?? "draft") as ReviewStatus,
+    overallRating: (gid(r, "overallRating", "overall_rating") as ReviewRating | null) ?? null,
+    goals: Array.isArray(r.goals) ? (r.goals as Record<string, unknown>[]).map(normGoal) : [],
+    managerComments: String(gid(r, "managerComments", "manager_comments") ?? ""),
+    selfComments: String(gid(r, "selfComments", "self_comments") ?? ""),
+    createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listPerformanceReviews(params?: {
+  status?: ReviewStatus;
+  employee_id?: string;
+}): Promise<{ items: PerformanceReview[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  if (params?.employee_id) sp.set("employee_id", params.employee_id);
+  const r = await apiFetch(`${SVC}/performance-reviews?${sp}`);
+  if (!r.ok) throw new Error(`listPerformanceReviews: ${r.status}`);
+  const data = await r.json();
+  if (Array.isArray(data)) return { items: (data as Record<string, unknown>[]).map(normReview), total: data.length };
+  const obj = data as Record<string, unknown>;
+  return { items: Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]).map(normReview) : [], total: Number(obj.total ?? 0) };
+}
+
+export async function createPerformanceReview(input: {
+  employee_id: string;
+  review_period: string;
+}): Promise<PerformanceReview> {
+  const r = await apiFetch(`${SVC}/performance-reviews`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`createPerformanceReview: ${r.status}`);
+  return normReview(await r.json());
+}
+
+export async function updatePerformanceReview(
+  id: string,
+  patch: Partial<{
+    status: ReviewStatus;
+    overall_rating: ReviewRating;
+    self_comments: string;
+    manager_comments: string;
+  }>
+): Promise<PerformanceReview> {
+  const r = await apiFetch(`${SVC}/performance-reviews/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(`updatePerformanceReview: ${r.status}`);
+  return normReview(await r.json());
+}

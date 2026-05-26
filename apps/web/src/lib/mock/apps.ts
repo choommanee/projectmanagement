@@ -95,6 +95,7 @@ export const mockApps: AppDef[] = [
           { id: "je",      name: "Journal Entries",   href: "/accounting/journal-entries", icon: "tasks"     },
           { id: "trial-balance", name: "Trial Balance",    href: "/accounting/reports",         icon: "dashboard" },
           { id: "budget",        name: "Budget",           href: "/accounting/budget",           icon: "dollar-sign" },
+          { id: "aging",         name: "AR/AP Aging",      href: "/accounting/aging",            icon: "tasks"       },
         ]},
       ]},
       { id: "billing", name: "Billing", groups: [
@@ -126,6 +127,7 @@ export const mockApps: AppDef[] = [
           { id: "payroll-run",  name: "Payroll Run",    href: "/hr/payroll-run",    icon: "tasks" },
           { id: "payroll",      name: "Payslips",       href: "/hr/payroll",        icon: "tasks" },
           { id: "leave",        name: "Leave Requests", href: "/hr/leave-requests", icon: "tasks" },
+          { id: "performance",  name: "Performance Reviews", href: "/hr/performance-reviews", icon: "tasks" },
         ]},
       ]},
     ],
@@ -141,6 +143,7 @@ export const mockApps: AppDef[] = [
       { id: "purchasing", name: "Purchasing", groups: [
         { id: "p1", name: "Orders", subareas: [
           { id: "purchase-orders", name: "Purchase Orders", href: "/procurement/purchase-orders", icon: "tasks" },
+          { id: "rfqs", name: "RFQ", href: "/procurement/rfqs", icon: "tasks" },
           { id: "goods-receipts", name: "Goods Receipts", href: "/procurement/goods-receipts", icon: "warehouse" },
         ]},
         { id: "p2", name: "Vendors", subareas: [
@@ -160,6 +163,7 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "crm", name: "CRM", groups: [
         { id: "c1", name: "Accounts", subareas: [
+          { id: "pipeline",     name: "Pipeline",     href: "/sales/pipeline",     icon: "workflow" },
           { id: "quotations",   name: "Quotations",   href: "/sales/quotations",   icon: "tasks"  },
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
