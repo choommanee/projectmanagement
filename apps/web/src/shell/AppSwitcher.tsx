@@ -8,6 +8,7 @@ import {
   Users,
   Package,
   TrendingUp,
+  ShieldCheck,
   LayoutGrid,
   ChevronDown,
   type LucideIcon,
@@ -22,6 +23,7 @@ const APP_ICONS: Record<string, LucideIcon> = {
   hr:          Users,
   procurement: Package,
   sales:       TrendingUp,
+  quality:     ShieldCheck,
 };
 
 function AppIcon({ id, size = 20, className }: { id: string; size?: number; className?: string }) {
