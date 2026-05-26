@@ -472,3 +472,33 @@ export async function rejectLeaveRequest(id: string, reason: string): Promise<Le
   if (!r.ok) throw new Error(`rejectLeaveRequest: ${r.status}`);
   return normalizeLeaveRequest(await r.json() as Record<string, unknown>);
 }
+
+// ─── payroll runs ──────────────────────────────────────────────────────────
+
+export interface PayrollRun {
+  id: string;
+  period_start: string;
+  period_end: string;
+  status: "draft" | "processing" | "completed" | "cancelled";
+  total_employees: number;
+  total_net_pay: number;
+  created_at: string;
+  completed_at?: string;
+}
+
+export async function listPayrollRuns(): Promise<PayrollRun[]> {
+  const r = await apiFetch(`${SVC}/payroll-runs`);
+  if (!r.ok) return [];
+  const d = await r.json() as unknown;
+  return Array.isArray(d) ? (d as PayrollRun[]) : ((d as Record<string, unknown>)?.runs as PayrollRun[] ?? []);
+}
+
+export async function createPayrollRun(body: { period_start: string; period_end: string }): Promise<PayrollRun> {
+  const r = await apiFetch(`${SVC}/payroll-runs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<PayrollRun>;
+}
