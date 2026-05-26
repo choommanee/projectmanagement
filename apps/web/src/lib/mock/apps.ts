@@ -37,6 +37,15 @@ export const mockApps: AppDef[] = [
           { id: "customers",    name: "Customers",    href: "/pm/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/pm/sales-orders", icon: "tasks"  },
         ]},
+        { id: "acc", name: "Accounting", subareas: [
+          { id: "coa",  name: "Chart of Accounts", href: "/pm/accounting/accounts",       icon: "dashboard" },
+          { id: "je",   name: "Journal Entries",   href: "/pm/accounting/journal-entries", icon: "tasks"     },
+          { id: "inv",  name: "Invoices",          href: "/pm/accounting/invoices",        icon: "tasks"     },
+        ]},
+        { id: "hr", name: "HR", subareas: [
+          { id: "depts", name: "Departments", href: "/pm/hr/departments", icon: "people"  },
+          { id: "emps",  name: "Employees",   href: "/pm/hr/employees",   icon: "people"  },
+        ]},
       ]},
     ],
   },
