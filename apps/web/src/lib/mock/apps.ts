@@ -71,6 +71,8 @@ export const mockApps: AppDef[] = [
           { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow"  },
           { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"     },
           { id: "inventory",   name: "Inventory",    href: "/mfg/inventory",    icon: "warehouse" },
+          { id: "lots",        name: "Lots",          href: "/mfg/lots",         icon: "warehouse" },
+          { id: "routings",    name: "Routings",      href: "/mfg/routings",     icon: "bom"       },
         ]},
       ]},
       { id: "quality", name: "Quality", groups: [

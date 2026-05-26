@@ -677,6 +677,18 @@ export async function deleteRoutingOperation(id: string): Promise<void> {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteRoutingOp failed: ${r.status}`); }
 }
 
+export async function listRoutings(params: { item_id?: string; status?: string; limit?: number; offset?: number } = {}): Promise<{ items: RoutingHeader[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.item_id) qs.set("item_id", params.item_id);
+  if (params.status) qs.set("status", params.status);
+  qs.set("limit", String(params.limit ?? 50));
+  qs.set("offset", String(params.offset ?? 0));
+  const r = await apiFetch(`${SVC}/routings?${qs}`);
+  if (!r.ok) throw new Error(`listRoutings failed: ${r.status}`);
+  const body = await r.json();
+  return { items: ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normRoutingHeader), total: body.total ?? 0 };
+}
+
 // ─── Work Orders ─────────────────────────────────────────────────────────────
 
 export async function listWorkOrders(params: { status?: string; q?: string; limit?: number; offset?: number } = {}): Promise<{ items: WorkOrder[]; total: number }> {
@@ -735,6 +747,18 @@ export async function listWoMaterials(id: string): Promise<WOMaterial[]> {
 }
 
 // ─── Lots ─────────────────────────────────────────────────────────────────
+
+export async function listLots(params: { item_id?: string; status?: string; limit?: number; offset?: number } = {}): Promise<{ items: Lot[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.item_id) qs.set("item_id", params.item_id);
+  if (params.status) qs.set("status", params.status);
+  qs.set("limit", String(params.limit ?? 50));
+  qs.set("offset", String(params.offset ?? 0));
+  const r = await apiFetch(`${SVC}/lots?${qs}`);
+  if (!r.ok) throw new Error(`listLots failed: ${r.status}`);
+  const body = await r.json();
+  return { items: ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normLot), total: body.total ?? 0 };
+}
 
 export async function getLot(id: string): Promise<Lot> {
   const r = await apiFetch(`${SVC}/lots/${id}`);
