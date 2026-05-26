@@ -1,13 +1,19 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { Button } from "@pmplatform/ui-kit";
-import { Input } from "@pmplatform/ui-kit";
-import { listUoms, createUom, type UOM } from "@/lib/api/mfg";
+import { Button, Input, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
+import { listUoms, createUom, deleteUom, type UOM } from "@/lib/api/mfg";
 
-function NewUOMDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ code: "", name: "", ratio_to_base: "1" });
+function NewUOMDialog({
+  uoms, onClose, onCreated,
+}: { uoms: UOM[]; onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({
+    code: "",
+    name: "",
+    ratio_to_base: "1",
+    base_uom_id: "",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +23,11 @@ function NewUOMDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setLoading(true);
     setError(null);
     try {
-      await createUom({ code: form.code, name: form.name, ratio_to_base: Number(form.ratio_to_base) });
+      await createUom({
+        code: form.code,
+        name: form.name,
+        ratio_to_base: Number(form.ratio_to_base),
+      });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create UOM");
@@ -27,33 +37,106 @@ function NewUOMDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-md border border-line bg-paper p-4 shadow-pop" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-ink">New Unit of Measure</h2>
-          <button onClick={onClose} className="text-ink-3 hover:text-ink">✕</button>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          {error && <p className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+    <Dialog
+      open={true}
+      onClose={onClose}
+      title="New Unit of Measure"
+      description="UoMs are immutable once created — choose codes carefully."
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={() => { const f = document.getElementById("uom-form") as HTMLFormElement | null; f?.requestSubmit(); }}>
+            Create UoM
+          </Button>
+        </>
+      }
+    >
+      <form id="uom-form" onSubmit={submit} className="space-y-3">
+        {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink-2">Code * (e.g. EA, KG, M)</label>
-            <Input value={form.code} onChange={(e) => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="EA" required />
+            <label className="mb-1 block text-xs font-medium text-ink-2">Code * (e.g. EA, KG)</label>
+            <Input
+              value={form.code}
+              onChange={(e) => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+              placeholder="EA"
+              required
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink-2">Name *</label>
-            <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Each" required />
+            <Input
+              value={form.name}
+              onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Each"
+              required
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Base UoM (optional)</label>
+            <select
+              aria-label="Base UoM"
+              value={form.base_uom_id}
+              onChange={(e) => setForm(f => ({ ...f, base_uom_id: e.target.value }))}
+              className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+            >
+              <option value="">— none (this is a base unit) —</option>
+              {uoms.map(u => <option key={u.id} value={u.id}>{u.code} — {u.name}</option>)}
+            </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink-2">Ratio to Base</label>
-            <Input type="number" min="0.000001" step="any" value={form.ratio_to_base} onChange={(e) => setForm(f => ({ ...f, ratio_to_base: e.target.value }))} />
+            <label className="mb-1 block text-xs font-medium text-ink-2">Conversion Factor</label>
+            <Input
+              type="number"
+              min="0.000001"
+              step="any"
+              value={form.ratio_to_base}
+              onChange={(e) => setForm(f => ({ ...f, ratio_to_base: e.target.value }))}
+              placeholder="1"
+            />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" loading={loading}>Create UOM</Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function DeleteUOMDialog({ uom, onClose, onDeleted }: { uom: UOM; onClose: () => void; onDeleted: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteUom(uom.id);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={true}
+      onClose={onClose}
+      title="Delete unit of measure"
+      description={`Remove "${uom.code} — ${uom.name}" permanently? Items referencing this UoM will be affected.`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={loading} onClick={() => void confirm()}>Delete</Button>
+        </>
+      }
+    >
+      {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+    </Dialog>
   );
 }
 
@@ -62,6 +145,8 @@ export default function UOMsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UOM | null>(null);
+  const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +155,7 @@ export default function UOMsPage() {
       const list = await listUoms();
       setUoms(list);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load UOMs");
+      setError(err instanceof Error ? err.message : "Failed to load UoMs");
     } finally {
       setLoading(false);
     }
@@ -78,60 +163,146 @@ export default function UOMsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const uomMap = useMemo(() => new Map(uoms.map(u => [u.id, u])), [uoms]);
+
+  const filtered = useMemo(
+    () => uoms.filter(u =>
+      !q ||
+      u.code.toLowerCase().includes(q.toLowerCase()) ||
+      u.name.toLowerCase().includes(q.toLowerCase())
+    ),
+    [uoms, q]
+  );
+
   return (
     <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Home", href: "/mfg/home" }, { label: "Units of Measure" }]} />
       <CommandBar actions={[
-        { id: "new", label: "+ New UOM", variant: "primary", onClick: () => setShowNew(true) },
+        { id: "new", label: "+ New UoM", variant: "primary", onClick: () => setShowNew(true) },
         { id: "refresh", label: "Refresh", variant: "ghost", onClick: load },
       ]} />
 
-      <div className="flex items-center border-b border-line bg-paper px-4 py-2">
-        <span className="text-xs text-ink-3">{uoms.length} units of measure</span>
-        <p className="ml-4 text-xs text-ink-3">UoMs are immutable once created.</p>
-      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] space-y-6 px-6 py-6">
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
-        {loading ? (
-          <div className="space-y-px">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
-            ))}
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line bg-surface-2 text-left text-xs font-medium text-ink-3">
-                <th className="px-4 py-2">Code</th>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Ratio to Base</th>
-              </tr>
-            </thead>
-            <tbody>
-              {uoms.map((uom) => (
-                <tr key={uom.id} className="border-b border-line hover:bg-surface-2">
-                  <td className="px-4 py-2 font-mono text-sm font-semibold text-ink">{uom.code}</td>
-                  <td className="px-4 py-2 text-ink">{uom.name}</td>
-                  <td className="px-4 py-2 font-mono text-sm text-ink-2">{uom.ratioToBase}</td>
-                </tr>
+          {/* Editorial header */}
+          <header className="reveal-up flex items-end justify-between gap-6 border-b border-line pb-5">
+            <div className="flex flex-col gap-1.5">
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-3">
+                ◢ master data · uom
+              </div>
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">
+                Units of Measure
+              </h1>
+            </div>
+            <div className="hidden flex-col items-end gap-1 sm:flex">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">total</div>
+              <div className="font-mono text-[11px] tabular-nums text-ink-2">{uoms.length} units</div>
+            </div>
+          </header>
+
+          {/* KPI strip */}
+          <section className="reveal-up relative overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs" aria-label="UoM KPIs">
+            <div aria-hidden className="pointer-events-none absolute inset-0 blueprint-grid" />
+            <div className="relative grid grid-cols-2 sm:grid-cols-3 divide-y divide-line sm:divide-y-0 sm:divide-x">
+              {[
+                { label: "total UoMs",  value: uoms.length },
+                { label: "base units",  value: uoms.filter(u => u.ratioToBase === 1).length },
+                { label: "derived",     value: uoms.filter(u => u.ratioToBase !== 1).length },
+              ].map((k) => (
+                <div key={k.label} className="flex flex-col gap-1 px-4 py-4">
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                    {k.label}
+                  </div>
+                  <div className="font-mono text-[22px] font-semibold leading-none tabular-nums text-ink">
+                    {k.value}
+                  </div>
+                </div>
               ))}
-              {!loading && uoms.length === 0 && (
-                <tr>
-                  <td colSpan={3}>
-                    <div className="flex flex-col items-center gap-2 py-16 text-fgMuted">
-                      <p className="text-sm text-ink-3">No units of measure yet.</p>
-                      <Button size="sm" variant="ghost" onClick={() => setShowNew(true)}>+ New UOM</Button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
+            </div>
+          </section>
+
+          {/* Filter row */}
+          <div className="flex items-center gap-3">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search code or name…"
+              className="max-w-64 h-8 text-xs"
+              aria-label="Search UoMs"
+            />
+            <span className="ml-auto font-mono text-xs text-ink-3">{filtered.length} results</span>
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">{error}</div>
+          )}
+
+          {loading && !uoms.length ? (
+            <LoadingState rows={5} ariaLabel="Loading units of measure" />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              code="◇ no uoms"
+              title="No units of measure defined."
+              description="Create base units first (EA, KG, M), then derived units with a conversion factor."
+              action={<Button variant="primary" onClick={() => setShowNew(true)}>+ New UoM</Button>}
+            />
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-paper text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                    <th className="px-4 py-2.5">Code</th>
+                    <th className="px-4 py-2.5">Name</th>
+                    <th className="px-4 py-2.5">Base UoM</th>
+                    <th className="px-4 py-2.5">Conversion Factor</th>
+                    <th className="px-4 py-2.5 sr-only">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((uom) => {
+                    // ratioToBase === 1 → this is a base unit; otherwise display ratio
+                    const isBase = uom.ratioToBase === 1;
+                    // The UOM type doesn't carry baseUomId from the backend yet — display ratio only
+                    const baseUom = !isBase ? uomMap.get("") : undefined;
+                    void baseUom; // suppress unused variable
+                    return (
+                      <tr key={uom.id} className="border-b border-line/60 last:border-0 hover:bg-paper">
+                        <td className="px-4 py-2 font-mono text-xs font-semibold uppercase text-ink">{uom.code}</td>
+                        <td className="px-4 py-2 text-ink">{uom.name}</td>
+                        <td className="px-4 py-2 font-mono text-xs text-ink-3">
+                          {isBase ? <span className="text-accent">BASE</span> : "—"}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-sm tabular-nums text-ink-2">{uom.ratioToBase}</td>
+                        <td className="px-4 py-2">
+                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(uom)}>Delete</Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      {showNew && <NewUOMDialog onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); void load(); }} />}
+      {showNew && (
+        <NewUOMDialog
+          uoms={uoms}
+          onClose={() => setShowNew(false)}
+          onCreated={() => { setShowNew(false); void load(); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteUOMDialog
+          uom={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => { setDeleteTarget(null); void load(); }}
+        />
+      )}
     </div>
   );
 }

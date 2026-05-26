@@ -59,6 +59,7 @@ export interface WorkCenter {
   name: string;
   type: WCType;
   capacityPerDayHrs: number;
+  machineCount: number;
   status: ItemStatus;
   createdAt: string;
   updatedAt: string;
@@ -301,6 +302,7 @@ function normWorkCenter(r: Record<string, unknown>): WorkCenter {
     name: String(g(r, "name") ?? ""),
     type: (g(r, "type") ?? "machine") as WCType,
     capacityPerDayHrs: Number(gid(r, "capacityPerDayHrs", "capacity_per_day_hrs") ?? 8),
+    machineCount: Number(gid(r, "machineCount", "machine_count") ?? r["MachineCount"] ?? 1),
     status: (g(r, "status") ?? "active") as ItemStatus,
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
@@ -518,6 +520,11 @@ export async function getUom(id: string): Promise<UOM> {
   return normUOM(await r.json());
 }
 
+export async function deleteUom(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/uoms/${id}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteUom failed: ${r.status}`); }
+}
+
 // ─── Items ──────────────────────────────────────────────────────────────────
 
 export async function listItems(params: { q?: string; type?: string; status?: string; limit?: number; offset?: number } = {}): Promise<{ items: Item[]; total: number }> {
@@ -565,7 +572,7 @@ export async function listWorkCenters(): Promise<WorkCenter[]> {
   return ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normWorkCenter);
 }
 
-export async function createWorkCenter(input: { code: string; name: string; type?: WCType; capacity_per_day_hrs?: number }): Promise<WorkCenter> {
+export async function createWorkCenter(input: { code: string; name: string; type?: WCType; capacity_per_day_hrs?: number; machine_count?: number }): Promise<WorkCenter> {
   const r = await apiFetch(`${SVC}/work-centers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createWorkCenter failed: ${r.status}`); }
   return normWorkCenter(await r.json());
@@ -577,10 +584,15 @@ export async function getWorkCenter(id: string): Promise<WorkCenter> {
   return normWorkCenter(await r.json());
 }
 
-export async function updateWorkCenter(id: string, patch: { name?: string; type?: WCType; capacity_per_day_hrs?: number; status?: ItemStatus; version: number }): Promise<WorkCenter> {
+export async function updateWorkCenter(id: string, patch: { name?: string; type?: WCType; capacity_per_day_hrs?: number; machine_count?: number; status?: ItemStatus; version: number }): Promise<WorkCenter> {
   const r = await apiFetch(`${SVC}/work-centers/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateWorkCenter failed: ${r.status}`); }
   return normWorkCenter(await r.json());
+}
+
+export async function deleteWorkCenter(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/work-centers/${id}?version=${version}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteWorkCenter failed: ${r.status}`); }
 }
 
 // ─── BOMs ───────────────────────────────────────────────────────────────────
