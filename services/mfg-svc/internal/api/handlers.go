@@ -142,6 +142,22 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.Get("/inventory/items/{itemId}/balance", getItemBalance(svc))
 		r.With(libauth.RequireAction(authz, "mfg.inventory.post", "*")).
 			Post("/inventory/transactions", postInventoryTransaction(svc))
+
+		// Suppliers
+		r.Get("/suppliers", listSuppliers(svc))
+		r.With(libauth.RequireAction(authz, "mfg.supplier.create", "*")).Post("/suppliers", createSupplier(svc))
+		r.Get("/suppliers/{id}", getSupplier(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.supplier.update", "Supplier::{:id}", loaderOpts...)).Patch("/suppliers/{id}", updateSupplier(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.supplier.delete", "Supplier::{:id}", loaderOpts...)).Delete("/suppliers/{id}", deleteSupplier(svc))
+
+		// Purchase Orders
+		r.Get("/purchase-orders", listPurchaseOrders(svc))
+		r.With(libauth.RequireAction(authz, "mfg.po.create", "*")).Post("/purchase-orders", createPurchaseOrder(svc))
+		r.Get("/purchase-orders/{id}", getPurchaseOrder(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.po.update", "PO::{:id}", loaderOpts...)).Patch("/purchase-orders/{id}", updatePurchaseOrder(svc))
+		r.With(libauth.RequireAction(authz, "mfg.po.add_line", "*")).Post("/purchase-orders/{id}/lines", addPOLine(svc))
+		r.With(libauth.RequireAction(authz, "mfg.po.update_line", "*")).Patch("/purchase-orders/{id}/lines/{lineId}", updatePOLine(svc))
+		r.With(libauth.RequireAction(authz, "mfg.po.delete_line", "*")).Delete("/purchase-orders/{id}/lines/{lineId}", deletePOLine(svc))
 	})
 
 	return r

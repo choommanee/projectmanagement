@@ -116,6 +116,8 @@ func TestReleaseWorkOrder_PublishesNotifEvent(t *testing.T) {
 		store.NewMRP(p),
 		store.NewGenealogy(p),
 		store.NewInventory(p),
+		store.NewSuppliers(p),
+		store.NewPurchaseOrders(p),
 		"",
 		"",
 	).WithNotifPublisher(pub)

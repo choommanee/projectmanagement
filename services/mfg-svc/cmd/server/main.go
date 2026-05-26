@@ -51,6 +51,8 @@ func main() {
 	mrp := store.NewMRP(p)
 	genealogy := store.NewGenealogy(p)
 	inventory := store.NewInventory(p)
+	suppliers := store.NewSuppliers(p)
+	purchaseOrders := store.NewPurchaseOrders(p)
 
 	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
@@ -66,7 +68,7 @@ func main() {
 		}
 	}
 
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, inventory, mrpEngineURL, traceEngineURL).
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, inventory, suppliers, purchaseOrders, mrpEngineURL, traceEngineURL).
 		WithNotifPublisher(notifPub)
 
 	ps, err := libpolicy.LoadShared()

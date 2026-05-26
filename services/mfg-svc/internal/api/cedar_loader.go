@@ -2,8 +2,8 @@
 // mfg-svc. Plan #6 Task 6 Step 2.
 //
 // Supported entity types: Item, UOM, BOM, BOMLine, Routing, RoutingOp,
-// WorkCenter, WorkOrder, Lot, MRPRun. Each returns `{tenant_id: "..."}`;
-// none of these entities track an `owner_user` field today.
+// WorkCenter, WorkOrder, Lot, MRPRun, Supplier, PO. Each returns
+// `{tenant_id: "..."}`. None of these entities track an `owner_user` field today.
 package api
 
 import (
@@ -83,6 +83,10 @@ func mfgTableForType(typ string) (string, bool) {
 		return "lot", true
 	case "MRPRun":
 		return "mrp_run", true
+	case "Supplier":
+		return "supplier", true
+	case "PO":
+		return "purchase_order", true
 	}
 	return "", false
 }

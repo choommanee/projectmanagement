@@ -174,7 +174,15 @@ permit (
     Action::"mfg.lot.update_status",
     Action::"mfg.lot.add_genealogy",
     Action::"mfg.mrp.run",
-    Action::"mfg.inventory.post"
+    Action::"mfg.inventory.post",
+    Action::"mfg.supplier.create",
+    Action::"mfg.supplier.update",
+    Action::"mfg.supplier.delete",
+    Action::"mfg.po.create",
+    Action::"mfg.po.update",
+    Action::"mfg.po.add_line",
+    Action::"mfg.po.update_line",
+    Action::"mfg.po.delete_line"
   ],
   resource
 )
@@ -352,8 +360,8 @@ when {
   resource.tenant_id != context.tenant_id
 };
 
-// Mfg write actions: forbid mutating items / boms / work orders that belong
-// to a different tenant.
+// Mfg write actions: forbid mutating items / boms / work orders / procurement
+// that belong to a different tenant.
 forbid (
   principal,
   action in [
@@ -364,7 +372,10 @@ forbid (
     Action::"mfg.work_center.delete",
     Action::"mfg.work_order.update",
     Action::"mfg.work_order.delete",
-    Action::"mfg.work_order.release"
+    Action::"mfg.work_order.release",
+    Action::"mfg.supplier.update",
+    Action::"mfg.supplier.delete",
+    Action::"mfg.po.update"
   ],
   resource
 )

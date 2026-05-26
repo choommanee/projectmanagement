@@ -28,6 +28,8 @@ type Service struct {
 	MRP            *store.MRP
 	Genealogy      *store.Genealogy
 	Inventory      *store.Inventory
+	Suppliers      *store.Suppliers
+	PurchaseOrders *store.PurchaseOrders
 	MRPEngineURL   string
 	TraceEngineURL string
 	notif          notiflib.Publisher
@@ -42,6 +44,8 @@ func New(
 	mrp *store.MRP,
 	genealogy *store.Genealogy,
 	inventory *store.Inventory,
+	suppliers *store.Suppliers,
+	purchaseOrders *store.PurchaseOrders,
 	mrpEngineURL string,
 	traceEngineURL string,
 ) *Service {
@@ -54,6 +58,8 @@ func New(
 		MRP:            mrp,
 		Genealogy:      genealogy,
 		Inventory:      inventory,
+		Suppliers:      suppliers,
+		PurchaseOrders: purchaseOrders,
 		MRPEngineURL:   mrpEngineURL,
 		TraceEngineURL: traceEngineURL,
 		notif:          notiflib.NoopPublisher{},

@@ -93,7 +93,7 @@ func newCedarHandler(p *pgxpool.Pool, authz libauth.Authorizer) http.Handler {
 	workOrders := store.NewWorkOrders(p, boms)
 	mrp := store.NewMRP(p)
 	genealogy := store.NewGenealogy(p)
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, store.NewInventory(p), "http://localhost:19999", "http://localhost:19998")
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, store.NewInventory(p), store.NewSuppliers(p), store.NewPurchaseOrders(p), "http://localhost:19999", "http://localhost:19998")
 	return api.NewRouter(svc, authz)
 }
 
@@ -107,7 +107,7 @@ func newCedarHandlerWithLoader(p *pgxpool.Pool, authz libauth.Authorizer) http.H
 	workOrders := store.NewWorkOrders(p, boms)
 	mrp := store.NewMRP(p)
 	genealogy := store.NewGenealogy(p)
-	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, store.NewInventory(p), "http://localhost:19999", "http://localhost:19998")
+	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, store.NewInventory(p), store.NewSuppliers(p), store.NewPurchaseOrders(p), "http://localhost:19999", "http://localhost:19998")
 	return api.NewRouterWithLoader(svc, authz, api.NewCedarLoader(p))
 }
 
