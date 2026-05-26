@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -391,6 +392,7 @@ function PODetail({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PurchaseOrdersPage() {
+  const router = useRouter();
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
@@ -484,7 +486,7 @@ export default function PurchaseOrdersPage() {
                 return (
                   <li
                     key={po.id}
-                    onClick={() => void handleSelectPO(po)}
+                    onClick={() => { void handleSelectPO(po); router.push('/procurement/purchase-orders/' + po.id); }}
                     className={`cursor-pointer border-b border-line px-3 py-3 hover:bg-surface-2 ${selected?.id === po.id ? "bg-accent/5 border-l-2 border-l-accent" : ""}`}
                   >
                     <div className="flex items-center justify-between">
