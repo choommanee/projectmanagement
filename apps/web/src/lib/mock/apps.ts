@@ -37,15 +37,6 @@ export const mockApps: AppDef[] = [
           { id: "customers",    name: "Customers",    href: "/pm/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/pm/sales-orders", icon: "tasks"  },
         ]},
-        { id: "acc", name: "Accounting", subareas: [
-          { id: "coa",  name: "Chart of Accounts", href: "/pm/accounting/accounts",       icon: "dashboard" },
-          { id: "je",   name: "Journal Entries",   href: "/pm/accounting/journal-entries", icon: "tasks"     },
-          { id: "inv",  name: "Invoices",          href: "/pm/accounting/invoices",        icon: "tasks"     },
-        ]},
-        { id: "hr", name: "HR", subareas: [
-          { id: "depts", name: "Departments", href: "/pm/hr/departments", icon: "people"  },
-          { id: "emps",  name: "Employees",   href: "/pm/hr/employees",   icon: "people"  },
-        ]},
       ]},
     ],
   },
@@ -84,6 +75,45 @@ export const mockApps: AppDef[] = [
           { id: "ncrs",  name: "NCR / CAPA",   href: "/mfg/ncrs",          icon: "quality" },
           { id: "insp",  name: "Inspections",   href: "/mfg/inspections",   icon: "quality" },
           { id: "trace", name: "Traceability",  href: "/mfg/traceability",  icon: "trace"   },
+        ]},
+      ]},
+    ],
+  },
+  {
+    id: "accounting", name: "Accounting Hub",
+    areas: [
+      { id: "home", name: "Home", groups: [
+        { id: "h1", name: "Overview", subareas: [
+          { id: "dash", name: "Dashboard", href: "/accounting/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "ledger", name: "General Ledger", groups: [
+        { id: "l1", name: "Accounts", subareas: [
+          { id: "coa",     name: "Chart of Accounts", href: "/accounting/accounts",        icon: "dashboard" },
+          { id: "je",      name: "Journal Entries",   href: "/accounting/journal-entries", icon: "tasks"     },
+          { id: "reports", name: "Financial Reports", href: "/accounting/reports",         icon: "dashboard" },
+        ]},
+      ]},
+      { id: "billing", name: "Billing", groups: [
+        { id: "b1", name: "Documents", subareas: [
+          { id: "inv", name: "Invoices", href: "/accounting/invoices", icon: "tasks" },
+        ]},
+      ]},
+    ],
+  },
+  {
+    id: "hr", name: "HR Hub",
+    areas: [
+      { id: "home", name: "Home", groups: [
+        { id: "h1", name: "Overview", subareas: [
+          { id: "dash", name: "Dashboard", href: "/hr/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "org", name: "Organization", groups: [
+        { id: "o1", name: "Structure", subareas: [
+          { id: "depts", name: "Departments", href: "/hr/departments", icon: "people"  },
+          { id: "pos",   name: "Positions",   href: "/hr/positions",   icon: "people"  },
+          { id: "emps",  name: "Employees",   href: "/hr/employees",   icon: "people"  },
         ]},
       ]},
     ],
