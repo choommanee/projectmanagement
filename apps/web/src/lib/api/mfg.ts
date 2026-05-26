@@ -1181,6 +1181,12 @@ export async function listRFQs(params: { status?: RFQStatus; limit?: number; off
   return { items: ((body.items ?? body ?? []) as Record<string, unknown>[]).map(normRFQ), total: Number(body.total ?? 0) };
 }
 
+export async function getRFQ(id: string): Promise<RFQ> {
+  const r = await apiFetch(`${SVC}/rfqs/${id}`);
+  if (!r.ok) throw new Error(`getRFQ failed: ${r.status}`);
+  return normRFQ(await r.json());
+}
+
 export async function createRFQ(input: { supplier_id: string; response_deadline?: string; notes?: string }): Promise<RFQ> {
   const r = await apiFetch(`${SVC}/rfqs`, {
     method: "POST",

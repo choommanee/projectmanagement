@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import {
   listRFQs, createRFQ, sendRFQ, listSuppliers,
@@ -18,6 +19,7 @@ const STATUS_COLORS: Record<RFQStatus, string> = {
 };
 
 export default function RFQPage() {
+  const router = useRouter();
   const [rfqs, setRfqs] = useState<RFQ[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filter, setFilter] = useState<RFQStatus | "all">("all");
@@ -125,7 +127,7 @@ export default function RFQPage() {
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No RFQs found</td></tr>
               )}
               {filtered.map(rfq => (
-                <tr key={rfq.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => setSelected(rfq)}>
+                <tr key={rfq.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => router.push('/procurement/rfqs/' + rfq.id)}>
                   <td className="px-4 py-3 font-mono text-xs">{rfq.rfqNumber}</td>
                   <td className="px-4 py-3">{rfq.supplierName}</td>
                   <td className="px-4 py-3">
