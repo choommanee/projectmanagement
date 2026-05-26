@@ -53,6 +53,7 @@ export const mockApps: AppDef[] = [
           { id: "bom",            name: "BOM",            href: "/mfg/bom",           icon: "bom"              },
           { id: "mrp",            name: "MRP Run",        href: "/mfg/mrp",           icon: "workflow"         },
           { id: "scheduling",     name: "Scheduling Board",href: "/mfg/scheduling",  icon: "workflow"         },
+          { id: "oee",            name: "OEE Dashboard",  href: "/mfg/oee",           icon: "dashboard"        },
         ]},
         { id: "g2", name: "Master Data", subareas: [
           { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"   },
@@ -112,8 +113,12 @@ export const mockApps: AppDef[] = [
           { id: "depts",   name: "Departments", href: "/hr/departments", icon: "people"  },
           { id: "pos",     name: "Positions",   href: "/hr/positions",   icon: "people"  },
           { id: "emps",    name: "Employees",   href: "/hr/employees",   icon: "people"  },
-          { id: "payroll", name: "Payroll",     href: "/hr/payroll",     icon: "tasks"   },
-          { id: "leave",   name: "Leave Requests", href: "/hr/leave",   icon: "tasks"   },
+        ]},
+      ]},
+      { id: "payroll-area", name: "Payroll", groups: [
+        { id: "pay1", name: "Pay", subareas: [
+          { id: "payroll",      name: "Payslips",       href: "/hr/payroll",        icon: "tasks" },
+          { id: "leave",        name: "Leave Requests", href: "/hr/leave-requests", icon: "tasks" },
         ]},
       ]},
     ],
@@ -165,6 +170,35 @@ export const mockApps: AppDef[] = [
           { id: "all-docs",   name: "All Documents",  href: "/docs/documents",  icon: "tasks"  },
           { id: "workspaces", name: "Workspaces",     href: "/docs/workspaces", icon: "folder" },
           { id: "templates",  name: "Templates",      href: "/docs/templates",  icon: "tasks"  },
+        ]},
+      ]},
+    ],
+  },
+  {
+    id: "admin", name: "Admin Hub",
+    areas: [
+      { id: "home", name: "Home", groups: [
+        { id: "h1", name: "Overview", subareas: [
+          { id: "dash", name: "Dashboard", href: "/admin/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "people", name: "People & Access", groups: [
+        { id: "p1", name: "Users", subareas: [
+          { id: "users",   name: "Users",       href: "/admin/users",   icon: "people"   },
+          { id: "roles",   name: "Roles",        href: "/admin/roles",   icon: "settings" },
+          { id: "invites", name: "Invitations",  href: "/admin/invites", icon: "people"   },
+        ]},
+      ]},
+      { id: "audit-area", name: "Audit & Compliance", groups: [
+        { id: "a1", name: "Audit", subareas: [
+          { id: "audit-log", name: "Audit Log", href: "/admin/audit-log", icon: "knowledge" },
+        ]},
+      ]},
+      { id: "config", name: "Configuration", groups: [
+        { id: "cfg1", name: "Tenant", subareas: [
+          { id: "tenant-settings", name: "Tenant Settings", href: "/admin/tenant-settings", icon: "settings" },
+          { id: "api-keys",        name: "API Keys",         href: "/admin/api-keys",        icon: "settings" },
+          { id: "integrations",    name: "Integrations",     href: "/admin/integrations",    icon: "settings" },
         ]},
       ]},
     ],

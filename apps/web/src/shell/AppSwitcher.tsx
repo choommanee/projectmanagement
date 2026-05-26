@@ -26,6 +26,7 @@ const APP_ICONS: Record<string, LucideIcon> = {
   sales:       TrendingUp,
   docs:        FileText,
   quality:     ShieldCheck,
+  admin:       ShieldCheck,
 };
 
 function AppIcon({ id, size = 20, className }: { id: string; size?: number; className?: string }) {

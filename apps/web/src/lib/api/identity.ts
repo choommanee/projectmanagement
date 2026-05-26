@@ -4,6 +4,15 @@ export interface UserSummary {
   email: string;
 }
 
+export interface IdentityUser {
+  id: string;
+  email: string;
+  display_name?: string;
+  role?: string;
+  active?: boolean;
+  tenant_id?: string;
+}
+
 export async function listUsers(q?: string, limit = 50): Promise<UserSummary[]> {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
@@ -12,4 +21,13 @@ export async function listUsers(q?: string, limit = 50): Promise<UserSummary[]> 
   if (!res.ok) throw new Error(`listUsers: ${res.status}`);
   const data = (await res.json()) as { users: UserSummary[] };
   return data.users;
+}
+
+export async function listIdentityUsers(): Promise<IdentityUser[]> {
+  const res = await fetch("/api/identity/users?limit=200", { cache: "no-store" });
+  if (!res.ok) throw new Error(`listIdentityUsers: ${res.status}`);
+  const data = await res.json();
+  if (Array.isArray(data)) return data as IdentityUser[];
+  if (Array.isArray(data?.users)) return data.users as IdentityUser[];
+  return [];
 }
