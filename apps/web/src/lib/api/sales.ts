@@ -327,3 +327,92 @@ export async function updateShipmentStatus(id: string, status: ShipmentStatus): 
   const r = await apiFetch(`${SVC}/shipments/${id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateShipmentStatus failed: ${r.status}`); }
 }
+
+// ─── CRM Pipeline ──────────────────────────────────────────────────────────
+
+export type OpportunityStage = "prospect" | "qualified" | "proposal" | "negotiation" | "won" | "lost";
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  customerId: string;
+  customerName: string;
+  stage: OpportunityStage;
+  value: number;
+  currency: string;
+  expectedCloseDate: string | null;
+  probability: number;
+  assignedTo: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normOpportunity(r: Record<string, unknown>): Opportunity {
+  return {
+    id: String(r.id ?? ""),
+    title: String(g(r, "title") ?? ""),
+    customerId: String(gid(r, "customerId", "customer_id") ?? r["CustomerID"] ?? ""),
+    customerName: String(gid(r, "customerName", "customer_name") ?? ""),
+    stage: (g(r, "stage") ?? "prospect") as OpportunityStage,
+    value: Number(g(r, "value") ?? 0),
+    currency: String(g(r, "currency") ?? "THB"),
+    expectedCloseDate: (gid(r, "expectedCloseDate", "expected_close_date") as string | null) ?? null,
+    probability: Number(g(r, "probability") ?? 0),
+    assignedTo: String(gid(r, "assignedTo", "assigned_to") ?? ""),
+    notes: String(g(r, "notes") ?? ""),
+    createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listOpportunities(params: {
+  stage?: OpportunityStage;
+  customer_id?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: Opportunity[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params.stage) sp.set("stage", params.stage);
+  if (params.customer_id) sp.set("customer_id", params.customer_id);
+  if (params.limit) sp.set("limit", String(params.limit));
+  if (params.offset) sp.set("offset", String(params.offset));
+  const r = await apiFetch(`${SVC}/opportunities?${sp}`);
+  if (!r.ok) throw new Error(`listOpportunities failed: ${r.status}`);
+  const body = await r.json() as Record<string, unknown>;
+  if (Array.isArray(body)) return { items: (body as Record<string, unknown>[]).map(normOpportunity), total: (body as unknown[]).length };
+  return { items: ((body.items ?? []) as Record<string, unknown>[]).map(normOpportunity), total: Number(body.total ?? 0) };
+}
+
+export async function createOpportunity(input: {
+  title: string;
+  customer_id: string;
+  value?: number;
+  expected_close_date?: string;
+  probability?: number;
+  notes?: string;
+}): Promise<Opportunity> {
+  const r = await apiFetch(`${SVC}/opportunities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createOpportunity failed: ${r.status}`); }
+  return normOpportunity(await r.json());
+}
+
+export async function updateOpportunity(id: string, patch: Partial<{
+  stage: OpportunityStage;
+  value: number;
+  probability: number;
+  expected_close_date: string;
+  notes: string;
+}>): Promise<Opportunity> {
+  const r = await apiFetch(`${SVC}/opportunities/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(`updateOpportunity failed: ${r.status}`);
+  return normOpportunity(await r.json());
+}
