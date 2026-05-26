@@ -142,6 +142,48 @@ function normalizeInvoice(r: Record<string, unknown>): Invoice {
   };
 }
 
+// ─── financial computation helpers ────────────────────────────────────────
+
+/**
+ * Compute the net balance for one account from all journal lines touching it.
+ * Debit-normal accounts (asset, expense): balance = total_debits - total_credits
+ * Credit-normal accounts (liability, equity, revenue): balance = total_credits - total_debits
+ */
+export function computeAccountBalance(
+  lines: JournalLine[],
+  accountId: string,
+  normalSide: "debit" | "credit",
+): number {
+  let debits = 0;
+  let credits = 0;
+  for (const l of lines) {
+    if (l.accountId === accountId) {
+      debits += l.debit;
+      credits += l.credit;
+    }
+  }
+  return normalSide === "debit" ? debits - credits : credits - debits;
+}
+
+/**
+ * Aggregate all posted journal entry lines into a per-account debit/credit map.
+ * Returns a Map keyed by accountId with { debits, credits } totals.
+ */
+export function groupLinesByAccount(
+  entries: JournalEntry[],
+): Map<string, { debits: number; credits: number }> {
+  const map = new Map<string, { debits: number; credits: number }>();
+  for (const entry of entries) {
+    for (const line of entry.lines) {
+      const existing = map.get(line.accountId) ?? { debits: 0, credits: 0 };
+      existing.debits += line.debit;
+      existing.credits += line.credit;
+      map.set(line.accountId, existing);
+    }
+  }
+  return map;
+}
+
 // ─── accounts ──────────────────────────────────────────────────────────────
 
 export async function listAccounts(params?: { q?: string; type?: AccountType }): Promise<ChartOfAccount[]> {

@@ -88,7 +88,7 @@ export const mockApps: AppDef[] = [
         { id: "l1", name: "Accounts", subareas: [
           { id: "coa",     name: "Chart of Accounts", href: "/accounting/accounts",        icon: "dashboard" },
           { id: "je",      name: "Journal Entries",   href: "/accounting/journal-entries", icon: "tasks"     },
-          { id: "reports", name: "Financial Reports", href: "/accounting/reports",         icon: "dashboard" },
+          { id: "trial-balance", name: "Trial Balance",    href: "/accounting/reports",         icon: "dashboard" },
         ]},
       ]},
       { id: "billing", name: "Billing", groups: [
@@ -146,6 +146,31 @@ export const mockApps: AppDef[] = [
         { id: "c1", name: "Accounts", subareas: [
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
+        ]},
+      ]},
+    ],
+  },
+  {
+    id: "quality", name: "Quality Hub",
+    areas: [
+      { id: "home", name: "Home", groups: [
+        { id: "h1", name: "Overview", subareas: [
+          { id: "dash", name: "Dashboard", href: "/quality/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "apqp-area", name: "APQP / PPAP", groups: [
+        { id: "q1", name: "Planning", subareas: [
+          { id: "apqp", name: "APQP Projects",  href: "/quality/apqp",          icon: "quality" },
+          { id: "ppap", name: "PPAP Packages",  href: "/quality/ppap",          icon: "quality" },
+          { id: "fmea", name: "FMEA",           href: "/quality/fmea",          icon: "quality" },
+          { id: "cp",   name: "Control Plans",  href: "/quality/control-plans", icon: "quality" },
+        ]},
+      ]},
+      { id: "ops", name: "Operations", groups: [
+        { id: "q2", name: "Execution", subareas: [
+          { id: "ncrs",  name: "NCR / CAPA",   href: "/quality/ncrs",         icon: "quality" },
+          { id: "insp",  name: "Inspections",  href: "/quality/inspections",  icon: "quality" },
+          { id: "trace", name: "Traceability", href: "/quality/traceability", icon: "trace"   },
         ]},
       ]},
     ],
