@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -355,6 +356,7 @@ function JEDetail({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function JournalEntriesPage() {
+  const router = useRouter();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<JournalEntry | null>(null);
@@ -436,7 +438,7 @@ export default function JournalEntriesPage() {
               {entries.map((je) => (
                 <li
                   key={je.id}
-                  onClick={() => void handleSelect(je)}
+                  onClick={() => router.push('/accounting/journal-entries/' + je.id)}
                   className={`cursor-pointer border-b border-line px-3 py-3 hover:bg-surface-2 ${selected?.id === je.id ? "bg-accent/5 border-l-2 border-l-accent" : ""}`}
                 >
                   <div className="flex items-center justify-between">
