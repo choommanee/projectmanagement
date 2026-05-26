@@ -648,3 +648,130 @@ export async function updatePerformanceReview(
   if (!r.ok) throw new Error(`updatePerformanceReview: ${r.status}`);
   return normReview(await r.json());
 }
+
+// ─── Recruitment ────────────────────────────────────────────────────────────
+
+export type JobStatus = "open" | "closed" | "draft" | "on_hold";
+export type ApplicantStage = "applied" | "screening" | "interview" | "offer" | "hired" | "rejected";
+
+export interface JobPosting {
+  id: string;
+  title: string;
+  departmentId: string | null;
+  departmentName: string;
+  positionId: string | null;
+  positionName: string;
+  status: JobStatus;
+  openings: number;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Applicant {
+  id: string;
+  jobId: string;
+  name: string;
+  email: string;
+  phone: string;
+  stage: ApplicantStage;
+  notes: string;
+  appliedAt: string;
+  updatedAt: string;
+}
+
+function normJobPosting(r: Record<string, unknown>): JobPosting {
+  return {
+    id: String(r.id ?? ""),
+    title: String(g(r, "title") ?? ""),
+    departmentId: (gid(r, "departmentId", "department_id") as string | null) ?? null,
+    departmentName: String(gid(r, "departmentName", "department_name") ?? ""),
+    positionId: (gid(r, "positionId", "position_id") as string | null) ?? null,
+    positionName: String(gid(r, "positionName", "position_name") ?? ""),
+    status: (g(r, "status") ?? "draft") as JobStatus,
+    openings: Number(g(r, "openings") ?? 1),
+    description: String(g(r, "description") ?? ""),
+    createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+function normApplicant(r: Record<string, unknown>): Applicant {
+  return {
+    id: String(r.id ?? ""),
+    jobId: String(gid(r, "jobId", "job_id") ?? ""),
+    name: String(g(r, "name") ?? ""),
+    email: String(g(r, "email") ?? ""),
+    phone: String(g(r, "phone") ?? ""),
+    stage: (g(r, "stage") ?? "applied") as ApplicantStage,
+    notes: String(g(r, "notes") ?? ""),
+    appliedAt: String(gid(r, "appliedAt", "applied_at") ?? gid(r, "createdAt", "created_at") ?? ""),
+    updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listJobPostings(params?: { status?: JobStatus }): Promise<{ items: JobPosting[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params?.status) sp.set("status", params.status);
+  const r = await apiFetch(`${SVC}/jobs?${sp}`);
+  if (!r.ok) throw new Error(`listJobPostings: ${r.status}`);
+  const data = await r.json();
+  if (Array.isArray(data)) return { items: (data as Record<string, unknown>[]).map(normJobPosting), total: data.length };
+  const obj = data as Record<string, unknown>;
+  return { items: Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]).map(normJobPosting) : [], total: Number(obj.total ?? 0) };
+}
+
+export async function createJobPosting(input: {
+  title: string;
+  department_id?: string;
+  position_id?: string;
+  openings?: number;
+  description?: string;
+}): Promise<JobPosting> {
+  const r = await apiFetch(`${SVC}/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`createJobPosting: ${r.status}`);
+  return normJobPosting(await r.json());
+}
+
+export async function updateJobPosting(id: string, patch: Partial<{ status: JobStatus; openings: number; description: string }>): Promise<JobPosting> {
+  const r = await apiFetch(`${SVC}/jobs/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(`updateJobPosting: ${r.status}`);
+  return normJobPosting(await r.json());
+}
+
+export async function listApplicants(jobId: string): Promise<Applicant[]> {
+  const r = await apiFetch(`${SVC}/jobs/${jobId}/applicants`);
+  if (!r.ok) throw new Error(`listApplicants: ${r.status}`);
+  const data = await r.json();
+  if (Array.isArray(data)) return (data as Record<string, unknown>[]).map(normApplicant);
+  const obj = data as Record<string, unknown>;
+  return Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]).map(normApplicant) : [];
+}
+
+export async function createApplicant(jobId: string, input: { name: string; email: string; phone?: string; notes?: string }): Promise<Applicant> {
+  const r = await apiFetch(`${SVC}/jobs/${jobId}/applicants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`createApplicant: ${r.status}`);
+  return normApplicant(await r.json());
+}
+
+export async function updateApplicantStage(jobId: string, applicantId: string, stage: ApplicantStage): Promise<Applicant> {
+  const r = await apiFetch(`${SVC}/jobs/${jobId}/applicants/${applicantId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage }),
+  });
+  if (!r.ok) throw new Error(`updateApplicantStage: ${r.status}`);
+  return normApplicant(await r.json());
+}
