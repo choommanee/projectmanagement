@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
@@ -176,6 +177,7 @@ function DeleteConfirmDialog({ wc, onClose, onDeleted }: { wc: WorkCenter; onClo
 }
 
 export default function WorkCentersPage() {
+  const router = useRouter();
   const [wcs, setWcs] = useState<WorkCenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -312,7 +314,7 @@ export default function WorkCentersPage() {
                 </thead>
                 <tbody>
                   {filtered.map((wc) => (
-                    <tr key={wc.id} className="border-b border-line/60 last:border-0 hover:bg-paper">
+                    <tr key={wc.id} onClick={() => router.push('/mfg/work-centers/' + wc.id)} className="border-b border-line/60 last:border-0 hover:bg-paper cursor-pointer">
                       <td className="px-4 py-2 font-mono text-xs font-semibold uppercase text-ink">{wc.code}</td>
                       <td className="px-4 py-2 font-medium text-ink">{wc.name}</td>
                       <td className="px-4 py-2">
