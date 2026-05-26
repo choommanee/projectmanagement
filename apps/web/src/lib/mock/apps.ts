@@ -112,6 +112,7 @@ export const mockApps: AppDef[] = [
           { id: "pos",     name: "Positions",   href: "/hr/positions",   icon: "people"  },
           { id: "emps",    name: "Employees",   href: "/hr/employees",   icon: "people"  },
           { id: "payroll", name: "Payroll",     href: "/hr/payroll",     icon: "tasks"   },
+          { id: "leave",   name: "Leave Requests", href: "/hr/leave",   icon: "tasks"   },
         ]},
       ]},
     ],

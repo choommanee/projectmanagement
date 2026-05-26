@@ -376,3 +376,99 @@ export async function markPayslipPaid(id: string): Promise<Payslip> {
   if (!r.ok) throw new Error(`markPayslipPaid: ${r.status}`);
   return normalizePayslip(await r.json() as Record<string, unknown>);
 }
+
+// ─── leave requests ────────────────────────────────────────────────────────
+
+export interface LeaveRequest {
+  id: string;
+  tenant_id: string;
+  employee_id: string;
+  leave_type: "annual" | "sick" | "maternity" | "paternity" | "unpaid" | "other";
+  start_date: string;
+  end_date: string;
+  days: number;
+  reason?: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  approved_by?: string;
+  approved_at?: string;
+  rejected_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function normalizeLeaveRequest(r: Record<string, unknown>): LeaveRequest {
+  return {
+    id: String(r.id ?? ""),
+    tenant_id: String(gid(r, "tenantId", "tenant_id") ?? ""),
+    employee_id: String(gid(r, "employeeId", "employee_id") ?? ""),
+    leave_type: (gid(r, "leaveType", "leave_type") ?? "annual") as LeaveRequest["leave_type"],
+    start_date: String(gid(r, "startDate", "start_date") ?? ""),
+    end_date: String(gid(r, "endDate", "end_date") ?? ""),
+    days: Number(g(r, "days") ?? 0),
+    reason: r.reason ? String(r.reason) : undefined,
+    status: (g(r, "status") ?? "pending") as LeaveRequest["status"],
+    approved_by: (gid(r, "approvedBy", "approved_by") as string | undefined) ?? undefined,
+    approved_at: (gid(r, "approvedAt", "approved_at") as string | undefined) ?? undefined,
+    rejected_reason: (gid(r, "rejectedReason", "rejected_reason") as string | undefined) ?? undefined,
+    created_at: String(gid(r, "createdAt", "created_at") ?? ""),
+    updated_at: String(gid(r, "updatedAt", "updated_at") ?? ""),
+  };
+}
+
+export async function listLeaveRequests(params?: {
+  employee_id?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: LeaveRequest[]; total: number }> {
+  const sp = new URLSearchParams();
+  if (params?.employee_id) sp.set("employee_id", params.employee_id);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.offset != null) sp.set("offset", String(params.offset));
+  const r = await apiFetch(`${SVC}/leave-requests${sp.toString() ? `?${sp}` : ""}`);
+  if (!r.ok) throw new Error(`listLeaveRequests: ${r.status}`);
+  const data = await r.json() as unknown;
+  if (Array.isArray(data)) return { items: (data as Record<string, unknown>[]).map(normalizeLeaveRequest), total: data.length };
+  const obj = data as Record<string, unknown>;
+  const items = Array.isArray(obj.items) ? (obj.items as Record<string, unknown>[]).map(normalizeLeaveRequest) : [];
+  return { items, total: Number(obj.total ?? items.length) };
+}
+
+export async function createLeaveRequest(input: {
+  employee_id: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason?: string;
+}): Promise<LeaveRequest> {
+  const r = await apiFetch(`${SVC}/leave-requests`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`createLeaveRequest: ${r.status}`);
+  return normalizeLeaveRequest(await r.json() as Record<string, unknown>);
+}
+
+export async function getLeaveRequest(id: string): Promise<LeaveRequest> {
+  const r = await apiFetch(`${SVC}/leave-requests/${id}`);
+  if (!r.ok) throw new Error(`getLeaveRequest: ${r.status}`);
+  return normalizeLeaveRequest(await r.json() as Record<string, unknown>);
+}
+
+export async function approveLeaveRequest(id: string): Promise<LeaveRequest> {
+  const r = await apiFetch(`${SVC}/leave-requests/${id}/approve`, { method: "POST" });
+  if (!r.ok) throw new Error(`approveLeaveRequest: ${r.status}`);
+  return normalizeLeaveRequest(await r.json() as Record<string, unknown>);
+}
+
+export async function rejectLeaveRequest(id: string, reason: string): Promise<LeaveRequest> {
+  const r = await apiFetch(`${SVC}/leave-requests/${id}/reject`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!r.ok) throw new Error(`rejectLeaveRequest: ${r.status}`);
+  return normalizeLeaveRequest(await r.json() as Record<string, unknown>);
+}

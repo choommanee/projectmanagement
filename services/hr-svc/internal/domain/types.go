@@ -118,3 +118,49 @@ type CreatePayslipInput struct {
 	Deductions  float64   `json:"deductions"`
 	Currency    string    `json:"currency"`
 }
+
+// ---- Leave ----
+
+type LeaveType   string
+type LeaveStatus string
+
+const (
+	LeaveAnnual    LeaveType = "annual"
+	LeaveSick      LeaveType = "sick"
+	LeaveMaternity LeaveType = "maternity"
+	LeavePaternity LeaveType = "paternity"
+	LeaveUnpaid    LeaveType = "unpaid"
+	LeaveOther     LeaveType = "other"
+)
+
+const (
+	LeavePending   LeaveStatus = "pending"
+	LeaveApproved  LeaveStatus = "approved"
+	LeaveRejected  LeaveStatus = "rejected"
+	LeaveCancelled LeaveStatus = "cancelled"
+)
+
+type LeaveRequest struct {
+	ID             uuid.UUID   `json:"id"`
+	TenantID       uuid.UUID   `json:"tenant_id"`
+	EmployeeID     uuid.UUID   `json:"employee_id"`
+	LeaveType      LeaveType   `json:"leave_type"`
+	StartDate      time.Time   `json:"start_date"`
+	EndDate        time.Time   `json:"end_date"`
+	Days           int         `json:"days"`
+	Reason         string      `json:"reason,omitempty"`
+	Status         LeaveStatus `json:"status"`
+	ApprovedBy     *uuid.UUID  `json:"approved_by,omitempty"`
+	ApprovedAt     *time.Time  `json:"approved_at,omitempty"`
+	RejectedReason string      `json:"rejected_reason,omitempty"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+type CreateLeaveInput struct {
+	EmployeeID uuid.UUID `json:"employee_id"`
+	LeaveType  LeaveType `json:"leave_type"`
+	StartDate  time.Time `json:"start_date"`
+	EndDate    time.Time `json:"end_date"`
+	Reason     string    `json:"reason,omitempty"`
+}

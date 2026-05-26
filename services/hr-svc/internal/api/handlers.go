@@ -64,6 +64,13 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.Get("/payslips/{id}", getPayslip(svc))
 		r.With(libauth.RequireAction(authz, "hr.payslip.approve", "*")).Post("/payslips/{id}/approve", approvePayslip(svc))
 		r.With(libauth.RequireAction(authz, "hr.payslip.pay", "*")).Post("/payslips/{id}/mark-paid", markPayslipPaid(svc))
+
+		// Leave Requests
+		r.Get("/leave-requests", listLeaveRequests(svc))
+		r.With(libauth.RequireAction(authz, "hr.leave.create", "*")).Post("/leave-requests", createLeaveRequest(svc))
+		r.Get("/leave-requests/{id}", getLeaveRequest(svc))
+		r.With(libauth.RequireAction(authz, "hr.leave.approve", "*")).Post("/leave-requests/{id}/approve", approveLeaveRequest(svc))
+		r.With(libauth.RequireAction(authz, "hr.leave.approve", "*")).Post("/leave-requests/{id}/reject", rejectLeaveRequest(svc))
 	})
 
 	return r
@@ -831,6 +838,185 @@ func markPayslipPaid(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, ps)
+	}
+}
+
+// ---- Leave Requests ----
+
+type createLeaveReq struct {
+	EmployeeID string `json:"employee_id"`
+	LeaveType  string `json:"leave_type"`
+	StartDate  string `json:"start_date"`
+	EndDate    string `json:"end_date"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+func createLeaveRequest(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		var req createLeaveReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		empID, err := uuid.Parse(req.EmployeeID)
+		if err != nil {
+			writeErr(w, 400, errors.New("employee_id must be a valid UUID"))
+			return
+		}
+		startDate, err := time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("start_date must be YYYY-MM-DD"))
+			return
+		}
+		endDate, err := time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			writeErr(w, 400, errors.New("end_date must be YYYY-MM-DD"))
+			return
+		}
+		if endDate.Before(startDate) {
+			writeErr(w, 400, errors.New("end_date must be >= start_date"))
+			return
+		}
+		inp := domain.CreateLeaveInput{
+			EmployeeID: empID,
+			LeaveType:  domain.LeaveType(req.LeaveType),
+			StartDate:  startDate,
+			EndDate:    endDate,
+			Reason:     req.Reason,
+		}
+		lr, err := svc.LeaveRequests.Create(r.Context(), tid, inp)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 201, lr)
+	}
+}
+
+func getLeaveRequest(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		lr, err := svc.LeaveRequests.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, lr)
+	}
+}
+
+func listLeaveRequests(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		var employeeID *uuid.UUID
+		if s := r.URL.Query().Get("employee_id"); s != "" {
+			if id, err := uuid.Parse(s); err == nil {
+				employeeID = &id
+			}
+		}
+		var status *domain.LeaveStatus
+		if s := r.URL.Query().Get("status"); s != "" {
+			v := domain.LeaveStatus(s)
+			status = &v
+		}
+		limit := atoiOr(r.URL.Query().Get("limit"), 100)
+		offset := atoiOr(r.URL.Query().Get("offset"), 0)
+		items, total, err := svc.LeaveRequests.List(r.Context(), tid, employeeID, status, limit, offset)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
+	}
+}
+
+func approveLeaveRequest(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var approvedBy *uuid.UUID
+		if claims, ok := libauth.FromCtx(r.Context()); ok {
+			if uid, err := uuid.Parse(claims.Subject); err == nil {
+				approvedBy = &uid
+			}
+		}
+		if err := svc.LeaveRequests.UpdateStatus(r.Context(), tid, id, domain.LeaveApproved, approvedBy, ""); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		lr, err := svc.LeaveRequests.GetByID(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, lr)
+	}
+}
+
+type rejectLeaveReq struct {
+	Reason string `json:"reason"`
+}
+
+func rejectLeaveRequest(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req rejectLeaveReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.LeaveRequests.UpdateStatus(r.Context(), tid, id, domain.LeaveRejected, nil, req.Reason); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		lr, err := svc.LeaveRequests.GetByID(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, lr)
 	}
 }
 

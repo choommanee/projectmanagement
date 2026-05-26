@@ -619,3 +619,26 @@ when {
   context.roles.contains("tenant-admin") ||
   context.roles.contains("platform-admin")
 };
+
+// Leave: tenant-admin, platform-admin, and project-manager may create leave
+// requests. Approval/rejection is restricted to tenant-admin and platform-admin.
+permit (
+  principal,
+  action == Action::"hr.leave.create",
+  resource
+)
+when {
+  context.roles.contains("platform-admin") ||
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("project-manager")
+};
+
+permit (
+  principal,
+  action == Action::"hr.leave.approve",
+  resource
+)
+when {
+  context.roles.contains("platform-admin") ||
+  context.roles.contains("tenant-admin")
+};
