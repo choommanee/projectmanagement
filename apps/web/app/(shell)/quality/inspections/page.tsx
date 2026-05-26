@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Tag } from "@pmplatform/ui-kit";
@@ -213,6 +214,7 @@ function InspectionModal({ id, itemMap, onClose }: { id: string; itemMap: Map<st
 }
 
 export default function InspectionsPage() {
+  const router = useRouter();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -281,7 +283,7 @@ export default function InspectionsPage() {
               {inspections.map(insp => {
                 const item = itemMap.get(insp.itemId);
                 return (
-                  <tr key={insp.id} onClick={() => setDetailId(insp.id)}
+                  <tr key={insp.id} onClick={() => router.push('/quality/inspections/' + insp.id)}
                     className="cursor-pointer border-b border-line hover:bg-surface-2">
                     <td className="px-4 py-2 text-xs text-ink-2">
                       {insp.inspectedAt ? new Date(insp.inspectedAt).toLocaleString() : "—"}
