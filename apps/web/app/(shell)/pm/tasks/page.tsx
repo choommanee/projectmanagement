@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw, Plus, Download } from "lucide-react";
+import { RefreshCw, Plus, Download, List, LayoutGrid } from "lucide-react";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
@@ -56,6 +56,68 @@ function InitialsAvatar({ id }: { id?: string | null }) {
   );
 }
 
+// ─── Kanban Board ─────────────────────────────────────────────────────────────
+
+const KANBAN_COLS: Array<{ status: TaskStatus; label: string; tone: string }> = [
+  { status: "todo",        label: "To Do",      tone: "text-ink-3"   },
+  { status: "in_progress", label: "In Progress", tone: "text-info"    },
+  { status: "blocked",     label: "Blocked",     tone: "text-danger"  },
+  { status: "review",      label: "Review",      tone: "text-warning" },
+  { status: "done",        label: "Done",        tone: "text-success" },
+];
+
+function KanbanBoard({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void }) {
+  const byStatus = useMemo(() => {
+    const m = new Map<TaskStatus, Task[]>();
+    KANBAN_COLS.forEach((c) => m.set(c.status, []));
+    tasks.forEach((t) => {
+      const col = m.get(t.status as TaskStatus);
+      if (col) col.push(t);
+    });
+    return m;
+  }, [tasks]);
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-4 pt-1">
+      {KANBAN_COLS.map(({ status, label, tone }) => {
+        const col = byStatus.get(status) ?? [];
+        return (
+          <div key={status} className="flex w-64 shrink-0 flex-col gap-2">
+            {/* Column header */}
+            <div className="flex items-center justify-between rounded-sm bg-surface-2 px-3 py-2">
+              <span className={`text-xs font-semibold uppercase tracking-wide ${tone}`}>{label}</span>
+              <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-mono text-ink-3">{col.length}</span>
+            </div>
+            {/* Cards */}
+            <div className="flex flex-col gap-2">
+              {col.length === 0 ? (
+                <div className="rounded-sm border border-dashed border-line px-3 py-4 text-center text-xs text-ink-3">
+                  Empty
+                </div>
+              ) : col.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => onSelect(task)}
+                  className="w-full rounded-sm border border-line bg-surface p-3 text-left hover:border-accent/50 hover:bg-surface-2 transition-colors"
+                >
+                  <p className="text-xs font-mono text-ink-3 mb-1">{task.code}</p>
+                  <p className="text-sm font-medium text-ink line-clamp-2">{task.title}</p>
+                  {task.priority && (
+                    <div className="mt-2">
+                      <Tag tone={priorityTone(task.priority)}>{priorityLabel(task.priority)}</Tag>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
@@ -73,6 +135,7 @@ export default function TasksPage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
+  const [view, setView] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -245,6 +308,25 @@ export default function TasksPage() {
                 className="w-56 text-sm"
                 aria-label="Search tasks"
               />
+              {/* View toggle */}
+              <div className="flex rounded border border-line overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setView("list")}
+                  className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${view === "list" ? "bg-accent text-white" : "bg-surface hover:bg-surface-2 text-ink"}`}
+                  aria-label="List view"
+                >
+                  <List size={14} /> List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("kanban")}
+                  className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${view === "kanban" ? "bg-accent text-white" : "bg-surface hover:bg-surface-2 text-ink"}`}
+                  aria-label="Kanban view"
+                >
+                  <LayoutGrid size={14} /> Kanban
+                </button>
+              </div>
             </div>
           </div>
 
@@ -265,7 +347,14 @@ export default function TasksPage() {
             />
           )}
 
-          {!loading && tasks.length > 0 && (
+          {!loading && tasks.length > 0 && view === "kanban" && (
+            <KanbanBoard
+              tasks={tasks}
+              onSelect={(task) => setSelectedTaskId(task.id)}
+            />
+          )}
+
+          {!loading && tasks.length > 0 && view === "list" && (
             <div className="overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xs">
               <table className="w-full text-sm">
                 <thead>
