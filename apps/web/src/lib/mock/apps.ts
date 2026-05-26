@@ -31,6 +31,7 @@ export const mockApps: AppDef[] = [
           { id: "workflows",     name: "Workflows",        href: "/pm/workflows",       icon: "workflow"  },
           { id: "audit",         name: "Audit Explorer",   href: "/pm/audit",           icon: "settings"  },
           { id: "reports",       name: "Reports & BI",     href: "/pm/reports",         icon: "dashboard" },
+          { id: "resources",     name: "Resource Planning", href: "/pm/resources",        icon: "people"    },
           { id: "dash-builder",  name: "Dashboard Builder",href: "/pm/reports/dashboard", icon: "dashboard" },
           { id: "integration",   name: "Order Integration", href: "/pm/integration",       icon: "workflow"  },
           { id: "notif-prefs",   name: "Notifications",     href: "/pm/notifications",     icon: "settings"  },
@@ -53,7 +54,8 @@ export const mockApps: AppDef[] = [
           { id: "bom",            name: "BOM",            href: "/mfg/bom",           icon: "bom"              },
           { id: "mrp",            name: "MRP Run",        href: "/mfg/mrp",           icon: "workflow"         },
           { id: "scheduling",     name: "Scheduling Board",href: "/mfg/scheduling",  icon: "workflow"         },
-          { id: "capacity",       name: "Capacity Planning",href: "/mfg/capacity",   icon: "dashboard"        },
+          { id: "capacity",       name: "Capacity Planning",href: "/mfg/capacity",              icon: "dashboard" },
+          { id: "prod-calendar",  name: "Production Calendar", href: "/mfg/production-calendar", icon: "workflow"  },
           { id: "oee",            name: "OEE Dashboard",  href: "/mfg/oee",           icon: "dashboard"        },
           { id: "shift-report",   name: "Shift Report",   href: "/mfg/shift-report",  icon: "dashboard"        },
         ]},
@@ -111,6 +113,11 @@ export const mockApps: AppDef[] = [
       { id: "home", name: "Home", groups: [
         { id: "h1", name: "Overview", subareas: [
           { id: "dash", name: "Dashboard", href: "/hr/home", icon: "dashboard" },
+        ]},
+      ]},
+      { id: "self-svc", name: "Self Service", groups: [
+        { id: "ss1", name: "My HR", subareas: [
+          { id: "self-service", name: "Self Service", href: "/hr/self-service", icon: "people" },
         ]},
       ]},
       { id: "org", name: "Organization", groups: [
