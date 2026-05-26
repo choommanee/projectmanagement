@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -353,6 +354,7 @@ function SODetail({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SalesOrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<SalesOrder | null>(null);
@@ -440,7 +442,7 @@ export default function SalesOrdersPage() {
                 return (
                   <li
                     key={so.id}
-                    onClick={() => void handleSelectSO(so)}
+                    onClick={() => router.push('/sales/orders/' + so.id)}
                     className={`cursor-pointer border-b border-line px-3 py-3 hover:bg-surface-2 ${selected?.id === so.id ? "bg-accent/5 border-l-2 border-l-accent" : ""}`}
                   >
                     <div className="flex items-center justify-between">
