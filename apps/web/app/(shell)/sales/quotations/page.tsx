@@ -1,10 +1,11 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
 import {
-  listQuotes, createQuote, updateQuoteStatus, listCustomers,
+  listQuotes, createQuote, updateQuoteStatus, listCustomers, convertQuoteToOrder,
   type Quote, type QuoteStatus, type Customer,
 } from "@/lib/api/sales";
 
@@ -108,6 +109,7 @@ function NewQuoteDialog({
 }
 
 export default function SalesQuotationsPage() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +133,16 @@ export default function SalesQuotationsPage() {
   async function updateStatus(id: string, status: QuoteStatus) {
     setProcessing(id);
     try { await updateQuoteStatus(id, status); load(); } finally { setProcessing(null); }
+  }
+
+  async function handleConvert(id: string) {
+    setProcessing(id);
+    try {
+      await convertQuoteToOrder(id);
+      router.push("/sales/orders");
+    } catch (err) {
+      alert(`Failed to convert: ${err}`);
+    } finally { setProcessing(null); }
   }
 
   return (
@@ -201,6 +213,11 @@ export default function SalesQuotationsPage() {
                             Reject
                           </Button>
                         </>
+                      )}
+                      {q.status === "accepted" && (
+                        <Button size="sm" variant="primary" onClick={() => handleConvert(q.id)} disabled={processing === q.id}>
+                          Convert to SO
+                        </Button>
                       )}
                     </div>
                   </td>

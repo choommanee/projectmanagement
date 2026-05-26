@@ -210,3 +210,13 @@ export async function updateQuoteStatus(id: string, status: QuoteStatus): Promis
   });
   if (!r.ok) throw new Error(await r.text());
 }
+
+export async function convertQuoteToOrder(quoteId: string): Promise<SalesOrder> {
+  const r = await apiFetch(`/api/sales/quotations/${quoteId}/convert`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
