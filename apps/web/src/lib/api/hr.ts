@@ -502,3 +502,50 @@ export async function createPayrollRun(body: { period_start: string; period_end:
   if (!r.ok) throw new Error(await r.text());
   return r.json() as Promise<PayrollRun>;
 }
+
+// ─── training records ──────────────────────────────────────────────────────
+
+export type TrainingStatus = "enrolled" | "in_progress" | "completed" | "expired";
+
+export interface TrainingRecord {
+  id: string;
+  employee_id: string;
+  employee_name?: string;
+  course_name: string;
+  provider?: string;
+  started_at?: string;
+  completed_at?: string;
+  expiry_date?: string;
+  status: TrainingStatus;
+  certificate_no?: string;
+  notes?: string;
+}
+
+export async function listTrainingRecords(params?: { employee_id?: string; status?: string }): Promise<TrainingRecord[]> {
+  const q = new URLSearchParams();
+  if (params?.employee_id) q.set("employee_id", params.employee_id);
+  if (params?.status) q.set("status", params.status);
+  const r = await apiFetch(`${SVC}/training?${q}`);
+  if (!r.ok) return [];
+  const d = await r.json() as unknown;
+  return Array.isArray(d) ? (d as TrainingRecord[]) : ((d as Record<string, unknown>)?.records as TrainingRecord[] ?? []);
+}
+
+export async function createTrainingRecord(body: Omit<TrainingRecord, "id" | "employee_name">): Promise<TrainingRecord> {
+  const r = await apiFetch(`${SVC}/training`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<TrainingRecord>;
+}
+
+export async function updateTrainingStatus(id: string, status: TrainingStatus, certificate_no?: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/training/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status, certificate_no }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
