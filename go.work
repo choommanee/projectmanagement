@@ -20,6 +20,7 @@ use (
 	./services/notification-svc
 	./services/project-svc
 	./services/quality-svc
+	./services/sales-svc
 	./services/reports-svc
 	./services/tenant-svc
 	./services/workflow-svc
