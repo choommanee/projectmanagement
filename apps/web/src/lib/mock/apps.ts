@@ -32,6 +32,7 @@ export const mockApps: AppDef[] = [
           { id: "audit",         name: "Audit Explorer",   href: "/pm/audit",           icon: "settings"  },
           { id: "reports",       name: "Reports & BI",     href: "/pm/reports",         icon: "dashboard" },
           { id: "dash-builder",  name: "Dashboard Builder",href: "/pm/reports/dashboard", icon: "dashboard" },
+          { id: "integration",   name: "Order Integration", href: "/pm/integration",       icon: "workflow"  },
         ]},
       ]},
     ],
