@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import {
   listPerformanceReviews, createPerformanceReview, updatePerformanceReview,
@@ -22,6 +23,7 @@ const STATUS_COLORS: Record<ReviewStatus, string> = {
 };
 
 export default function PerformanceReviewsPage() {
+  const router = useRouter();
   const [reviews, setReviews] = useState<PerformanceReview[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filter, setFilter] = useState<ReviewStatus | "all">("all");
@@ -155,7 +157,7 @@ export default function PerformanceReviewsPage() {
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No reviews found</td></tr>
               )}
               {filtered.map(rev => (
-                <tr key={rev.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => setSelected(rev)}>
+                <tr key={rev.id} className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => router.push('/hr/performance-reviews/' + rev.id)}>
                   <td className="px-4 py-3 font-medium">{rev.employeeName}</td>
                   <td className="px-4 py-3 font-mono text-xs">{rev.reviewPeriod}</td>
                   <td className="px-4 py-3">
