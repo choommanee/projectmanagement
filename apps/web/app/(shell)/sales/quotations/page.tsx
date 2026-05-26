@@ -186,7 +186,7 @@ export default function SalesQuotationsPage() {
                   <td colSpan={7} className="px-4 py-6 text-center text-ink-3">No quotations found.</td>
                 </tr>
               ) : quotes.map((q) => (
-                <tr key={q.id} className="hover:bg-surface-2/50">
+                <tr key={q.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/sales/quotations/' + q.id)}>
                   <td className="px-4 py-2 font-mono text-xs text-ink-3">{q.code ?? q.id.slice(0, 8)}</td>
                   <td className="px-4 py-2 font-medium">{q.customer_name ?? q.customer_id}</td>
                   <td className="px-4 py-2 text-ink-3">{q.title ?? "—"}</td>

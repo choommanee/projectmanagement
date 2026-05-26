@@ -192,6 +192,24 @@ export async function listQuotes(params?: { status?: string; customer_id?: strin
   return Array.isArray(d) ? d : d?.quotes ?? [];
 }
 
+export async function getQuote(id: string): Promise<Quote> {
+  const r = await apiFetch(`${SVC}/quotations/${id}`);
+  if (!r.ok) throw new Error(`getQuote failed: ${r.status}`);
+  const d = await r.json() as Record<string, unknown>;
+  return {
+    id: String(d.id ?? ""),
+    code: d.code ? String(d.code) : undefined,
+    customer_id: String(d.customer_id ?? d.customerId ?? ""),
+    customer_name: d.customer_name ? String(d.customer_name) : d.customerName ? String(d.customerName) : undefined,
+    title: d.title ? String(d.title) : undefined,
+    valid_until: d.valid_until ? String(d.valid_until) : d.validUntil ? String(d.validUntil) : undefined,
+    status: (d.status ?? "draft") as QuoteStatus,
+    total_amount: d.total_amount != null ? Number(d.total_amount) : d.totalAmount != null ? Number(d.totalAmount) : undefined,
+    notes: d.notes ? String(d.notes) : undefined,
+    created_at: d.created_at ? String(d.created_at) : d.createdAt ? String(d.createdAt) : undefined,
+  };
+}
+
 export async function createQuote(body: Omit<Quote, "id" | "code" | "customer_name">): Promise<Quote> {
   const r = await apiFetch("/api/sales/quotations", {
     method: "POST",
