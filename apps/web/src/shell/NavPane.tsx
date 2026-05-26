@@ -1,14 +1,15 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   FolderKanban, ListTodo, Timer, Factory, GitBranch, Workflow,
   ShieldCheck, Network, Users, Settings, Lightbulb, Compass,
-  Layers, LayoutDashboard, Circle,
+  Layers, LayoutDashboard, Circle, Warehouse, ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import type { AppDef } from "./shell.types";
+import type { AppDef, AppArea } from "./shell.types";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   folder:    FolderKanban,
@@ -25,19 +26,83 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ba:        Compass,
   sa:        Layers,
   dashboard: LayoutDashboard,
+  warehouse: Warehouse,
 };
 
-export function NavPane({ app }: { app: AppDef }) {
-  const pathname = usePathname();
-  const t = useTranslations("shell");
+function lsKey(appId: string, areaId: string) {
+  return `nav-area-${appId}-${areaId}`;
+}
+
+function areaContainsPath(area: AppArea, pathname: string): boolean {
+  return area.groups.some((g) =>
+    g.subareas.some((sub) => pathname.startsWith(sub.href))
+  );
+}
+
+function CollapsibleArea({
+  area,
+  areaIdx,
+  app,
+  pathname,
+}: {
+  area: AppArea;
+  areaIdx: number;
+  app: AppDef;
+  pathname: string;
+}) {
+  const key = lsKey(app.id, area.id);
+
+  // Initialise state: open by default, but read localStorage on first render.
+  // We cannot read localStorage during SSR, so we start with `true` then
+  // correct via useEffect to avoid hydration mismatch.
+  const [open, setOpen] = useState(true);
+
+  useEffect(() => {
+    // Force-open if the current path lives inside this area.
+    if (areaContainsPath(area, pathname)) {
+      setOpen(true);
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored !== null) {
+        setOpen(stored === "true");
+      }
+    } catch {
+      // localStorage unavailable — leave default open.
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(key, String(next));
+    } catch {
+      // ignore
+    }
+  }
 
   return (
-    <nav aria-label={t("primaryNav")} className="h-full w-[248px] shrink-0 overflow-y-auto border-r border-line bg-surface py-3 px-2">
-      {app.areas.map((area, areaIdx) => (
-        <div key={area.id}>
-          <div className={`text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3 px-3 mb-1 ${areaIdx === 0 ? "mt-2" : "mt-4"}`}>
-            {area.name}
-          </div>
+    <div key={area.id}>
+      <button
+        type="button"
+        onClick={toggle}
+        className={`group/area flex w-full items-center gap-1 px-3 mb-1 ${areaIdx === 0 ? "mt-2" : "mt-4"}`}
+        aria-expanded={open}
+      >
+        <span className="flex-1 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+          {area.name}
+        </span>
+        <ChevronDown
+          size={11}
+          className={`shrink-0 text-ink-3 transition-transform duration-150 ${open ? "" : "-rotate-90"}`}
+        />
+      </button>
+
+      {open && (
+        <>
           {area.groups.map((g) => (
             <div key={g.id}>
               {g.name && (
@@ -71,7 +136,26 @@ export function NavPane({ app }: { app: AppDef }) {
               </ul>
             </div>
           ))}
-        </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function NavPane({ app }: { app: AppDef }) {
+  const pathname = usePathname();
+  const t = useTranslations("shell");
+
+  return (
+    <nav aria-label={t("primaryNav")} className="h-full w-[248px] shrink-0 overflow-y-auto border-r border-line bg-surface py-3 px-2">
+      {app.areas.map((area, areaIdx) => (
+        <CollapsibleArea
+          key={area.id}
+          area={area}
+          areaIdx={areaIdx}
+          app={app}
+          pathname={pathname}
+        />
       ))}
     </nav>
   );
