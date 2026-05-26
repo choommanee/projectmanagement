@@ -13,6 +13,7 @@ export const mockApps: AppDef[] = [
         { id: "w1", name: "Projects", subareas: [
           { id: "projects", name: "Active Projects", href: "/pm/projects", icon: "folder",    count: 7  },
           { id: "tasks",    name: "My Tasks",        href: "/pm/tasks",    icon: "tasks",     count: 12 },
+          { id: "timesheet", name: "Timesheet",      href: "/pm/timesheet", icon: "tasks"               },
           { id: "backlog",  name: "Backlog",         href: "/pm/backlog",  icon: "tasks"                },
           { id: "sprints",  name: "Sprints",         href: "/pm/sprints",  icon: "sprint",    count: 2  },
           { id: "inbox",    name: "My Tasks (Approvals)", href: "/pm/inbox", icon: "tasks",   count: 0  },
@@ -135,6 +136,7 @@ export const mockApps: AppDef[] = [
           { id: "payroll",      name: "Payslips",       href: "/hr/payroll",        icon: "tasks" },
           { id: "leave",        name: "Leave Requests", href: "/hr/leave-requests", icon: "tasks" },
           { id: "performance",  name: "Performance Reviews", href: "/hr/performance-reviews", icon: "tasks" },
+          { id: "recruitment", name: "Recruitment", href: "/hr/recruitment", icon: "people" },
         ]},
       ]},
     ],
@@ -215,6 +217,7 @@ export const mockApps: AppDef[] = [
       { id: "audit-area", name: "Audit & Compliance", groups: [
         { id: "a1", name: "Audit", subareas: [
           { id: "audit-log", name: "Audit Log", href: "/admin/audit-log", icon: "knowledge" },
+          { id: "system-health", name: "System Health", href: "/admin/system-health", icon: "dashboard" },
         ]},
       ]},
       { id: "config", name: "Configuration", groups: [
