@@ -916,6 +916,12 @@ export async function listSuppliers(): Promise<Supplier[]> {
   return ((body.items ?? body) as Record<string, unknown>[] | null ?? []).map(normSupplier);
 }
 
+export async function getSupplier(id: string): Promise<Supplier> {
+  const r = await apiFetch(`${SVC}/suppliers/${id}`);
+  if (!r.ok) throw new Error(`getSupplier failed: ${r.status}`);
+  return normSupplier(await r.json());
+}
+
 export async function createSupplier(input: { code: string; name: string; contact?: string; email?: string; phone?: string; lead_time_days?: number; active?: boolean }): Promise<Supplier> {
   const r = await apiFetch(`${SVC}/suppliers`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createSupplier failed: ${r.status}`); }

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -182,6 +183,7 @@ function DeleteDialog({ supplier, onClose, onDeleted }: { supplier: Supplier; on
 }
 
 export default function SuppliersPage() {
+  const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -255,7 +257,7 @@ export default function SuppliersPage() {
             </thead>
             <tbody>
               {suppliers.map((s) => (
-                <tr key={s.id} className="border-b border-line hover:bg-surface-2">
+                <tr key={s.id} onClick={() => router.push('/mfg/suppliers/' + s.id)} className="cursor-pointer border-b border-line hover:bg-surface-2">
                   <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{s.code}</td>
                   <td className="px-4 py-2 font-medium text-ink">{s.name}</td>
                   <td className="px-4 py-2 text-xs text-ink-2">{s.contact || "—"}</td>
