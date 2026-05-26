@@ -57,13 +57,14 @@ export const mockApps: AppDef[] = [
           { id: "shift-report",   name: "Shift Report",   href: "/mfg/shift-report",  icon: "dashboard"        },
         ]},
         { id: "g2", name: "Master Data", subareas: [
-          { id: "items",       name: "Items",        href: "/mfg/items",        icon: "factory"   },
-          { id: "suppliers",   name: "Suppliers",    href: "/mfg/suppliers",    icon: "factory"   },
-          { id: "workcenters", name: "Work Centers", href: "/mfg/work-centers", icon: "workflow"  },
-          { id: "uoms",        name: "UoMs",         href: "/mfg/uoms",         icon: "tasks"     },
-          { id: "inventory",   name: "Inventory",    href: "/mfg/inventory",    icon: "warehouse" },
-          { id: "lots",        name: "Lots",          href: "/mfg/lots",         icon: "warehouse" },
-          { id: "routings",    name: "Routings",      href: "/mfg/routings",     icon: "bom"       },
+          { id: "items",       name: "Items",          href: "/mfg/items",        icon: "factory"   },
+          { id: "suppliers",   name: "Suppliers",      href: "/mfg/suppliers",    icon: "factory"   },
+          { id: "workcenters", name: "Work Centers",   href: "/mfg/work-centers", icon: "workflow"  },
+          { id: "uoms",        name: "UoMs",           href: "/mfg/uoms",         icon: "tasks"     },
+          { id: "inventory",   name: "Inventory",      href: "/mfg/inventory",    icon: "warehouse" },
+          { id: "lots",        name: "Lots",            href: "/mfg/lots",         icon: "warehouse" },
+          { id: "routings",    name: "Routings",        href: "/mfg/routings",     icon: "bom"       },
+          { id: "costing",     name: "Item Costing",    href: "/mfg/costing",      icon: "dashboard" },
         ]},
       ]},
       { id: "quality", name: "Quality", groups: [
@@ -111,9 +112,10 @@ export const mockApps: AppDef[] = [
       ]},
       { id: "org", name: "Organization", groups: [
         { id: "o1", name: "Structure", subareas: [
-          { id: "depts",   name: "Departments", href: "/hr/departments", icon: "people"  },
-          { id: "pos",     name: "Positions",   href: "/hr/positions",   icon: "people"  },
-          { id: "emps",    name: "Employees",   href: "/hr/employees",   icon: "people"  },
+          { id: "depts",    name: "Departments",     href: "/hr/departments", icon: "people"    },
+          { id: "pos",      name: "Positions",       href: "/hr/positions",   icon: "people"    },
+          { id: "emps",     name: "Employees",       href: "/hr/employees",   icon: "people"    },
+          { id: "training", name: "Training Records", href: "/hr/training",    icon: "knowledge" },
         ]},
       ]},
       { id: "payroll-area", name: "Payroll", groups: [
@@ -139,7 +141,8 @@ export const mockApps: AppDef[] = [
           { id: "goods-receipts", name: "Goods Receipts", href: "/procurement/goods-receipts", icon: "warehouse" },
         ]},
         { id: "p2", name: "Vendors", subareas: [
-          { id: "suppliers", name: "Suppliers", href: "/procurement/suppliers", icon: "people" },
+          { id: "suppliers",        name: "Suppliers",        href: "/procurement/suppliers",        icon: "people"  },
+          { id: "vendor-scorecard", name: "Vendor Scorecard", href: "/procurement/vendor-scorecard", icon: "quality" },
         ]},
       ]},
     ],
@@ -157,6 +160,7 @@ export const mockApps: AppDef[] = [
           { id: "quotations",   name: "Quotations",   href: "/sales/quotations",   icon: "tasks"  },
           { id: "customers",    name: "Customers",    href: "/sales/customers",    icon: "people" },
           { id: "sales-orders", name: "Sales Orders", href: "/sales/orders",       icon: "tasks"  },
+          { id: "invoices",     name: "Invoices",     href: "/sales/invoices",     icon: "tasks"  },
         ]},
       ]},
     ],

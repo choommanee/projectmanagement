@@ -220,3 +220,56 @@ export async function convertQuoteToOrder(quoteId: string): Promise<SalesOrder> 
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+// ─── Sales Invoices ────────────────────────────────────────────────────────
+
+export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
+
+export interface SalesInvoice {
+  id: string;
+  code?: string;
+  so_id?: string;
+  customer_id: string;
+  customer_name?: string;
+  issue_date: string;
+  due_date?: string;
+  status: InvoiceStatus;
+  subtotal?: number;
+  tax?: number;
+  total?: number;
+  notes?: string;
+  created_at?: string;
+}
+
+export async function listSalesInvoices(params?: { status?: string }): Promise<SalesInvoice[]> {
+  const q = params?.status ? `?status=${params.status}` : "";
+  const r = await apiFetch(`/api/sales/invoices${q}`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return Array.isArray(d) ? d : d?.invoices ?? [];
+}
+
+export async function createSalesInvoice(body: {
+  so_id?: string;
+  customer_id: string;
+  issue_date: string;
+  due_date?: string;
+  notes?: string;
+}): Promise<SalesInvoice> {
+  const r = await apiFetch("/api/sales/invoices", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
+  const r = await apiFetch(`/api/sales/invoices/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
