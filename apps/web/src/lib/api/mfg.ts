@@ -1103,6 +1103,13 @@ export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   return Array.isArray(d) ? d : d?.receipts ?? [];
 }
 
+export async function getGoodsReceipt(id: string): Promise<GoodsReceipt> {
+  const r = await apiFetch(`${SVC}/goods-receipts/${id}`);
+  if (!r.ok) throw new Error(`getGoodsReceipt: ${r.status}`);
+  const d = await r.json();
+  return d as GoodsReceipt;
+}
+
 export async function receivePO(poId: string, body: { lines: Array<{ line_id: string; qty_received: number }>; notes?: string }): Promise<void> {
   const r = await apiFetch(`/api/mfg/purchase-orders/${poId}/receive`, {
     method: "POST",

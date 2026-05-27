@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar, type CommandAction } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -230,6 +231,7 @@ function CreatePayslipDialog({
 }
 
 export default function PayrollPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Payslip[]>([]);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState<PayslipStatus | "">("");
@@ -372,7 +374,8 @@ export default function PayrollPage() {
               items.map((ps) => (
                 <tr
                   key={ps.id}
-                  className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                  className="border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
+                  onClick={() => router.push('/hr/payroll/' + ps.id)}
                 >
                   <td className="px-3 py-2 font-mono text-[var(--color-text-secondary)] max-w-[160px] truncate">
                     {ps.employee_id}
@@ -397,7 +400,7 @@ export default function PayrollPage() {
                       {ps.status.charAt(0).toUpperCase() + ps.status.slice(1)}
                     </Tag>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1">
                       {ps.status === "draft" && (
                         <Button
