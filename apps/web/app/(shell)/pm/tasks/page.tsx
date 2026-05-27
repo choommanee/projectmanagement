@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { RefreshCw, Plus, Download, List, LayoutGrid } from "lucide-react";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
@@ -66,7 +67,7 @@ const KANBAN_COLS: Array<{ status: TaskStatus; label: string; tone: string }> = 
   { status: "done",        label: "Done",        tone: "text-success" },
 ];
 
-function KanbanBoard({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void }) {
+function KanbanBoard({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) => void; }) {
   const byStatus = useMemo(() => {
     const m = new Map<TaskStatus, Task[]>();
     KANBAN_COLS.forEach((c) => m.set(c.status, []));
@@ -122,6 +123,7 @@ function KanbanBoard({ tasks, onSelect }: { tasks: Task[]; onSelect: (t: Task) =
 
 export default function TasksPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
@@ -350,7 +352,7 @@ export default function TasksPage() {
           {!loading && tasks.length > 0 && view === "kanban" && (
             <KanbanBoard
               tasks={tasks}
-              onSelect={(task) => setSelectedTaskId(task.id)}
+              onSelect={(task) => router.push('/pm/tasks/' + task.id)}
             />
           )}
 
@@ -376,7 +378,7 @@ export default function TasksPage() {
                   {tasks.map((task, i) => (
                     <tr
                       key={task.id}
-                      onClick={() => setSelectedTaskId(task.id)}
+                      onClick={() => router.push('/pm/tasks/' + task.id)}
                       className={`cursor-pointer border-b border-line last:border-0 hover:bg-accent-soft/30 transition-colors ${i % 2 === 0 ? "bg-paper" : "bg-surface"}`}
                     >
                       <td className="px-3 py-2">
