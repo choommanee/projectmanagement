@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -83,6 +84,7 @@ const TYPE_FILTERS: Array<{ value: TaskType | ""; label: string }> = [
 
 export default function BacklogPage() {
   const qc = useQueryClient();
+  const router = useRouter();
   const [search, setSearch]         = useState("");
   const [typeFilter, setTypeFilter] = useState<TaskType | "">("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -230,7 +232,7 @@ export default function BacklogPage() {
                 <BacklogRow
                   key={task.id}
                   task={task}
-                  onOpen={(t) => setSelectedTaskId(t.id)}
+                  onOpen={(t) => router.push('/pm/tasks/' + t.id)}
                 />
               ))}
             </SortableContext>
