@@ -44,8 +44,12 @@ func main() {
 	employees := store.NewEmployeeStore(p)
 	payslips := store.NewPayslipStore(p)
 	leaveRequests := store.NewLeaveRequestStore(p)
+	training := store.NewTrainingStore(p)
+	jobs := store.NewJobStore(p)
+	performanceReviews := store.NewPerformanceReviewStore(p)
+	payrollRuns := store.NewPayrollRunStore(p)
 
-	svc := service.New(depts, positions, employees, payslips, leaveRequests)
+	svc := service.New(depts, positions, employees, payslips, leaveRequests, training, jobs, performanceReviews, payrollRuns)
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

@@ -71,6 +71,33 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.Get("/leave-requests/{id}", getLeaveRequest(svc))
 		r.With(libauth.RequireAction(authz, "hr.leave.approve", "*")).Post("/leave-requests/{id}/approve", approveLeaveRequest(svc))
 		r.With(libauth.RequireAction(authz, "hr.leave.approve", "*")).Post("/leave-requests/{id}/reject", rejectLeaveRequest(svc))
+
+		// Training
+		r.Get("/training", listTraining(svc))
+		r.With(libauth.RequireAction(authz, "hr.training.create", "*")).Post("/training", createTraining(svc))
+		r.Get("/training/{id}", getTraining(svc))
+		r.With(libauth.RequireAction(authz, "hr.training.update", "*")).Patch("/training/{id}", patchTraining(svc))
+
+		// Jobs / Recruitment
+		r.Get("/jobs", listJobs(svc))
+		r.With(libauth.RequireAction(authz, "hr.job.create", "*")).Post("/jobs", createJob(svc))
+		r.Get("/jobs/{id}", getJob(svc))
+		r.With(libauth.RequireAction(authz, "hr.job.update", "*")).Patch("/jobs/{id}", patchJob(svc))
+		r.Get("/jobs/{id}/applicants", listApplicants(svc))
+		r.With(libauth.RequireAction(authz, "hr.applicant.create", "*")).Post("/jobs/{id}/applicants", createApplicant(svc))
+		r.With(libauth.RequireAction(authz, "hr.applicant.update", "*")).Patch("/jobs/{id}/applicants/{applicantId}", patchApplicant(svc))
+
+		// Performance Reviews
+		r.Get("/performance-reviews", listPerformanceReviews(svc))
+		r.With(libauth.RequireAction(authz, "hr.review.create", "*")).Post("/performance-reviews", createPerformanceReview(svc))
+		r.Get("/performance-reviews/{id}", getPerformanceReview(svc))
+		r.With(libauth.RequireAction(authz, "hr.review.update", "*")).Patch("/performance-reviews/{id}", patchPerformanceReview(svc))
+
+		// Payroll Runs
+		r.Get("/payroll-runs", listPayrollRuns(svc))
+		r.With(libauth.RequireAction(authz, "hr.payroll_run.create", "*")).Post("/payroll-runs", createPayrollRun(svc))
+		r.Get("/payroll-runs/{id}", getPayrollRun(svc))
+		r.With(libauth.RequireAction(authz, "hr.payroll_run.update", "*")).Patch("/payroll-runs/{id}", patchPayrollRun(svc))
 	})
 
 	return r
