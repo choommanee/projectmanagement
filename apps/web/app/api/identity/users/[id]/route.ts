@@ -11,6 +11,15 @@ async function proxyHeaders() {
   return h;
 }
 
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const h = await proxyHeaders();
+  if (!h) return NextResponse.json({ error: "not authenticated" }, { status: 401 });
+  const { id } = await ctx.params;
+  const res = await fetch(`${SVC}/v1/users/${id}`, { headers: h, cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  return NextResponse.json(data, { status: res.status });
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const h = await proxyHeaders();
   if (!h) return NextResponse.json({ error: "not authenticated" }, { status: 401 });

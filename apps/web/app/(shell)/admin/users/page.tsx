@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { Button, Input, Tag } from "@pmplatform/ui-kit";
 import { listIdentityUsers, type IdentityUser } from "@/lib/api/identity";
@@ -23,6 +24,7 @@ function roleTone(role: string): Tone {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<IdentityUser[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function AdminUsersPage() {
                   <td colSpan={4} className="px-4 py-6 text-center text-ink-3">No users found.</td>
                 </tr>
               ) : filtered.map((u) => (
-                <tr key={u.id} className="hover:bg-surface/50">
+                <tr key={u.id} className="hover:bg-surface/50 cursor-pointer" onClick={() => router.push('/admin/users/' + u.id)}>
                   <td className="px-4 py-2 font-medium">{u.display_name || "—"}</td>
                   <td className="px-4 py-2 text-ink-3">{u.email}</td>
                   <td className="px-4 py-2">

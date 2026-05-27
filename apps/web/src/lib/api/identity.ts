@@ -31,3 +31,10 @@ export async function listIdentityUsers(): Promise<IdentityUser[]> {
   if (Array.isArray(data?.users)) return data.users as IdentityUser[];
   return [];
 }
+
+export async function getIdentityUser(id: string): Promise<IdentityUser> {
+  const res = await fetch(`/api/identity/users/${id}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`getIdentityUser: ${res.status}`);
+  const data = await res.json();
+  return data as IdentityUser;
+}
