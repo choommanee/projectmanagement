@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -157,6 +158,7 @@ function DeleteDialog({ position, onClose, onDeleted }: { position: Position; on
 }
 
 export default function PositionsPage() {
+  const router = useRouter();
   const [positions, setPositions] = useState<Position[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,7 +239,7 @@ export default function PositionsPage() {
               {positions.map((p) => {
                 const dept = p.departmentId ? deptMap.get(p.departmentId) : null;
                 return (
-                  <tr key={p.id} className="border-b border-line hover:bg-surface-2">
+                  <tr key={p.id} className="border-b border-line hover:bg-surface-2 cursor-pointer" onClick={() => router.push('/hr/positions/' + p.id)}>
                     <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{p.code}</td>
                     <td className="px-4 py-2 font-medium text-ink">{p.name}</td>
                     <td className="px-4 py-2 text-xs text-ink-2">
