@@ -37,9 +37,10 @@ export async function listNotifications(
   const r = await fetch(`${SVC}?${qs}`);
   if (!r.ok) throw new Error(`list failed: ${r.status}`);
   const body = await r.json();
+  const items = (body.items as Record<string, unknown>[] ?? []).map(normNotif);
   return {
-    items: (body.items as Record<string, unknown>[] ?? []).map(normNotif),
-    total: body.total ?? 0,
+    items,
+    total: typeof body.total === "number" ? body.total : items.length,
   };
 }
 

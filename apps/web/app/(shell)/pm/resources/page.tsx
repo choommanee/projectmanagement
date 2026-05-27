@@ -87,9 +87,9 @@ export default function ResourcePlanningPage() {
   function cellColor(md: number): string {
     if (md === 0) return "";
     const pct = md / CAPACITY_MD_PER_WEEK;
-    if (pct > 1.0) return "bg-red-100 text-red-700 font-semibold";
-    if (pct > 0.8) return "bg-amber-100 text-amber-700";
-    return "bg-green-100 text-green-700";
+    if (pct > 1.0) return "bg-danger/10 text-danger font-semibold";
+    if (pct > 0.8) return "bg-warning/10 text-warning";
+    return "bg-success/10 text-success";
   }
 
   const fmtMd = (md: number) => md === 0 ? "—" : md.toFixed(1) + "d";
@@ -99,24 +99,24 @@ export default function ResourcePlanningPage() {
       <Breadcrumb items={[{ label: "PM" }, { label: "Resource Planning" }]} />
 
       <div className="flex items-center gap-4 text-xs">
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block" /> &lt;80% capacity</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" /> 80–100%</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" /> Over capacity</div>
-        <span className="text-muted-foreground ml-2">Capacity = {CAPACITY_MD_PER_WEEK} man-days/week</span>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-success/10 border border-success/20 inline-block" /> &lt;80% capacity</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-warning/10 border border-warning/20 inline-block" /> 80–100%</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-danger/10 border border-danger/20 inline-block" /> Over capacity</div>
+        <span className="text-ink-3 ml-2">Capacity = {CAPACITY_MD_PER_WEEK} man-days/week</span>
       </div>
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-ink-3">Loading...</div>
       ) : assignedUserIds.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-8 text-center">No assigned tasks found in the next 8 weeks.</div>
+        <div className="text-sm text-ink-3 py-8 text-center">No assigned tasks found in the next 8 weeks.</div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="bg-muted/50">
-                <th className="px-4 py-2 text-left font-medium text-xs text-muted-foreground w-44 border-b border-border">Team Member</th>
+              <tr className="bg-surface-2/50">
+                <th className="px-4 py-2 text-left font-medium text-xs text-ink-3 w-44 border-b border-line">Team Member</th>
                 {weeks.map(w => (
-                  <th key={weekKey(w)} className="px-2 py-2 text-center font-medium text-xs text-muted-foreground min-w-[80px] border-b border-border">
+                  <th key={weekKey(w)} className="px-2 py-2 text-center font-medium text-xs text-ink-3 min-w-[80px] border-b border-line">
                     {w.toLocaleDateString("en", { month: "short", day: "numeric" })}
                   </th>
                 ))}
@@ -127,7 +127,7 @@ export default function ResourcePlanningPage() {
                 const user = userMap.get(uid);
                 const userRow = grid.get(uid) ?? new Map();
                 return (
-                  <tr key={uid} className="border-t border-border hover:bg-muted/20">
+                  <tr key={uid} className="border-t border-line hover:bg-surface-2/20">
                     <td className="px-4 py-2 font-medium text-xs whitespace-nowrap">
                       {user?.display_name ?? user?.email ?? uid.slice(0, 8)}
                     </td>
