@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -144,6 +145,7 @@ function DeleteDialog({ dept, onClose, onDeleted }: { dept: Department; onClose:
 }
 
 export default function DepartmentsPage() {
+  const router = useRouter();
   const [depts, setDepts] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -218,7 +220,7 @@ export default function DepartmentsPage() {
               {depts.map((d) => {
                 const parent = d.parentId ? deptMap.get(d.parentId) : null;
                 return (
-                  <tr key={d.id} className="border-b border-line hover:bg-surface-2">
+                  <tr key={d.id} className="border-b border-line hover:bg-surface-2 cursor-pointer" onClick={() => router.push('/hr/departments/' + d.id)}>
                     <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{d.code}</td>
                     <td className="px-4 py-2 font-medium text-ink">{d.name}</td>
                     <td className="px-4 py-2 text-xs text-ink-2">

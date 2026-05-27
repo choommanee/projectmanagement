@@ -160,6 +160,12 @@ export async function deleteDepartment(id: string): Promise<void> {
   if (!r.ok && r.status !== 204) throw new Error(`deleteDepartment: ${r.status}`);
 }
 
+export async function getDepartment(id: string): Promise<Department> {
+  const r = await apiFetch(`${SVC}/departments/${id}`);
+  if (!r.ok) throw new Error(`getDepartment: ${r.status}`);
+  return normalizeDept(await r.json() as Record<string, unknown>);
+}
+
 // ─── positions ─────────────────────────────────────────────────────────────
 
 export async function listPositions(q?: string): Promise<Position[]> {
@@ -204,6 +210,12 @@ export async function updatePosition(id: string, patch: Partial<{
 export async function deletePosition(id: string): Promise<void> {
   const r = await apiFetch(`${SVC}/positions/${id}`, { method: "DELETE" });
   if (!r.ok && r.status !== 204) throw new Error(`deletePosition: ${r.status}`);
+}
+
+export async function getPosition(id: string): Promise<Position> {
+  const r = await apiFetch(`${SVC}/positions/${id}`);
+  if (!r.ok) throw new Error(`getPosition: ${r.status}`);
+  return normalizePosition(await r.json() as Record<string, unknown>);
 }
 
 // ─── employees ─────────────────────────────────────────────────────────────
