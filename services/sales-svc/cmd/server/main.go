@@ -41,8 +41,12 @@ func main() {
 
 	customers := store.NewCustomerStore(p)
 	salesOrders := store.NewSalesOrderStore(p)
+	quotations := store.NewQuotationStore(p)
+	invoices := store.NewSalesInvoiceStore(p)
+	shipments := store.NewShipmentStore(p)
+	opportunities := store.NewOpportunityStore(p)
 
-	svc := service.New(customers, salesOrders)
+	svc := service.New(customers, salesOrders, quotations, invoices, shipments, opportunities)
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

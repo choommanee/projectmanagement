@@ -72,3 +72,117 @@ type SOLine struct {
 	UnitPrice  float64
 	Notes      string
 }
+
+// ---- Quotation ----
+
+type QuotationStatus string
+
+const (
+	QuotationDraft    QuotationStatus = "draft"
+	QuotationSent     QuotationStatus = "sent"
+	QuotationAccepted QuotationStatus = "accepted"
+	QuotationRejected QuotationStatus = "rejected"
+	QuotationExpired  QuotationStatus = "expired"
+)
+
+type Quotation struct {
+	ID          uuid.UUID
+	TenantID    uuid.UUID
+	Code        string
+	CustomerID  uuid.UUID
+	Title       string
+	ValidUntil  *time.Time
+	Status      QuotationStatus
+	TotalAmount float64
+	Notes       string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Version     int
+}
+
+// ---- SalesInvoice ----
+
+type InvoiceStatus string
+
+const (
+	InvoiceDraft     InvoiceStatus = "draft"
+	InvoiceSent      InvoiceStatus = "sent"
+	InvoicePaid      InvoiceStatus = "paid"
+	InvoiceOverdue   InvoiceStatus = "overdue"
+	InvoiceCancelled InvoiceStatus = "cancelled"
+)
+
+type SalesInvoice struct {
+	ID         uuid.UUID
+	TenantID   uuid.UUID
+	Code       string
+	SOID       *uuid.UUID
+	CustomerID uuid.UUID
+	IssueDate  time.Time
+	DueDate    *time.Time
+	Status     InvoiceStatus
+	Subtotal   float64
+	Tax        float64
+	Total      float64
+	Notes      string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Version    int
+}
+
+// ---- Shipment ----
+
+type ShipmentStatus string
+
+const (
+	ShipmentPending   ShipmentStatus = "pending"
+	ShipmentPacked    ShipmentStatus = "packed"
+	ShipmentShipped   ShipmentStatus = "shipped"
+	ShipmentDelivered ShipmentStatus = "delivered"
+	ShipmentReturned  ShipmentStatus = "returned"
+)
+
+type Shipment struct {
+	ID              uuid.UUID
+	TenantID        uuid.UUID
+	Code            string
+	SOID            *uuid.UUID
+	CustomerID      *uuid.UUID
+	ShipDate        *time.Time
+	Carrier         string
+	TrackingNo      string
+	DeliveryAddress string
+	Status          ShipmentStatus
+	Notes           string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+// ---- Opportunity ----
+
+type OpportunityStage string
+
+const (
+	StageProspect    OpportunityStage = "prospect"
+	StageQualified   OpportunityStage = "qualified"
+	StageProposal    OpportunityStage = "proposal"
+	StageNegotiation OpportunityStage = "negotiation"
+	StageWon         OpportunityStage = "won"
+	StageLost        OpportunityStage = "lost"
+)
+
+type Opportunity struct {
+	ID                uuid.UUID
+	TenantID          uuid.UUID
+	Title             string
+	CustomerID        uuid.UUID
+	Stage             OpportunityStage
+	Value             float64
+	Currency          string
+	ExpectedCloseDate *time.Time
+	Probability       int
+	AssignedTo        *uuid.UUID
+	Notes             string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}

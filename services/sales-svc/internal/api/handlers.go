@@ -54,6 +54,30 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.With(libauth.RequireAction(authz, "sales.order.update", "*")).Post("/sales-orders/{id}/lines", addSOLine(svc))
 		r.With(libauth.RequireAction(authz, "sales.order.update", "*")).Patch("/sales-orders/{id}/lines/{lineId}", updateSOLine(svc))
 		r.With(libauth.RequireAction(authz, "sales.order.update", "*")).Delete("/sales-orders/{id}/lines/{lineId}", deleteSOLine(svc))
+
+		// Quotations
+		r.Get("/quotations", listQuotations(svc))
+		r.With(libauth.RequireAction(authz, "sales.quotation.create", "*")).Post("/quotations", createQuotation(svc))
+		r.Get("/quotations/{id}", getQuotation(svc))
+		r.With(libauth.RequireAction(authz, "sales.quotation.update", "*")).Patch("/quotations/{id}", updateQuotation(svc))
+
+		// Invoices
+		r.Get("/invoices", listInvoices(svc))
+		r.With(libauth.RequireAction(authz, "sales.invoice.create", "*")).Post("/invoices", createInvoice(svc))
+		r.Get("/invoices/{id}", getInvoice(svc))
+		r.With(libauth.RequireAction(authz, "sales.invoice.update", "*")).Patch("/invoices/{id}", updateInvoice(svc))
+
+		// Shipments
+		r.Get("/shipments", listShipments(svc))
+		r.With(libauth.RequireAction(authz, "sales.shipment.create", "*")).Post("/shipments", createShipment(svc))
+		r.Get("/shipments/{id}", getShipment(svc))
+		r.With(libauth.RequireAction(authz, "sales.shipment.update", "*")).Patch("/shipments/{id}", updateShipment(svc))
+
+		// Opportunities
+		r.Get("/opportunities", listOpportunities(svc))
+		r.With(libauth.RequireAction(authz, "sales.opportunity.create", "*")).Post("/opportunities", createOpportunity(svc))
+		r.Get("/opportunities/{id}", getOpportunity(svc))
+		r.With(libauth.RequireAction(authz, "sales.opportunity.update", "*")).Patch("/opportunities/{id}", updateOpportunity(svc))
 	})
 
 	return r
