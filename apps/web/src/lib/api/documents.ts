@@ -275,6 +275,13 @@ export async function deleteComment(id: string): Promise<void> {
 }
 
 // Templates
+export async function getTemplate(id: string): Promise<Template> {
+  const r = await fetch(`/api/documents/templates/${id}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`getTemplate: ${r.status}`);
+  const d = await r.json();
+  return normTemplate(d);
+}
+
 export async function listTemplates(type?: DocumentType): Promise<Template[]> {
   const qs = type ? `?type=${type}` : "";
   const r = await fetch(`/api/templates${qs}`);

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Tag } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { listTemplates, type Template, type DocumentType } from "@/lib/api/documents";
@@ -44,6 +45,7 @@ function fmtDate(iso: string): string {
 }
 
 export default function TemplatesPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +112,8 @@ export default function TemplatesPage() {
                   return (
                     <tr
                       key={tmpl.id}
-                      className="border-b border-line last:border-0 hover:bg-surface-2 cursor-default transition-colors"
+                      onClick={() => router.push('/docs/templates/' + tmpl.id)}
+                      className="border-b border-line last:border-0 hover:bg-surface-2 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-2.5 font-medium text-ink">{tmpl.name}</td>
                       <td className="px-4 py-2.5">
