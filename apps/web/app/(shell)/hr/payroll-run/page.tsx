@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
@@ -65,6 +66,7 @@ function NewRunDialog({
 }
 
 export default function PayrollRunPage() {
+  const router = useRouter();
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
@@ -102,7 +104,7 @@ export default function PayrollRunPage() {
               {runs.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No payroll runs. Click &quot;New Run&quot; to start one.</td></tr>
               ) : runs.map((run) => (
-                <tr key={run.id} className="hover:bg-surface-2/50">
+                <tr key={run.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/hr/payroll-run/' + run.id)}>
                   <td className="px-4 py-2 font-medium">
                     {run.period_start?.slice(0, 10)} → {run.period_end?.slice(0, 10)}
                   </td>

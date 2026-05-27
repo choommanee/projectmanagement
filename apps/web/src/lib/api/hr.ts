@@ -515,6 +515,12 @@ export async function createPayrollRun(body: { period_start: string; period_end:
   return r.json() as Promise<PayrollRun>;
 }
 
+export async function getPayrollRun(id: string): Promise<PayrollRun> {
+  const r = await apiFetch(`${SVC}/payroll-runs/${id}`);
+  if (!r.ok) throw new Error(`getPayrollRun: ${r.status}`);
+  return r.json();
+}
+
 // ─── training records ──────────────────────────────────────────────────────
 
 export type TrainingStatus = "enrolled" | "in_progress" | "completed" | "expired";
