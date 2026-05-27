@@ -767,6 +767,12 @@ export async function createJobPosting(input: {
   return normJobPosting(await r.json());
 }
 
+export async function getJobPosting(id: string): Promise<JobPosting> {
+  const r = await apiFetch(`${SVC}/jobs/${id}`);
+  if (!r.ok) throw new Error(`getJobPosting: ${r.status}`);
+  return normJobPosting(await r.json());
+}
+
 export async function updateJobPosting(id: string, patch: Partial<{ status: JobStatus; openings: number; description: string }>): Promise<JobPosting> {
   const r = await apiFetch(`${SVC}/jobs/${id}`, {
     method: "PATCH",

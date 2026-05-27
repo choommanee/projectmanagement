@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import {
   listJobPostings, createJobPosting, updateJobPosting,
@@ -26,6 +27,7 @@ const STAGE_COLORS: Record<ApplicantStage, string> = {
 };
 
 export default function RecruitmentPage() {
+  const router = useRouter();
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [selected, setSelected] = useState<JobPosting | null>(null);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -111,7 +113,7 @@ export default function RecruitmentPage() {
             {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
             {jobs.map(job => (
               <div key={job.id}
-                onClick={() => selectJob(job)}
+                onClick={() => router.push('/hr/recruitment/' + job.id)}
                 className={`rounded-lg border p-3 cursor-pointer transition-colors ${selected?.id === job.id ? "border-accent bg-accent/5" : "border-border hover:bg-muted/30"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
