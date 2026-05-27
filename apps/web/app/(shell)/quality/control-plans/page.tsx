@@ -302,7 +302,7 @@ export default function ControlPlansPage() {
               {plans.map(cp => {
                 const item = itemMap.get(cp.itemId);
                 return (
-                  <tr key={cp.id} onClick={() => setSelected(cp)}
+                  <tr key={cp.id} onClick={() => router.push('/quality/control-plans/' + cp.id)}
                     className="cursor-pointer border-b border-line hover:bg-surface-2">
                     <td className="px-4 py-2 font-medium text-ink">{cp.name}</td>
                     <td className="px-4 py-2">
