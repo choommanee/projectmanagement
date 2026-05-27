@@ -18,7 +18,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang={locale} className={`${sans.variable} ${mono.variable}`}>
-      <body>
+      <body suppressHydrationWarning>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <QueryProvider>
             <ThemeProvider>

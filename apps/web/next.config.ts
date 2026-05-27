@@ -5,7 +5,7 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const config: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@pmplatform/ui-kit", "@pmplatform/design-tokens"],
+  transpilePackages: ["@pmplatform/ui-kit", "@pmplatform/design-tokens", "reactflow", "@reactflow/core", "@reactflow/background", "@reactflow/controls", "@reactflow/minimap"],
 };
 
 export default withNextIntl(config);

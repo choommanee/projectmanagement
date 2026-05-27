@@ -19,7 +19,12 @@
   --color-accent:       var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft:  var(--accent-soft);
+  --color-accent-muted: var(--accent-muted);
   --color-signal:       var(--signal);
+
+  /* Sidebar */
+  --color-sidebar-bg:   var(--sidebar-bg);
+  --color-sidebar-text: var(--sidebar-text);
   --color-signal-soft:  var(--signal-soft);
 
   --color-success:      var(--success);
@@ -38,6 +43,7 @@
   --radius-xs:  var(--r-xs);
   --radius-sm:  var(--r-sm);
   --radius-md:  var(--r-md);
+  --radius-lg:  var(--r-lg);
 
   /* Legacy compat — keep old tokens working */
   --color-primary:      var(--accent);
@@ -61,26 +67,38 @@
   --line:         rgba(11,15,20,0.08);
   --line-strong:  rgba(11,15,20,0.16);
 
-  --accent:       #1F4FFF;
-  --accent-hover: #1843DB;
-  --accent-soft:  rgba(31,79,255,0.08);
+  --accent:       #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-soft:  rgba(79,70,229,0.08);
+  --accent-muted: rgba(79,70,229,0.12);
   --signal:       #FF6B1F;
   --signal-soft:  rgba(255,107,31,0.10);
 
   --success:      #0F8A4E;
   --warning:      #B5701C;
   --danger:       #C0303C;
-  --info:         #1F4FFF;
+  --info:         #4F46E5;
 
-  --shadow-xs:  0 1px 0 rgba(11,15,20,0.04);
-  --shadow-sm:  0 1px 2px rgba(11,15,20,0.06), 0 1px 1px rgba(11,15,20,0.04);
-  --shadow-md:  0 6px 24px -8px rgba(11,15,20,0.10), 0 2px 6px rgba(11,15,20,0.06);
-  --shadow-lg:  0 24px 48px -16px rgba(11,15,20,0.18);
-  --shadow-pop: 0 18px 40px -12px rgba(11,15,20,0.22), 0 0 0 1px rgba(11,15,20,0.06);
+  /* Sidebar — follows light/dark theme */
+  --sidebar-bg:          var(--surface-2);
+  --sidebar-surface:     rgba(0,0,0,0.04);
+  --sidebar-text:        var(--ink-2);
+  --sidebar-text-muted:  var(--ink-3);
+  --sidebar-border:      var(--line);
+  --sidebar-active-bg:   var(--accent-soft);
+  --sidebar-indicator:   var(--accent);
+  --sidebar-hover-bg:    rgba(0,0,0,0.04);
 
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 8px;
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg:  0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.04);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.06);
+
+  --r-xs: 5px;
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 14px;
 
   /* ─── Density scale (Phase A·3) ─────────────────────────────────────────── */
   /* These are the *defaults* (cozy). [data-density="compact"|"comfortable"]
@@ -120,7 +138,16 @@
   --ink-3:        #767E8A;
   --line:         rgba(236,239,243,0.08);
   --line-strong:  rgba(236,239,243,0.18);
-  --accent-soft:  rgba(31,79,255,0.16);
+  --accent-soft:  rgba(79,70,229,0.16);
+  --accent-muted: rgba(79,70,229,0.20);
+
+  --sidebar-bg:          #060A0F;
+  --sidebar-surface:     rgba(255,255,255,0.04);
+  --sidebar-text:        #B6BDC8;
+  --sidebar-text-muted:  rgba(182,189,200,0.5);
+  --sidebar-border:      rgba(255,255,255,0.06);
+  --sidebar-active-bg:   rgba(255,255,255,0.07);
+
   color-scheme: dark;
 }
 

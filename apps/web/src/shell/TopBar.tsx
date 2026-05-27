@@ -63,10 +63,13 @@ export function TopBar({
   const bgColor = user?.id ? avatarColor(user.id) : AVATAR_PALETTE[0];
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b border-line bg-paper/95 backdrop-blur supports-backdrop-filter:bg-paper/70 px-4">
+    <header className="flex h-12 items-center gap-3 border-b border-line bg-paper/98 backdrop-blur supports-backdrop-filter:bg-paper/80 px-4 z-30 relative">
       {/* Left: logo + app switcher */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="grid h-9 w-9 place-items-center rounded-sm bg-ink text-paper font-mono text-[13px] font-semibold tracking-tight select-none">
+        <div
+          className="grid h-8 w-8 place-items-center rounded-md text-white font-mono text-[12px] font-bold tracking-tight select-none shrink-0"
+          style={{ background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)" }}
+        >
           PM
         </div>
         <AppSwitcher
@@ -81,7 +84,7 @@ export function TopBar({
         type="button"
         onClick={openPalette}
         aria-label={t("search")}
-        className="mx-auto flex w-105 items-center gap-2 rounded-sm bg-surface-2 border border-transparent hover:border-line h-9 px-2.5 text-sm transition-colors cursor-pointer"
+        className="mx-auto flex w-96 items-center gap-2 rounded-md bg-surface-2 border border-line/50 hover:border-line h-8 px-2.5 text-sm transition-all duration-150 cursor-pointer hover:shadow-sm"
       >
         <Search size={14} className="text-ink-3 shrink-0" />
         <span className="flex-1 text-left text-ink-3 font-mono text-sm">

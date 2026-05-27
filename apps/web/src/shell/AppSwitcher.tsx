@@ -58,7 +58,7 @@ export function AppSwitcher({
       {/* Trigger */}
       <button
         type="button"
-        className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 h-9 text-sm font-medium text-ink-2 hover:text-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
+        className="flex items-center gap-1.5 rounded-md px-2 py-1 h-8 text-[13px] font-medium text-ink-2 hover:text-ink hover:bg-surface-2 border border-transparent hover:border-line transition-colors"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
         aria-expanded={open}

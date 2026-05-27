@@ -158,6 +158,32 @@ func (s *Definitions) SoftDelete(ctx context.Context, tid, id uuid.UUID, version
 	})
 }
 
+// ListByEventTrigger returns all published definitions that have trigger.type="event"
+// and trigger.event matching the given subject.
+func (s *Definitions) ListByEventTrigger(ctx context.Context, event string) ([]*domain.WorkflowDefinition, error) {
+	rows, err := s.p.Query(ctx, `
+		SELECT id, tenant_id, name, COALESCE(description,''), trigger, status, current_version,
+		       created_at, updated_at, version
+		FROM workflow_definition
+		WHERE status = 'published'
+		  AND deleted_at IS NULL
+		  AND trigger->>'type' = 'event'
+		  AND trigger->>'event' = $1`, event)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*domain.WorkflowDefinition
+	for rows.Next() {
+		var d domain.WorkflowDefinition
+		if err := scanDef(rows, &d); err != nil {
+			return nil, err
+		}
+		out = append(out, &d)
+	}
+	return out, rows.Err()
+}
+
 // PublishVersion sets definition status='published' and current_version=rev.
 func (s *Definitions) PublishVersion(ctx context.Context, tid, defID uuid.UUID, rev, version int) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {

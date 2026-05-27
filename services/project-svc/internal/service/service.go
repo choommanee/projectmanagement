@@ -18,6 +18,7 @@ type Service struct {
 	Tasks    *store.Tasks
 	Sprints  *store.Sprints
 	Worklog  *store.WorklogStore
+	Activity *store.ActivityStore
 	notif    notiflib.Publisher
 }
 
@@ -29,6 +30,13 @@ func New(p *store.Projects, t *store.Tasks, s *store.Sprints) *Service {
 // Returns the receiver for fluent wiring.
 func (svc *Service) WithNotifPublisher(pub notiflib.Publisher) *Service {
 	svc.notif = pub
+	return svc
+}
+
+// WithActivity attaches the activity/comment store to the service.
+// Returns the receiver for fluent wiring.
+func (svc *Service) WithActivity(a *store.ActivityStore) *Service {
+	svc.Activity = a
 	return svc
 }
 
@@ -199,6 +207,97 @@ func (svc *Service) CreateTask(ctx context.Context, in CreateTaskInput) (*domain
 		return nil, err
 	}
 	return t, nil
+}
+
+// PatchTaskInput holds data for patching a task.
+type PatchTaskInput struct {
+	store.TaskPatch
+	ActorID string // caller user ID, for activity + notification routing
+}
+
+// PatchTask fetches the existing task, applies the patch, records activity for
+// changed fields, and publishes notifications for important changes.
+func (svc *Service) PatchTask(ctx context.Context, in PatchTaskInput) (*domain.Task, error) {
+	// Fetch existing to diff
+	existing, err := svc.Tasks.GetByID(ctx, in.TenantID, in.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, err := svc.Tasks.Patch(ctx, in.TaskPatch)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse actor UUID once; nil is valid for system-generated events.
+	var actorUUID *uuid.UUID
+	if in.ActorID != "" {
+		if uid, err2 := uuid.Parse(in.ActorID); err2 == nil {
+			actorUUID = &uid
+		}
+	}
+
+	// Record activity for each changed field.
+	if svc.Activity != nil {
+		if in.Status != nil && string(existing.Status) != *in.Status {
+			_ = svc.Activity.RecordActivity(ctx, in.TenantID, in.ID, actorUUID,
+				"status_changed", string(existing.Status), *in.Status)
+		}
+		if in.Priority != nil && string(existing.Priority) != *in.Priority {
+			_ = svc.Activity.RecordActivity(ctx, in.TenantID, in.ID, actorUUID,
+				"priority_changed", string(existing.Priority), *in.Priority)
+		}
+		if in.AssigneeID != nil {
+			oldVal := ""
+			if existing.AssigneeID != nil {
+				oldVal = existing.AssigneeID.String()
+			}
+			newVal := ""
+			if *in.AssigneeID != nil {
+				newVal = (*in.AssigneeID).String()
+			}
+			if oldVal != newVal {
+				_ = svc.Activity.RecordActivity(ctx, in.TenantID, in.ID, actorUUID,
+					"assigned", oldVal, newVal)
+			}
+		}
+	}
+
+	// Notify when the assignee changes.
+	if svc.notif != nil && in.AssigneeID != nil && updated.AssigneeID != nil {
+		oldAssignee := ""
+		if existing.AssigneeID != nil {
+			oldAssignee = existing.AssigneeID.String()
+		}
+		if oldAssignee != updated.AssigneeID.String() {
+			_ = svc.notif.Publish(ctx, notiflib.Event{
+				TenantID: in.TenantID.String(),
+				UserID:   updated.AssigneeID.String(),
+				Kind:     "task.assigned",
+				Title:    "You have been assigned to: " + updated.Title,
+				Body:     updated.Code + " — " + updated.Title,
+			})
+		}
+	}
+
+	// Notify when status transitions to blocked.
+	if svc.notif != nil && in.Status != nil && *in.Status == "blocked" && string(existing.Status) != "blocked" {
+		targetID := in.ActorID
+		if updated.AssigneeID != nil {
+			targetID = updated.AssigneeID.String()
+		}
+		if targetID != "" {
+			_ = svc.notif.Publish(ctx, notiflib.Event{
+				TenantID: in.TenantID.String(),
+				UserID:   targetID,
+				Kind:     "task.blocked",
+				Title:    "Task blocked: " + updated.Title,
+				Body:     updated.Code + " has been marked as blocked.",
+			})
+		}
+	}
+
+	return updated, nil
 }
 
 // CreateSprintInput holds data for creating a sprint.

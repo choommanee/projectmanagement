@@ -22,6 +22,7 @@ import (
 	"github.com/pmplatform/services/workflow-svc/internal/api"
 	"github.com/pmplatform/services/workflow-svc/internal/service"
 	"github.com/pmplatform/services/workflow-svc/internal/store"
+	"github.com/pmplatform/services/workflow-svc/internal/trigger"
 )
 
 func main() {
@@ -43,26 +44,36 @@ func main() {
 	defer p.Close()
 
 	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
+	var triggerListener *trigger.Listener
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
 		if nc, err := natsx.Connect(natsURL); err != nil {
-			log.Warn().Err(err).Msg("nats unavailable — notif events disabled")
+			log.Warn().Err(err).Msg("nats unavailable — notif events + triggers disabled")
 		} else {
 			if pub, err := notiflib.NewJetStreamPublisher(nc); err != nil {
 				log.Warn().Err(err).Msg("notif publisher init failed")
 			} else {
 				notifPub = pub
-				defer nc.Close()
 			}
+			// Wire is deferred so svc is built first; Start is called after.
+			defer nc.Close()
+			triggerListener = trigger.New(nil, nc.Conn()) // svc attached below
 		}
 	}
 
+	templatesStore := store.NewTemplates(p)
 	svc := service.New(
 		store.NewDefinitions(p),
 		store.NewVersions(p),
 		store.NewInstances(p),
 		store.NewHumanTasks(p),
 		runtimeURL,
-	).WithNotifPublisher(notifPub)
+	).WithNotifPublisher(notifPub).WithTemplates(templatesStore)
+
+	if triggerListener != nil {
+		triggerListener.AttachService(svc)
+		triggerListener.Start(context.Background())
+		defer triggerListener.Stop()
+	}
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

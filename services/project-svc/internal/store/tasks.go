@@ -306,6 +306,34 @@ func (s *Tasks) RemoveDependency(ctx context.Context, tid, id uuid.UUID) error {
 	})
 }
 
+func (s *Tasks) ListDepsForProject(ctx context.Context, tenantID, projectID uuid.UUID) ([]domain.TaskDependency, error) {
+	const q = `
+		SELECT td.id, td.tenant_id, td.predecessor_id, td.successor_id, td.type, td.lag_days, td.created_at
+		FROM task_dependency td
+		JOIN task t ON t.id = td.successor_id
+		WHERE t.project_id = $1 AND td.tenant_id = $2 AND t.deleted_at IS NULL`
+	var out []domain.TaskDependency
+	err := s.withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, q, projectID, tenantID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var d domain.TaskDependency
+			if err := rows.Scan(&d.ID, &d.TenantID, &d.PredecessorID, &d.SuccessorID, &d.Type, &d.LagDays, &d.CreatedAt); err != nil {
+				return err
+			}
+			out = append(out, d)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 const taskSelect = `
     SELECT id, tenant_id, project_id, parent_id, code, title, COALESCE(description,''),
       type, status, priority, assignee_id, reviewer_id, estimate_md, actual_md, progress_pct,

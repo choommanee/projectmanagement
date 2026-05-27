@@ -87,6 +87,12 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.template.create", "*")).Post("/templates", createTemplate(svc))
 		r.Get("/templates/{id}", getTemplate(svc))
+
+		// Signatures
+		r.Get("/documents/{id}/signatures", listSignatures(svc))
+		r.Post("/documents/{id}/signatures", requestSignatures(svc))
+		r.Post("/documents/{id}/signatures/{sigId}/sign", signDocument(svc))
+		r.Post("/documents/{id}/signatures/{sigId}/decline", declineSignature(svc))
 	})
 
 	return r
@@ -640,6 +646,119 @@ func getTemplate(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, t)
+	}
+}
+
+// --- Signatures ---
+
+func listSignatures(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		sigs, err := svc.Signatures.List(r.Context(), tid, docID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if sigs == nil {
+			sigs = []domain.DocumentSignature{}
+		}
+		writeJSON(w, 200, map[string]any{"items": sigs})
+	}
+}
+
+type requestSignaturesReq struct {
+	Signers []struct {
+		ID    string `json:"id"`
+		Email string `json:"email"`
+	} `json:"signers"`
+}
+
+func requestSignatures(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req requestSignaturesReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if len(req.Signers) == 0 {
+			writeErr(w, 400, errors.New("at least one signer required"))
+			return
+		}
+		var created []domain.DocumentSignature
+		for _, s := range req.Signers {
+			signerID, err := uuid.Parse(s.ID)
+			if err != nil {
+				continue
+			}
+			sig, err := svc.Signatures.Create(r.Context(), tid, docID, signerID, s.Email, nil)
+			if err != nil {
+				writeErr(w, 500, err)
+				return
+			}
+			created = append(created, *sig)
+		}
+		writeJSON(w, 201, map[string]any{"items": created})
+	}
+}
+
+func signDocument(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		sigID, err := uuid.Parse(chi.URLParam(r, "sigId"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		sig, err := svc.Signatures.Sign(r.Context(), tid, sigID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, sig)
+	}
+}
+
+type declineReq struct{ Reason string `json:"reason"` }
+
+func declineSignature(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		sigID, err := uuid.Parse(chi.URLParam(r, "sigId"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req declineReq
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		sig, err := svc.Signatures.Decline(r.Context(), tid, sigID, req.Reason)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, sig)
 	}
 }
 

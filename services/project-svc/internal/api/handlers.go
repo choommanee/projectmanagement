@@ -74,6 +74,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		// loader returns the project's tenant_id (the new task will inherit it).
 		r.Get("/projects/{id}/tasks", listTasks(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.create", "Project::{:id}", loaderOpts...)).Post("/projects/{id}/tasks", createTask(svc))
+		r.Get("/projects/{id}/task-dependencies", listProjectTaskDeps(svc))
 
 		// Tasks standalone
 		r.Get("/tasks", listAllTasks(svc))
@@ -86,6 +87,12 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.Get("/tasks/{id}/worklogs", listWorklogs(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).
 			Post("/tasks/{id}/worklogs", createWorklog(svc))
+
+		// Task comments & activity feed
+		r.Get("/tasks/{id}/comments", listTaskComments(svc))
+		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).
+			Post("/tasks/{id}/comments", createTaskComment(svc))
+		r.Get("/tasks/{id}/activity", listTaskActivity(svc))
 
 		// Dependencies — the row is keyed on the dependency id, which the
 		// loader doesn't model; keep RequireAction with "*" until a
@@ -478,6 +485,46 @@ func listTasks(svc *service.Service) http.HandlerFunc {
 }
 
 
+func listProjectTaskDeps(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		pid, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		deps, err := svc.Tasks.ListDepsForProject(r.Context(), tid, pid)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if deps == nil {
+			deps = []domain.TaskDependency{}
+		}
+		type depJSON struct {
+			ID            string `json:"id"`
+			PredecessorID string `json:"predecessorId"`
+			SuccessorID   string `json:"successorId"`
+			Type          string `json:"type"`
+			LagDays       int    `json:"lagDays"`
+		}
+		out := make([]depJSON, len(deps))
+		for i, d := range deps {
+			out[i] = depJSON{
+				ID:            d.ID.String(),
+				PredecessorID: d.PredecessorID.String(),
+				SuccessorID:   d.SuccessorID.String(),
+				Type:          string(d.Type),
+				LagDays:       d.LagDays,
+			}
+		}
+		writeJSON(w, 200, out)
+	}
+}
+
 // updateTaskReq fields are all optional so that a PATCH request only touches
 // the fields the caller explicitly provided. String fields use *string so that
 // callers can send `"title": ""` to clear a value. The legacy value-type
@@ -553,7 +600,15 @@ func updateTask(svc *service.Service) http.HandlerFunc {
 			p.Priority = &s
 		}
 
-		t, err := svc.Tasks.Patch(r.Context(), p)
+		// Extract caller identity from JWT claims for activity recording.
+		callerID := ""
+		if claims, ok := libauth.FromCtx(r.Context()); ok {
+			callerID = claims.Subject
+		}
+		t, err := svc.PatchTask(r.Context(), service.PatchTaskInput{
+			TaskPatch: p,
+			ActorID:   callerID,
+		})
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrNotFound):
@@ -1024,6 +1079,94 @@ func unassignTask(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(204)
+	}
+}
+
+// --- Task Comments & Activity ---
+
+// GET /tasks/{id}/comments
+func listTaskComments(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		taskID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		comments, err := svc.Activity.ListComments(r.Context(), tid, taskID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if comments == nil {
+			comments = []domain.TaskComment{}
+		}
+		writeJSON(w, 200, map[string]any{"items": comments})
+	}
+}
+
+type createCommentReq struct {
+	Body     string `json:"body"`
+	AuthorID string `json:"authorId"`
+}
+
+// POST /tasks/{id}/comments
+func createTaskComment(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		taskID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req createCommentReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if req.Body == "" {
+			writeErr(w, 400, errors.New("body required"))
+			return
+		}
+		authorID, _ := uuid.Parse(req.AuthorID)
+		c, err := svc.Activity.CreateComment(r.Context(), tid, taskID, authorID, req.Body)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		// record activity event (best-effort: comment creation failure does not roll back the comment)
+		_ = svc.Activity.RecordActivity(r.Context(), tid, taskID, &authorID, "commented", "", req.Body[:min(len(req.Body), 80)])
+		writeJSON(w, 201, c)
+	}
+}
+
+// GET /tasks/{id}/activity
+func listTaskActivity(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		taskID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		acts, err := svc.Activity.ListActivity(r.Context(), tid, taskID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if acts == nil {
+			acts = []domain.TaskActivity{}
+		}
+		writeJSON(w, 200, map[string]any{"items": acts})
 	}
 }
 

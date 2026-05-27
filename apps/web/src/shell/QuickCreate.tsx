@@ -12,7 +12,7 @@ export function QuickCreate({ trigger, title, children, onSubmit }:
       {open && (
         <div role="dialog" aria-label={title} className="fixed inset-0 z-50 flex">
           <div className="flex-1 bg-black/30" onClick={() => setOpen(false)} />
-          <div className="w-[420px] border-l border-border bg-bg p-4">
+          <div className="w-[420px] border-l border-line bg-bg p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold">{title}</h2>
               <button aria-label="Close" onClick={() => setOpen(false)}><X size={14} /></button>

@@ -92,12 +92,16 @@ function CollapsibleArea({
         className={`group/area flex w-full items-center gap-1 px-3 mb-1 ${areaIdx === 0 ? "mt-2" : "mt-4"}`}
         aria-expanded={open}
       >
-        <span className="flex-1 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+        <span
+          className="flex-1 text-left text-[10px] font-semibold uppercase tracking-[0.12em]"
+          style={{ color: "var(--sidebar-text-muted)" }}
+        >
           {area.name}
         </span>
         <ChevronDown
           size={11}
-          className={`shrink-0 text-ink-3 transition-transform duration-150 ${open ? "" : "-rotate-90"}`}
+          className={`shrink-0 transition-transform duration-150 ${open ? "" : "-rotate-90"}`}
+          style={{ color: "var(--sidebar-text-muted)" }}
         />
       </button>
 
@@ -106,7 +110,12 @@ function CollapsibleArea({
           {area.groups.map((g) => (
             <div key={g.id}>
               {g.name && (
-                <div className="text-[11px] text-ink-3 px-3 mt-3 mb-1">{g.name}</div>
+                <div
+                  className="text-[11px] px-3 mt-3 mb-1"
+                  style={{ color: "var(--sidebar-text-muted)" }}
+                >
+                  {g.name}
+                </div>
               )}
               <ul>
                 {g.subareas.map((sub) => {
@@ -116,16 +125,27 @@ function CollapsibleArea({
                     <li key={sub.id}>
                       <Link
                         href={sub.href}
-                        className={`group relative flex items-center gap-2 h-8 px-3 rounded-sm text-sm transition-colors
-                          ${active
-                            ? "bg-accent-soft text-ink font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-[2px] before:rounded-r before:bg-accent"
-                            : "text-ink-2 hover:text-ink hover:bg-surface-2"
-                          }`}
+                        className={`group relative flex items-center gap-2 h-8 px-3 rounded-sm text-sm transition-all duration-150 ${active ? "font-medium" : "hover:brightness-110"}`}
+                        style={active ? {
+                          background: "var(--sidebar-active-bg)",
+                          color: "#FFFFFF",
+                          boxShadow: "inset 3px 0 0 var(--sidebar-indicator)",
+                        } : {
+                          color: "var(--sidebar-text)",
+                        }}
+                        onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = "var(--sidebar-hover-bg)"; }}
+                        onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLElement).style.background = ""; }}
                       >
-                        <IconComponent size={14} className="shrink-0" />
+                        <IconComponent size={14} className="shrink-0" style={{ opacity: active ? 1 : 0.7 }} />
                         <span className="flex-1 truncate">{sub.name}</span>
                         {sub.count !== undefined && (
-                          <span className={`ml-auto rounded-xs px-1.5 py-px font-mono text-[10px] tabular-nums ${active ? "bg-accent text-white" : "bg-surface-2 text-ink-3"}`}>
+                          <span
+                            className="ml-auto rounded-xs px-1.5 py-px font-mono text-[10px] tabular-nums"
+                            style={active
+                              ? { background: "var(--sidebar-indicator)", color: "#fff" }
+                              : { background: "rgba(255,255,255,0.08)", color: "var(--sidebar-text-muted)" }
+                            }
+                          >
                             {sub.count}
                           </span>
                         )}
@@ -147,7 +167,14 @@ export function NavPane({ app }: { app: AppDef }) {
   const t = useTranslations("shell");
 
   return (
-    <nav aria-label={t("primaryNav")} className="h-full w-[248px] shrink-0 overflow-y-auto border-r border-line bg-surface py-3 px-2">
+    <nav
+      aria-label={t("primaryNav")}
+      className="h-full w-[248px] shrink-0 overflow-y-auto border-r py-3 px-2"
+      style={{
+        background: "var(--sidebar-bg)",
+        borderColor: "var(--sidebar-border)",
+      }}
+    >
       {app.areas.map((area, areaIdx) => (
         <CollapsibleArea
           key={area.id}

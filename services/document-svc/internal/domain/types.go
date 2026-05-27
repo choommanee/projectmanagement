@@ -97,6 +97,29 @@ type Template struct {
 	CreatedAt    time.Time
 }
 
+type SignatureStatus string
+
+const (
+	SigPending  SignatureStatus = "pending"
+	SigSigned   SignatureStatus = "signed"
+	SigDeclined SignatureStatus = "declined"
+)
+
+type DocumentSignature struct {
+	ID            uuid.UUID       `json:"id"`
+	TenantID      uuid.UUID       `json:"tenantId"`
+	DocumentID    uuid.UUID       `json:"documentId"`
+	SignerID      uuid.UUID       `json:"signerId"`
+	SignerEmail   string          `json:"signerEmail"`
+	Status        SignatureStatus `json:"status"`
+	RequestedAt   time.Time       `json:"requestedAt"`
+	SignedAt      *time.Time      `json:"signedAt,omitempty"`
+	DeclinedAt    *time.Time      `json:"declinedAt,omitempty"`
+	DeclineReason string          `json:"declineReason,omitempty"`
+	SignatureHash string          `json:"signatureHash,omitempty"`
+	VersionID     *uuid.UUID      `json:"versionId,omitempty"`
+}
+
 var (
 	ErrNotFound     = errors.New("not found")
 	ErrConflict     = errors.New("version conflict")

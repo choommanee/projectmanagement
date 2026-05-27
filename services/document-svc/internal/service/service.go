@@ -16,10 +16,17 @@ type Service struct {
 	Documents  *store.Documents
 	Comments   *store.Comments
 	Templates  *store.Templates
+	Signatures *store.Signatures
 }
 
 func New(w *store.Workspaces, d *store.Documents, c *store.Comments, t *store.Templates) *Service {
 	return &Service{Workspaces: w, Documents: d, Comments: c, Templates: t}
+}
+
+// WithSignatures attaches the signature store; returns the receiver for fluent wiring.
+func (svc *Service) WithSignatures(s *store.Signatures) *Service {
+	svc.Signatures = s
+	return svc
 }
 
 // EnsureWorkspaceInput holds params for workspace upsert.

@@ -46,6 +46,17 @@ pub struct Step {
     pub message: Option<String>,
     // end
     pub result: Option<Value>,
+    // create_task / update_task_status
+    pub project_id: Option<String>,
+    pub task_title: Option<String>,
+    pub task_assignee: Option<String>,
+    pub task_priority: Option<String>,
+    pub task_type: Option<String>,
+    pub task_id: Option<String>,
+    pub task_status: Option<String>,
+    // create_document
+    pub doc_title: Option<String>,
+    pub doc_content: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -575,9 +586,38 @@ impl Executor {
                     // Found the cursor step — skip it (already executed/paused) and resume from next
                     skipping = false;
                     continue;
-                } else {
-                    continue;
                 }
+                // Cursor may be nested inside a switch case's do-steps.
+                // Re-evaluate the matching case and recurse with resume_from still set.
+                if step.step_type == "switch" {
+                    if let Some(cases) = &step.cases {
+                        let ctx = self.ctx(input);
+                        for case in cases {
+                            let case_matches = case.when == "default"
+                                || eval_expr(&case.when, &ctx).map(|v| is_truthy(&v)).unwrap_or(false);
+                            if case_matches && contains_step_id(&case.do_steps, resume_from.unwrap_or("")) {
+                                skipping = false;
+                                let step_input = json!({"variables": self.variables, "input": input});
+                                self.steps.push(StepResult {
+                                    step_id: step.id.clone(),
+                                    step_type: step.step_type.clone(),
+                                    status: "completed".into(),
+                                    input: step_input,
+                                    output: json!({"matched": true}),
+                                    error: None,
+                                    duration_ms: 0,
+                                });
+                                if let Some(result) = self.run_steps(&case.do_steps, input, resume_from, true) {
+                                    return Some(result);
+                                }
+                                break;
+                            }
+                            if case_matches { break; } // only first matching case
+                        }
+                    }
+                    if !skipping { continue; } // switch was handled above
+                }
+                continue;
             }
 
             let start = Instant::now();
@@ -627,7 +667,7 @@ impl Executor {
 
                 "set_variable" => {
                     let var_name = step.name.as_deref().unwrap_or("_var");
-                    let val = step.value.clone().unwrap_or(Value::Null);
+                    let val = resolve_json_templates(step.value.clone().unwrap_or(Value::Null), &self.ctx(input));
                     if let Value::Object(ref mut map) = self.variables {
                         map.insert(var_name.to_string(), val.clone());
                     } else {
@@ -759,7 +799,10 @@ impl Executor {
                         Some(assignee_raw.to_string())
                     };
 
-                    let form = step.form.clone().unwrap_or(Value::Null);
+                    let form = resolve_json_templates(
+                        step.form.clone().unwrap_or(Value::Null),
+                        &ctx,
+                    );
                     self.human_tasks.push(HumanTaskResult {
                         step_id: step.id.clone(),
                         assignee: assignee.clone(),
@@ -795,7 +838,9 @@ impl Executor {
                 }
 
                 "notification" => {
-                    tracing::info!(step_id = %step.id, "notification step (no-op in MVP)");
+                    let msg = step.message.as_deref().unwrap_or("");
+                    let resolved_msg = resolve_template(msg, &self.ctx(input));
+                    tracing::info!(step_id = %step.id, message = %resolved_msg, "notification step (no-op in MVP)");
                     let dur = start.elapsed().as_millis() as u64;
                     self.steps.push(StepResult {
                         step_id: step.id.clone(),
@@ -809,7 +854,8 @@ impl Executor {
                 }
 
                 "end" => {
-                    let output = step.result.clone().unwrap_or(Value::Null);
+                    let ctx = self.ctx(input);
+                    let output = resolve_json_templates(step.result.clone().unwrap_or(Value::Null), &ctx);
                     let dur = start.elapsed().as_millis() as u64;
                     self.steps.push(StepResult {
                         step_id: step.id.clone(),
@@ -821,6 +867,120 @@ impl Executor {
                         duration_ms: dur,
                     });
                     return Some(("completed".into(), Some(output), None, None));
+                }
+
+                "create_task" => {
+                    let ctx = self.ctx(input);
+                    let project_id = resolve_template(
+                        step.project_id.as_deref().unwrap_or(""),
+                        &ctx,
+                    );
+                    let title = resolve_template(
+                        step.task_title.as_deref().unwrap_or("Untitled Task"),
+                        &ctx,
+                    );
+                    let assignee = resolve_template(
+                        step.task_assignee.as_deref().unwrap_or(""),
+                        &ctx,
+                    );
+                    let priority = resolve_template(
+                        step.task_priority.as_deref().unwrap_or("med"),
+                        &ctx,
+                    );
+                    let task_type = resolve_template(
+                        step.task_type.as_deref().unwrap_or("task"),
+                        &ctx,
+                    );
+                    let code = format!("AUTO-{}", &step.id[..step.id.len().min(4)].to_uppercase());
+                    let mut body = json!({
+                        "code": code,
+                        "title": title,
+                        "priority": priority,
+                        "type": task_type,
+                    });
+                    if !assignee.is_empty() {
+                        body["assignee_id"] = Value::String(assignee);
+                    }
+                    let svc_url = std::env::var("PROJECT_SVC_URL")
+                        .unwrap_or_else(|_| "http://localhost:8083".into());
+                    let url = format!("{}/v1/projects/{}/tasks", svc_url, project_id);
+                    let dur = start.elapsed().as_millis() as u64;
+                    match make_http_post_json(&url, body) {
+                        Ok(out) => {
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "completed".into(),
+                                input: step_input,
+                                output: out,
+                                error: None,
+                                duration_ms: dur,
+                            });
+                        }
+                        Err(e) => {
+                            tracing::warn!(step_id = %step.id, err = %e, "create_task failed, continuing");
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "failed".into(),
+                                input: step_input,
+                                output: Value::Null,
+                                error: Some(e),
+                                duration_ms: dur,
+                            });
+                        }
+                    }
+                }
+
+                "create_document" => {
+                    let ctx = self.ctx(input);
+                    let project_id = resolve_template(
+                        step.project_id.as_deref().unwrap_or(""),
+                        &ctx,
+                    );
+                    let title = resolve_template(
+                        step.doc_title.as_deref().unwrap_or("Untitled Document"),
+                        &ctx,
+                    );
+                    let content = resolve_template(
+                        step.doc_content.as_deref().unwrap_or(""),
+                        &ctx,
+                    );
+                    let body = json!({
+                        "title": title,
+                        "project_id": project_id,
+                        "content": content,
+                        "kind": "general",
+                    });
+                    let svc_url = std::env::var("DOCUMENT_SVC_URL")
+                        .unwrap_or_else(|_| "http://localhost:8084".into());
+                    let url = format!("{}/v1/documents", svc_url);
+                    let dur = start.elapsed().as_millis() as u64;
+                    match make_http_post_json(&url, body) {
+                        Ok(out) => {
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "completed".into(),
+                                input: step_input,
+                                output: out,
+                                error: None,
+                                duration_ms: dur,
+                            });
+                        }
+                        Err(e) => {
+                            tracing::warn!(step_id = %step.id, err = %e, "create_document failed, continuing");
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "failed".into(),
+                                input: step_input,
+                                output: Value::Null,
+                                error: Some(e),
+                                duration_ms: dur,
+                            });
+                        }
+                    }
                 }
 
                 unknown => {
@@ -840,6 +1000,31 @@ impl Executor {
         }
 
         None // reached end of step list without explicit end/pause/fail
+    }
+}
+
+/// Recursively search for a step ID in a step tree (including switch do-blocks).
+fn contains_step_id(steps: &[Step], target: &str) -> bool {
+    for step in steps {
+        if step.id == target { return true; }
+        if let Some(cases) = &step.cases {
+            for case in cases {
+                if contains_step_id(&case.do_steps, target) { return true; }
+            }
+        }
+    }
+    false
+}
+
+/// Recursively resolve {{expr}} templates in every string inside a JSON value.
+fn resolve_json_templates(v: Value, ctx: &ExprContext) -> Value {
+    match v {
+        Value::String(s) => Value::String(resolve_template(&s, ctx)),
+        Value::Array(arr) => Value::Array(arr.into_iter().map(|x| resolve_json_templates(x, ctx)).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter().map(|(k, val)| (k, resolve_json_templates(val, ctx))).collect(),
+        ),
+        other => other,
     }
 }
 
@@ -870,6 +1055,31 @@ fn make_http_request(method: &str, url: &str, _body: Option<&Value>) -> Result<V
         Ok(Ok(v)) => Ok(v),
         Ok(Err(e)) => Err(e),
         Err(_) => Err("thread panicked during http request".into()),
+    }
+}
+
+fn make_http_post_json(url: &str, body: Value) -> Result<Value, String> {
+    let url_owned = url.to_owned();
+    let result = std::thread::spawn(move || -> Result<Value, String> {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e: reqwest::Error| e.to_string())?;
+        let resp = client
+            .post(&url_owned)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .map_err(|e: reqwest::Error| e.to_string())?;
+        let status = resp.status().as_u16();
+        let text = resp.text().unwrap_or_default();
+        let body_val: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
+        Ok(json!({ "status": status, "body": body_val }))
+    }).join();
+    match result {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err("thread panicked during http post".into()),
     }
 }
 

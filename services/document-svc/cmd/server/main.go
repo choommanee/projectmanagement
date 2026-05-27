@@ -54,7 +54,7 @@ func main() {
 		store.NewDocuments(p),
 		store.NewComments(p),
 		store.NewTemplates(p),
-	)
+	).WithSignatures(store.NewSignatures(p))
 	// Plan #6 Task 6 — wire the Cedar resource loader.
 	loader := api.NewCedarLoader(p)
 	h := api.NewRouterWithLoader(svc, authz, loader)

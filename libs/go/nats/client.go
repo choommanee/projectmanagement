@@ -27,6 +27,9 @@ func Connect(url string) (*Client, error) {
 
 func (c *Client) Close() { c.nc.Close() }
 
+// Conn returns the underlying *nats.Conn for low-level subscriptions.
+func (c *Client) Conn() *nats.Conn { return c.nc }
+
 func (c *Client) EnsureStream(ctx context.Context, name string, subjects []string) error {
 	_, err := c.js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:     name,

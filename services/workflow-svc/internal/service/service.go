@@ -23,6 +23,7 @@ type Service struct {
 	Versions   *store.Versions
 	Instances  *store.Instances
 	HumanTasks *store.HumanTasks
+	Templates  *store.Templates
 	RuntimeURL string
 	notif      notiflib.Publisher
 }
@@ -43,6 +44,31 @@ func New(defs *store.Definitions, vers *store.Versions, instances *store.Instanc
 func (s *Service) WithNotifPublisher(pub notiflib.Publisher) *Service {
 	s.notif = pub
 	return s
+}
+
+// WithTemplates attaches the templates store to the service.
+// Returns the receiver for fluent wiring.
+func (s *Service) WithTemplates(t *store.Templates) *Service {
+	s.Templates = t
+	return s
+}
+
+// FireEventTriggers finds all published workflows triggered by the given event subject
+// and starts an instance for each, injecting the event payload as input.
+func (s *Service) FireEventTriggers(ctx context.Context, event string, payload map[string]any) error {
+	defs, err := s.Defs.ListByEventTrigger(ctx, event)
+	if err != nil || len(defs) == 0 {
+		return err
+	}
+	inputBytes, _ := json.Marshal(payload)
+	for _, def := range defs {
+		_, _ = s.StartInstance(ctx, StartInstanceInput{
+			TenantID:     def.TenantID,
+			DefinitionID: def.ID,
+			Input:        inputBytes,
+		})
+	}
+	return nil
 }
 
 // ─── StartInstance ─────────────────────────────────────────────────────────────

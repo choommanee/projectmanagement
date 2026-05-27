@@ -74,6 +74,10 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireActionScoped(authz, "workflow.instance.resume", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/resume", resumeInstance(svc))
 		r.With(libauth.RequireActionScoped(authz, "workflow.instance.cancel", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/cancel", cancelInstance(svc))
 
+		// Templates (system-wide, no tenant scope on reads)
+		r.Get("/workflow-templates", listTemplates(svc))
+		r.With(libauth.RequireAction(authz, "workflow.create", "*")).Post("/workflow-templates/{templateId}/use", createFromTemplate(svc))
+
 		// Human tasks
 		r.Get("/human-tasks", listHumanTasks(svc))
 		r.Get("/instances/{id}/human-tasks", listInstanceHumanTasks(svc))
@@ -570,6 +574,87 @@ func cancelInstance(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, inst)
+	}
+}
+
+// ─── Templates ───────────────────────────────────────────────────────────────
+
+func listTemplates(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		templates, err := svc.Templates.List(r.Context())
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if templates == nil {
+			templates = []store.WorkflowTemplate{}
+		}
+		writeJSON(w, 200, map[string]any{"items": templates})
+	}
+}
+
+func createFromTemplate(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		tmplID, err := uuid.Parse(chi.URLParam(r, "templateId"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+
+		tmpl, err := svc.Templates.GetByID(r.Context(), tmplID)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, errors.New("template not found"))
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+
+		var req struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req.Name == "" {
+			req.Name = tmpl.Name
+		}
+		if req.Description == "" {
+			req.Description = tmpl.Description
+		}
+
+		wf := &domain.WorkflowDefinition{
+			ID:             uuid.New(),
+			TenantID:       tid,
+			Name:           req.Name,
+			Description:    req.Description,
+			Trigger:        json.RawMessage(`{"type":"manual"}`),
+			Status:         domain.WorkflowDraft,
+			CurrentVersion: 1,
+			Version:        1,
+		}
+		if err := svc.Defs.Create(r.Context(), wf); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+
+		ver := &domain.WorkflowVersion{
+			ID:           uuid.New(),
+			TenantID:     tid,
+			DefinitionID: wf.ID,
+			Rev:          1,
+			DSL:          tmpl.Definition,
+		}
+		if err := svc.Versions.Create(r.Context(), ver); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+
+		writeJSON(w, 201, map[string]any{"workflow": wf, "version": ver})
 	}
 }
 
