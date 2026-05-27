@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -95,6 +96,7 @@ function ReceivePODialog({
 }
 
 export default function GoodsReceiptsPage() {
+  const router = useRouter();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [receivingPO, setReceivingPO] = useState<PurchaseOrder | null>(null);
@@ -143,13 +145,13 @@ export default function GoodsReceiptsPage() {
               {pos.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No approved POs awaiting receipt.</td></tr>
               ) : pos.map((po) => (
-                <tr key={po.id} className="hover:bg-surface-2/50">
+                <tr key={po.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/procurement/goods-receipts/' + po.id)}>
                   <td className="px-4 py-2 font-mono text-xs">{po.poNumber ?? po.id.slice(0, 8)}</td>
                   <td className="px-4 py-2 font-medium">{po.supplierId}</td>
                   <td className="px-4 py-2 text-ink-muted">{po.orderDate ? new Date(po.orderDate).toLocaleDateString() : "—"}</td>
                   <td className="px-4 py-2 text-ink-muted">{po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : "—"}</td>
                   <td className="px-4 py-2"><Tag tone="accent" size="sm">{po.status}</Tag></td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="primary" onClick={() => openReceive(po)}>Receive</Button>
                   </td>
                 </tr>
