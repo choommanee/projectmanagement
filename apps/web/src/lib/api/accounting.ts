@@ -233,6 +233,12 @@ export async function deleteAccount(id: string): Promise<void> {
   if (!r.ok && r.status !== 204) throw new Error(`deleteAccount: ${r.status}`);
 }
 
+export async function getAccount(id: string): Promise<ChartOfAccount> {
+  const r = await apiFetch(`${SVC}/accounts/${id}`);
+  if (!r.ok) throw new Error(`getAccount: ${r.status}`);
+  return r.json();
+}
+
 // ─── journal entries ───────────────────────────────────────────────────────
 
 export async function listJournalEntries(params?: {

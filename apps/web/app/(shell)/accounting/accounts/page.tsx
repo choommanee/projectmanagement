@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
@@ -165,6 +166,7 @@ function DeleteDialog({ account, onClose, onDeleted }: { account: ChartOfAccount
 }
 
 export default function AccountsPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -236,7 +238,7 @@ export default function AccountsPage() {
             </thead>
             <tbody>
               {accounts.map((a) => (
-                <tr key={a.id} className="border-b border-line hover:bg-surface-2">
+                <tr key={a.id} className="border-b border-line hover:bg-surface-2 cursor-pointer" onClick={() => router.push('/accounting/accounts/' + a.id)}>
                   <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{a.code}</td>
                   <td className="px-4 py-2 font-medium text-ink">{a.name}</td>
                   <td className="px-4 py-2">
