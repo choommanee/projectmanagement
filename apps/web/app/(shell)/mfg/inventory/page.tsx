@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal } from "lucide-react";
 import { Button, Input } from "@pmplatform/ui-kit";
@@ -10,6 +11,7 @@ import { listInventory, type StockBalance } from "@/lib/api/inventory";
 import { StockTransactionPanel } from "@/components/StockTransactionPanel";
 
 export default function InventoryPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockBalance | null>(null);
   const [itemName, setItemName] = useState("");
@@ -101,7 +103,8 @@ export default function InventoryPage() {
           filtered.map((b) => (
             <div
               key={b.id}
-              className="flex items-center border-b border-border px-4 py-2 text-sm hover:bg-surface-2"
+              className="flex items-center border-b border-border px-4 py-2 text-sm hover:bg-surface-2 cursor-pointer"
+              onClick={() => router.push('/mfg/items/' + b.itemId)}
             >
               <span className="flex-1 font-mono text-xs">{b.itemId.slice(0, 8)}…</span>
               <span className="w-32 text-xs text-fgMuted">{b.lotNumber || "—"}</span>
@@ -121,7 +124,7 @@ export default function InventoryPage() {
                 {b.updatedAt ? new Date(b.updatedAt).toLocaleDateString() : "—"}
               </span>
               <div className="w-16 flex justify-end">
-                <Button size="sm" variant="ghost" onClick={() => openTransaction(b)}>
+                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openTransaction(b); }}>
                   <SlidersHorizontal size={13} />
                 </Button>
               </div>
