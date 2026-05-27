@@ -67,7 +67,7 @@ export default function InventoryPage() {
       />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+      <div className="flex items-center gap-3 border-b border-line px-4 py-2">
         <Input
           placeholder="Search item, lot, location…"
           value={search}
@@ -78,7 +78,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Column headers */}
-      <div className="flex border-b border-border bg-surface-2 px-4 py-1.5 text-xs font-medium text-fgMuted">
+      <div className="flex border-b border-line bg-surface-2 px-4 py-1.5 text-xs font-medium text-fgMuted">
         <span className="flex-1">Item ID</span>
         <span className="w-32">Lot</span>
         <span className="w-32">Location</span>
@@ -92,7 +92,7 @@ export default function InventoryPage() {
         {isLoading ? (
           <div className="space-y-px">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+              <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -103,7 +103,7 @@ export default function InventoryPage() {
           filtered.map((b) => (
             <div
               key={b.id}
-              className="flex items-center border-b border-border px-4 py-2 text-sm hover:bg-surface-2 cursor-pointer"
+              className="flex items-center border-b border-line px-4 py-2 text-sm hover:bg-surface-2 cursor-pointer"
               onClick={() => router.push('/mfg/items/' + b.itemId)}
             >
               <span className="flex-1 font-mono text-xs">{b.itemId.slice(0, 8)}…</span>

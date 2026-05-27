@@ -8,7 +8,7 @@ import {
 } from "@/lib/api/sales";
 
 const STATUS_COLORS: Record<QuoteStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-600",
+  draft: "bg-surface-2 text-ink-3",
   sent: "bg-blue-100 text-blue-700",
   accepted: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
@@ -41,7 +41,7 @@ export default function QuotationDetailPage() {
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading…</div>;
   if (!quote) return <div className="p-6 text-sm text-red-600">Quotation not found</div>;
 
   const isExpired = quote.valid_until && new Date(quote.valid_until) < new Date();
@@ -51,7 +51,7 @@ export default function QuotationDetailPage() {
       <Breadcrumb items={[{ label: "Sales" }, { label: "Quotations", href: "/sales/quotations" }, { label: quote.code ?? quote.id.slice(0, 8) }]} />
 
       {/* Header */}
-      <div className="rounded-lg border border-border bg-surface p-5 flex items-start justify-between">
+      <div className="rounded-lg border border-line bg-surface p-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-xl font-semibold font-mono">{quote.code ?? quote.id.slice(0, 8)}</h1>
@@ -61,8 +61,8 @@ export default function QuotationDetailPage() {
             )}
           </div>
           {quote.title && <p className="text-sm font-medium mb-1">{quote.title}</p>}
-          <div className="text-sm text-muted-foreground space-y-0.5">
-            {customer && <div className="font-medium text-foreground">{customer.name} <span className="text-xs text-muted-foreground">({customer.code})</span></div>}
+          <div className="text-sm text-ink-3 space-y-0.5">
+            {customer && <div className="font-medium text-foreground">{customer.name} <span className="text-xs text-ink-3">({customer.code})</span></div>}
             {!customer && quote.customer_name && <div className="font-medium text-foreground">{quote.customer_name}</div>}
             {quote.valid_until && <div className={isExpired ? "text-red-600" : ""}>Valid until: {quote.valid_until.slice(0, 10)}</div>}
             {quote.notes && <div className="text-xs mt-1">{quote.notes}</div>}
@@ -78,34 +78,34 @@ export default function QuotationDetailPage() {
               <button onClick={() => changeStatus("rejected")} disabled={saving} className="px-3 py-1.5 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50">Reject</button>
             </>
           )}
-          <button onClick={() => router.back()} className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground">← Back</button>
+          <button onClick={() => router.back()} className="px-3 py-1.5 text-xs rounded border border-line text-ink-3 hover:text-ink">← Back</button>
         </div>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Total Amount</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Total Amount</div>
           <div className="text-2xl font-mono font-bold text-green-600">{quote.total_amount != null ? fmt(quote.total_amount) : "—"}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Status</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Status</div>
           <div className="text-2xl font-mono font-bold capitalize">{quote.status}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Valid Until</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Valid Until</div>
           <div className={`text-2xl font-mono font-bold ${isExpired ? "text-red-600" : ""}`}>{quote.valid_until?.slice(0, 10) ?? "—"}</div>
         </div>
       </div>
 
       {/* Details grid */}
-      <div className="rounded-lg border border-border bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Quote #:</span> <span className="font-mono">{quote.code ?? "—"}</span></div>
-        <div><span className="text-muted-foreground">Customer:</span> {customer?.name ?? quote.customer_name ?? "—"}</div>
-        <div><span className="text-muted-foreground">Valid Until:</span> <span className={isExpired ? "text-red-600 font-medium" : ""}>{quote.valid_until?.slice(0, 10) ?? "—"}</span></div>
-        <div><span className="text-muted-foreground">Status:</span> {quote.status}</div>
-        {quote.total_amount != null && <div><span className="text-muted-foreground">Total Amount:</span> <span className="font-mono font-semibold">{fmt(quote.total_amount)}</span></div>}
-        {quote.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {quote.notes}</div>}
+      <div className="rounded-lg border border-line bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
+        <div><span className="text-ink-3">Quote #:</span> <span className="font-mono">{quote.code ?? "—"}</span></div>
+        <div><span className="text-ink-3">Customer:</span> {customer?.name ?? quote.customer_name ?? "—"}</div>
+        <div><span className="text-ink-3">Valid Until:</span> <span className={isExpired ? "text-red-600 font-medium" : ""}>{quote.valid_until?.slice(0, 10) ?? "—"}</span></div>
+        <div><span className="text-ink-3">Status:</span> {quote.status}</div>
+        {quote.total_amount != null && <div><span className="text-ink-3">Total Amount:</span> <span className="font-mono font-semibold">{fmt(quote.total_amount)}</span></div>}
+        {quote.notes && <div className="col-span-2"><span className="text-ink-3">Notes:</span> {quote.notes}</div>}
       </div>
     </div>
   );

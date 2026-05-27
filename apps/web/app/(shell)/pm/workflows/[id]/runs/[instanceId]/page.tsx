@@ -8,7 +8,7 @@ import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { ProcessFlowBar } from "@/shell/ProcessFlowBar";
 import {
-  getInstance, resumeInstance, cancelInstance, startInstance,
+  getInstance, resumeInstance, cancelInstance, startInstance, completeHumanTask,
   type InstanceDetail, type StepExecution, type HumanTask,
 } from "@/lib/api/workflows";
 
@@ -132,50 +132,139 @@ function StepsTab({ steps }: { steps: StepExecution[] }) {
 
 // ─── Human tasks tab ──────────────────────────────────────────────────────────
 
-function HumanTasksTab({ tasks }: { tasks: HumanTask[] }) {
+function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () => void }) {
+  const [responseJson, setResponseJson] = useState("{}");
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const isPending = !task.outcome;
+  const isOverdue = task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
+
+  const handleComplete = async (outcome: string) => {
+    let data: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(responseJson);
+      data = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : {};
+      setJsonError(null);
+    } catch {
+      setJsonError("Invalid JSON in response data");
+      return;
+    }
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await completeHumanTask(task.id, { outcome, data });
+      onComplete();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Failed to complete task");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="p-4">
-      {tasks.length === 0 && (
-        <p className="text-center text-xs text-ink-3 py-8">No human tasks for this run.</p>
-      )}
-      <div className="space-y-3">
-        {tasks.map((t) => {
-          const isOverdue = t.slaDeadline && !t.completedAt && new Date(t.slaDeadline) < new Date();
-          return (
-            <div key={t.id} className="rounded-md border border-line bg-paper p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="font-mono text-xs text-ink">{t.stepId}</span>
-                {t.outcome ? (
-                  <Tag tone="success">{t.outcome}</Tag>
-                ) : (
-                  <Tag tone="warning">pending</Tag>
-                )}
-                {t.assigneeId && (
-                  <span className="text-xs text-ink-3">→ {t.assigneeId.slice(0, 8)}</span>
-                )}
-              </div>
-              {t.form?.prompt != null && (
-                <p className="mb-1 text-sm text-ink">{String(t.form.prompt)}</p>
-              )}
-              <div className="flex gap-4 text-[11px] text-ink-3">
-                <span>Created: {fmtDate(t.createdAt)}</span>
-                {t.completedAt && <span>Completed: {fmtDate(t.completedAt)}</span>}
-                {t.slaDeadline && (
-                  <span className={isOverdue ? "text-danger font-medium" : ""}>
-                    SLA: {fmtDate(t.slaDeadline)}{isOverdue ? " (overdue)" : ""}
-                  </span>
-                )}
-              </div>
-              {t.data && (
-                <div className="mt-2">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3">Response data</p>
-                  <JsonBlock value={t.data} />
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <div className={`rounded-md border bg-paper p-4 ${isPending ? "border-warning/40" : "border-line"}`}>
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-2">
+        <span className="font-mono text-xs font-medium text-ink">{task.stepId}</span>
+        {task.outcome ? (
+          <Tag tone={task.outcome === "rejected" ? "danger" : "success"}>{task.outcome}</Tag>
+        ) : (
+          <Tag tone="warning">pending approval</Tag>
+        )}
+        {task.assigneeId && (
+          <span className="ml-auto text-[11px] text-ink-3">Assigned to: {task.assigneeId.slice(0, 8)}…</span>
+        )}
       </div>
+
+      {/* Prompt */}
+      {task.form?.prompt != null && (
+        <p className="mb-3 text-sm text-ink leading-relaxed">{String(task.form.prompt)}</p>
+      )}
+
+      {/* Form fields from DSL */}
+      {task.form && Object.keys(task.form).filter(k => k !== "prompt").length > 0 && (
+        <div className="mb-3 space-y-1">
+          {Object.entries(task.form).filter(([k]) => k !== "prompt").map(([k, v]) => (
+            <div key={k} className="flex gap-2 text-xs">
+              <span className="w-28 shrink-0 font-medium text-ink-3">{k}</span>
+              <span className="text-ink">{String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Timing */}
+      <div className="mb-3 flex flex-wrap gap-4 text-[11px] text-ink-3">
+        <span>Created: {fmtDate(task.createdAt)}</span>
+        {task.completedAt && <span>Completed: {fmtDate(task.completedAt)}</span>}
+        {task.slaDeadline && (
+          <span className={isOverdue ? "font-medium text-danger" : ""}>
+            SLA: {fmtDate(task.slaDeadline)}{isOverdue ? " ⚠ overdue" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Completed response */}
+      {task.data && !isPending && (
+        <div className="mb-2">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3">Response</p>
+          <JsonBlock value={task.data} />
+        </div>
+      )}
+
+      {/* Pending — action area */}
+      {isPending && (
+        <div className="mt-3 space-y-3 rounded-md border border-line bg-surface-2 p-3">
+          <div>
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-3">
+              Response data (JSON, optional)
+            </label>
+            <textarea
+              value={responseJson}
+              onChange={(e) => { setResponseJson(e.target.value); setJsonError(null); }}
+              rows={3}
+              className="w-full rounded-sm border border-line bg-paper px-2 py-1.5 font-mono text-[11px] text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+              placeholder='{"comment": "looks good"}'
+            />
+            {jsonError && <p className="mt-0.5 text-[11px] text-danger">{jsonError}</p>}
+          </div>
+          {actionError && (
+            <p className="rounded-sm border border-danger/30 bg-danger/5 px-2 py-1 text-[11px] text-danger">{actionError}</p>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={submitting}
+              onClick={() => handleComplete("approved")}
+            >
+              {submitting ? "Submitting…" : "✓ Approve"}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleComplete("rejected")}
+              disabled={submitting}
+              className="border-danger/30 text-danger hover:bg-danger/5 hover:border-danger"
+            >
+              ✗ Reject
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HumanTasksTab({ tasks, onComplete }: { tasks: HumanTask[]; onComplete: () => void }) {
+  if (tasks.length === 0) {
+    return <p className="px-4 py-8 text-center text-xs text-ink-3">No human tasks for this run.</p>;
+  }
+  return (
+    <div className="space-y-3 p-4">
+      {tasks.map((t) => (
+        <HumanTaskCard key={t.id} task={t} onComplete={onComplete} />
+      ))}
     </div>
   );
 }
@@ -206,6 +295,12 @@ export default function RunViewerPage() {
   }, [instanceId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!detail || detail.status === "completed" || detail.status === "failed" || detail.status === "cancelled") return;
+    const timer = setInterval(() => { load(); }, 3000);
+    return () => clearInterval(timer);
+  }, [detail?.status, load]);
 
   const handleResume = async () => {
     setResuming(true);
@@ -371,7 +466,7 @@ export default function RunViewerPage() {
               </div>
             )}
 
-            {tab === "human-tasks" && <HumanTasksTab tasks={detail.human_tasks} />}
+            {tab === "human-tasks" && <HumanTasksTab tasks={detail.human_tasks} onComplete={load} />}
           </div>
         </div>
       </div>

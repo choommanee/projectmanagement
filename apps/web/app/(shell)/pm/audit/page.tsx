@@ -25,7 +25,7 @@ const SVC_PALETTE = [
   "bg-success/15 text-success",
   "bg-signal-soft text-signal",
   "bg-warning/15 text-warning",
-  "bg-surface-3 text-ink-2",
+  "bg-surface-2 text-ink-2",
 ];
 const svcColorCache: Record<string, string> = {};
 let svcColorIdx = 0;

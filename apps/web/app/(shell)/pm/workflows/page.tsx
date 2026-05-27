@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, Trash2, Workflow } from "lucide-react";
+import { Layers, Plus, RefreshCw, Trash2, Workflow } from "lucide-react";
 import { Button, Input, Tag, TextArea } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
@@ -10,8 +10,11 @@ import {
   listWorkflows,
   createWorkflow,
   deleteWorkflow,
+  listWorkflowTemplates,
+  createWorkflowFromTemplate,
   type WorkflowDef,
   type WorkflowStatus,
+  type WorkflowTemplate,
 } from "@/lib/api/workflows";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -33,6 +36,167 @@ const STATUS_FILTERS: { value: WorkflowStatus | ""; label: string }[] = [
   { value: "published", label: "Published" },
   { value: "archived", label: "Archived" },
 ];
+
+// ─── Template helpers ─────────────────────────────────────────────────────────
+
+const CATEGORY_TONE: Record<string, string> = {
+  finance: "bg-accent/10 text-accent",
+  hr: "bg-success/10 text-success",
+  document: "bg-warning/10 text-warning",
+  engineering: "bg-surface-2 text-ink-2",
+  project: "bg-accent/10 text-accent",
+};
+
+function categoryBadge(cat: string): string {
+  return CATEGORY_TONE[cat.toLowerCase()] ?? "bg-surface-2 text-ink-2";
+}
+
+function templateStepCount(def: Record<string, unknown>): number | null {
+  const steps = def["steps"];
+  if (Array.isArray(steps)) return steps.length;
+  return null;
+}
+
+// ─── Use-template dialog ──────────────────────────────────────────────────────
+
+interface UseTemplateDialogProps {
+  template: WorkflowTemplate;
+  onClose: () => void;
+  onCreated: (wf: WorkflowDef) => void;
+}
+
+function UseTemplateDialog({ template, onClose, onCreated }: UseTemplateDialogProps) {
+  const [name, setName] = useState(template.name);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setError("Name is required"); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const wf = await createWorkflowFromTemplate(template.id, name.trim());
+      onCreated(wf);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="w-full max-w-md rounded-lg border border-line bg-paper shadow-xl">
+        <div className="border-b border-line px-4 py-3">
+          <h2 className="text-sm font-semibold text-ink">Use Template</h2>
+          <p className="mt-0.5 text-[11px] text-ink-3">
+            Creating from <span className="font-medium text-ink-2">{template.name}</span>
+          </p>
+        </div>
+        <div className="space-y-3 p-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Workflow Name *</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Invoice Approval"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") void handleSubmit(); }}
+            />
+          </div>
+          {error && <p className="text-xs text-danger">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-3">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={() => void handleSubmit()} disabled={loading}>
+            {loading ? "Creating…" : "Create Workflow →"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Template Gallery ─────────────────────────────────────────────────────────
+
+interface TemplateGalleryProps {
+  onCreated: (wf: WorkflowDef) => void;
+}
+
+function TemplateGallery({ onCreated }: TemplateGalleryProps) {
+  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [useTarget, setUseTarget] = useState<WorkflowTemplate | null>(null);
+
+  useEffect(() => {
+    listWorkflowTemplates().then(setTemplates).catch(() => {});
+  }, []);
+
+  if (templates.length === 0) return null;
+
+  return (
+    <>
+      <div className="mb-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Layers size={14} className="text-accent" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-2">
+            Start from a Template
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {templates.map((t) => {
+            const stepCount = templateStepCount(t.definition);
+            return (
+              <div
+                key={t.id}
+                className="flex flex-col rounded-md border border-line bg-surface p-3 shadow-xs transition-colors hover:border-accent/30 hover:bg-surface-2"
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${categoryBadge(t.category)}`}>
+                    {t.category}
+                  </span>
+                  {t.isSystem && (
+                    <span className="ml-auto text-[10px] text-ink-3">System</span>
+                  )}
+                </div>
+                <p className="mb-1 text-[13px] font-semibold text-ink">{t.name}</p>
+                {t.description && (
+                  <p className="mb-2 line-clamp-2 text-[11px] text-ink-3">{t.description}</p>
+                )}
+                <div className="mt-auto flex items-center justify-between">
+                  {stepCount !== null ? (
+                    <span className="font-mono text-[10px] text-ink-3">{stepCount} steps</span>
+                  ) : (
+                    <span />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setUseTarget(t)}
+                    className="rounded border border-line bg-paper px-2.5 py-1 text-[11px] font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent/5"
+                  >
+                    Use Template →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 border-b border-line" />
+      </div>
+
+      {useTarget && (
+        <UseTemplateDialog
+          template={useTarget}
+          onClose={() => setUseTarget(null)}
+          onCreated={(wf) => {
+            setUseTarget(null);
+            onCreated(wf);
+          }}
+        />
+      )}
+    </>
+  );
+}
 
 // ─── Create dialog ────────────────────────────────────────────────────────────
 
@@ -183,6 +347,9 @@ export default function WorkflowsPage() {
       />
 
       <div className="flex flex-1 flex-col overflow-auto p-4">
+        {/* Template gallery */}
+        <TemplateGallery onCreated={handleCreated} />
+
         {/* Search + filter */}
         <div className="mb-4 flex items-center gap-3">
           <Input

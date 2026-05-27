@@ -25,7 +25,7 @@ export default function AccountDetailPage() {
     }).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!account) return <div className="p-8 text-destructive">Account not found.</div>;
 
   const typeColors: Record<AccountType, string> = {
@@ -38,17 +38,17 @@ export default function AccountDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/accounting/accounts")} className="hover:underline">Chart of Accounts</button>
         <span className="mx-2">/</span>
         <span>{account.code} {account.name}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{account.code} — {account.name}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Currency: {account.currency} · {account.active ? "Active" : "Inactive"}</p>
+            <p className="text-sm text-ink-3 mt-1">Currency: {account.currency} · {account.active ? "Active" : "Inactive"}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${typeColors[account.type]}`}>
             {account.type}
@@ -65,21 +65,21 @@ export default function AccountDetailPage() {
           { label: "Recent JEs", value: String(entries.length) },
           { label: "Created", value: account.createdAt ? account.createdAt.slice(0, 10) : "—" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-semibold">{value}</p>
           </div>
         ))}
       </div>
 
       {entries.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+        <div className="rounded-lg border border-line bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">
             Recent Journal Entries
           </h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground text-xs uppercase">
+              <tr className="text-left text-ink-3 text-xs uppercase">
                 <th className="py-2 pr-4">Reference</th>
                 <th className="py-2 pr-4">Date</th>
                 <th className="py-2 pr-4">Memo</th>
@@ -88,13 +88,13 @@ export default function AccountDetailPage() {
             </thead>
             <tbody>
               {entries.map(je => (
-                <tr key={je.id} className="border-t border-border hover:bg-muted/30 cursor-pointer"
+                <tr key={je.id} className="border-t border-line hover:bg-surface-2 cursor-pointer"
                   onClick={() => router.push('/accounting/journal-entries/' + je.id)}>
                   <td className="py-2 pr-4 font-mono text-xs">{je.refNo || je.id.slice(0, 8)}</td>
                   <td className="py-2 pr-4">{je.entryDate ? je.entryDate.slice(0, 10) : je.createdAt?.slice(0, 10) ?? "—"}</td>
-                  <td className="py-2 pr-4 text-muted-foreground">{je.memo || "—"}</td>
+                  <td className="py-2 pr-4 text-ink-3">{je.memo || "—"}</td>
                   <td className="py-2">
-                    <span className={`px-2 py-0.5 rounded text-xs ${je.status === 'posted' ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs ${je.status === 'posted' ? 'bg-green-100 text-green-800' : 'bg-muted text-ink-3'}`}>
                       {je.status}
                     </span>
                   </td>

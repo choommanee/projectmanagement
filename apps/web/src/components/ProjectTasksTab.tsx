@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { RefreshCw, Plus } from "lucide-react";
 import { Button, Input, Tag } from "@pmplatform/ui-kit";
 import {
@@ -41,9 +41,18 @@ export function ProjectTasksTab({ projectId }: Props) {
 
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "">("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce search input 300ms
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search]);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -51,7 +60,7 @@ export function ProjectTasksTab({ projectId }: Props) {
     try {
       const result = await listTasksForProject(projectId, {
         status: statusFilter || undefined,
-        q: search || undefined,
+        q: debouncedSearch || undefined,
       });
       setTasks(result.items);
       setTotal(result.total);
@@ -60,7 +69,7 @@ export function ProjectTasksTab({ projectId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [projectId, statusFilter, search]);
+  }, [projectId, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     void fetchTasks();
@@ -100,7 +109,7 @@ export function ProjectTasksTab({ projectId }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tasks…"
-            className="w-40 text-sm"
+            className="w-56 text-sm"
           />
           <Button variant="ghost" size="sm" onClick={() => void fetchTasks()}>
             <RefreshCw size={13} />
@@ -113,12 +122,14 @@ export function ProjectTasksTab({ projectId }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <MiniMetric label="Estimate (md)" value={totalEstimateMd.toFixed(1)} />
-        <MiniMetric label="Actual (md)" value={totalActualMd.toFixed(1)} />
-        <MiniMetric label="Remaining (md)" value={remainingMd.toFixed(1)} />
-        <MiniMetric label="Done %" value={`${completionPct}%`} />
-      </div>
+      {!loading && (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <MiniMetric label="Estimate (md)" value={totalEstimateMd.toFixed(1)} />
+          <MiniMetric label="Actual (md)" value={totalActualMd.toFixed(1)} />
+          <MiniMetric label="Remaining (md)" value={remainingMd.toFixed(1)} />
+          <MiniMetric label="Done %" value={`${completionPct}%`} />
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -314,7 +325,7 @@ function CreateTaskDialog({
                 aria-label="Type"
                 value={type}
                 onChange={(e) => setType(e.target.value as TaskType)}
-                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink focus:outline-none"
+                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
               >
                 {(["task","subtask","milestone","deliverable","issue","risk","bug"] as TaskType[]).map((v) => (
                   <option key={v} value={v}>{v}</option>
@@ -327,7 +338,7 @@ function CreateTaskDialog({
                 aria-label="Status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink focus:outline-none"
+                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
               >
                 {(["todo","in_progress","blocked","review","done","cancelled"] as TaskStatus[]).map((v) => (
                   <option key={v} value={v}>{statusLabel(v)}</option>
@@ -340,7 +351,7 @@ function CreateTaskDialog({
                 aria-label="Priority"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink focus:outline-none"
+                className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
               >
                 {(["low","med","high","critical"] as TaskPriority[]).map((v) => (
                   <option key={v} value={v}>{priorityLabel(v)}</option>

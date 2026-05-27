@@ -7,7 +7,7 @@ import { getInvoice, updateInvoice, type Invoice, type InvStatus, type InvType }
 const STATUS_FLOW_AR: InvStatus[] = ["draft", "issued", "paid"];
 const STATUS_FLOW_AP: InvStatus[] = ["draft", "issued", "paid"];
 const STATUS_COLORS: Record<InvStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-600",
+  draft: "bg-surface-2 text-ink-3",
   issued: "bg-blue-100 text-blue-700",
   paid: "bg-green-100 text-green-700",
   overdue: "bg-red-100 text-red-700",
@@ -51,7 +51,7 @@ export default function InvoiceDetailPage() {
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading…</div>;
   if (!invoice) return <div className="p-6 text-sm text-red-600">Invoice not found</div>;
 
   const flow = STATUS_FLOW_AR;
@@ -63,7 +63,7 @@ export default function InvoiceDetailPage() {
       <Breadcrumb items={[{ label: "Accounting" }, { label: "Invoices", href: "/accounting/invoices" }, { label: invoice.invNo }]} />
 
       {/* Header */}
-      <div className="rounded-lg border border-border bg-surface p-5 flex items-start justify-between">
+      <div className="rounded-lg border border-line bg-surface p-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-xl font-semibold font-mono">{invoice.invNo}</h1>
@@ -72,7 +72,7 @@ export default function InvoiceDetailPage() {
               {isOverdue ? "overdue" : invoice.status}
             </span>
           </div>
-          <div className="text-sm text-muted-foreground space-y-0.5">
+          <div className="text-sm text-ink-3 space-y-0.5">
             <div className="font-medium text-foreground">{invoice.counterparty}</div>
             <div>Issued: {invoice.issueDate?.slice(0, 10)}</div>
             {invoice.dueDate && <div className={isOverdue ? "text-red-600 font-medium" : ""}>Due: {invoice.dueDate.slice(0, 10)}</div>}
@@ -90,24 +90,24 @@ export default function InvoiceDetailPage() {
               Cancel
             </button>
           )}
-          <button onClick={() => router.back()} className="px-3 py-1.5 text-xs rounded border border-border text-muted-foreground hover:text-foreground">← Back</button>
+          <button onClick={() => router.back()} className="px-3 py-1.5 text-xs rounded border border-line text-ink-3 hover:text-ink">← Back</button>
         </div>
       </div>
 
       {/* Amount card */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Amount</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Amount</div>
           <div className="text-2xl font-mono font-bold">{fmt(invoice.amount)}</div>
-          <div className="text-xs text-muted-foreground mt-1">{invoice.currency}</div>
+          <div className="text-xs text-ink-3 mt-1">{invoice.currency}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Type</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Type</div>
           <div className="text-2xl font-mono font-bold">{invoice.invType}</div>
-          <div className="text-xs text-muted-foreground mt-1">{invoice.invType === "AR" ? "Accounts Receivable" : "Accounts Payable"}</div>
+          <div className="text-xs text-ink-3 mt-1">{invoice.invType === "AR" ? "Accounts Receivable" : "Accounts Payable"}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Status</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Status</div>
           <div className={`text-2xl font-mono font-bold ${invoice.status === "paid" ? "text-green-600" : isOverdue ? "text-red-600" : ""}`}>
             {isOverdue ? "OVERDUE" : invoice.status.toUpperCase()}
           </div>
@@ -115,14 +115,14 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* Details */}
-      <div className="rounded-lg border border-border bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Invoice #:</span> <span className="font-mono">{invoice.invNo}</span></div>
-        <div><span className="text-muted-foreground">Counterparty:</span> {invoice.counterparty}</div>
-        <div><span className="text-muted-foreground">Issue Date:</span> {invoice.issueDate?.slice(0, 10)}</div>
-        <div><span className="text-muted-foreground">Due Date:</span> <span className={isOverdue ? "text-red-600 font-medium" : ""}>{invoice.dueDate?.slice(0, 10) ?? "—"}</span></div>
-        <div><span className="text-muted-foreground">Currency:</span> {invoice.currency}</div>
-        <div><span className="text-muted-foreground">Amount:</span> <span className="font-mono font-semibold">{fmt(invoice.amount)}</span></div>
-        {invoice.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {invoice.notes}</div>}
+      <div className="rounded-lg border border-line bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
+        <div><span className="text-ink-3">Invoice #:</span> <span className="font-mono">{invoice.invNo}</span></div>
+        <div><span className="text-ink-3">Counterparty:</span> {invoice.counterparty}</div>
+        <div><span className="text-ink-3">Issue Date:</span> {invoice.issueDate?.slice(0, 10)}</div>
+        <div><span className="text-ink-3">Due Date:</span> <span className={isOverdue ? "text-red-600 font-medium" : ""}>{invoice.dueDate?.slice(0, 10) ?? "—"}</span></div>
+        <div><span className="text-ink-3">Currency:</span> {invoice.currency}</div>
+        <div><span className="text-ink-3">Amount:</span> <span className="font-mono font-semibold">{fmt(invoice.amount)}</span></div>
+        {invoice.notes && <div className="col-span-2"><span className="text-ink-3">Notes:</span> {invoice.notes}</div>}
       </div>
     </div>
   );

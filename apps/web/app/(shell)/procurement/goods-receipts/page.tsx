@@ -53,11 +53,11 @@ function ReceivePODialog({
         {error && <p className="text-sm text-danger">{error}</p>}
 
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Lines to Receive</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">Lines to Receive</p>
           {lines.map((l, i) => (
             <div key={l.line_id} className="flex items-center gap-3 rounded border border-line bg-surface-2 px-3 py-2">
               <span className="flex-1 text-sm font-mono text-xs">{l.item_id}</span>
-              <span className="text-xs text-ink-muted">Ordered: {l.qty_ordered}</span>
+              <span className="text-xs text-ink-3">Ordered: {l.qty_ordered}</span>
               <input
                 type="number"
                 min={0}
@@ -69,7 +69,7 @@ function ReceivePODialog({
             </div>
           ))}
           {lines.length === 0 && !error && (
-            <p className="text-sm text-ink-muted">Loading lines…</p>
+            <p className="text-sm text-ink-3">Loading lines…</p>
           )}
         </div>
 
@@ -122,16 +122,16 @@ export default function GoodsReceiptsPage() {
       <Breadcrumb items={[{ label: "Procurement", href: "/procurement/home" }, { label: "Goods Receipts" }]} />
       <CommandBar actions={[]} />
 
-      <div className="rounded border border-line bg-surface-2 px-4 py-2 text-sm text-ink-muted">
+      <div className="rounded border border-line bg-surface-2 px-4 py-2 text-sm text-ink-3">
         Showing approved Purchase Orders ready for goods receipt.
       </div>
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-ink-muted">
+            <thead className="bg-surface-2 text-ink-3">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">PO Number</th>
                 <th className="px-4 py-2 text-left font-medium">Supplier</th>
@@ -143,13 +143,13 @@ export default function GoodsReceiptsPage() {
             </thead>
             <tbody className="divide-y divide-line">
               {pos.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No approved POs awaiting receipt.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-3">No approved POs awaiting receipt.</td></tr>
               ) : pos.map((po) => (
                 <tr key={po.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/procurement/goods-receipts/' + po.id)}>
                   <td className="px-4 py-2 font-mono text-xs">{po.poNumber ?? po.id.slice(0, 8)}</td>
                   <td className="px-4 py-2 font-medium">{po.supplierId}</td>
-                  <td className="px-4 py-2 text-ink-muted">{po.orderDate ? new Date(po.orderDate).toLocaleDateString() : "—"}</td>
-                  <td className="px-4 py-2 text-ink-muted">{po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-2 text-ink-3">{po.orderDate ? new Date(po.orderDate).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-2 text-ink-3">{po.expectedDate ? new Date(po.expectedDate).toLocaleDateString() : "—"}</td>
                   <td className="px-4 py-2"><Tag tone="accent" size="sm">{po.status}</Tag></td>
                   <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="primary" onClick={() => openReceive(po)}>Receive</Button>

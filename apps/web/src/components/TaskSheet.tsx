@@ -246,7 +246,7 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
             ) : task ? (
               <>
                 <span className="font-mono text-[11px] uppercase tracking-wider text-ink-3">{task.code}</span>
-                <h2 className="mt-0.5 text-base font-semibold text-ink leading-tight">{task.title}</h2>
+                <h2 className="mt-0.5 truncate text-base font-semibold text-ink leading-tight" title={task.title}>{task.title}</h2>
               </>
             ) : null}
           </div>
@@ -529,8 +529,9 @@ export function TaskSheet({ taskId, onClose, onChanged }: Props) {
           <div className="shrink-0 border-t border-line bg-paper px-5 py-3">
             <div className="flex items-center justify-between gap-3">
               <Button
-                variant="danger"
+                variant="ghost"
                 size="sm"
+                className="text-danger hover:bg-danger/10 hover:text-danger"
                 onClick={() => setShowDelete(true)}
               >
                 <Trash2 size={13} />

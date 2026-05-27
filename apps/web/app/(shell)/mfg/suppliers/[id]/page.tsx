@@ -8,11 +8,11 @@ import {
 } from "@/lib/api/mfg";
 
 const PO_STATUS_COLORS: Record<POStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-600",
-  submitted: "bg-blue-100 text-blue-700",
-  approved: "bg-indigo-100 text-indigo-700",
-  received: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-600",
+  draft:     "bg-surface-2 text-ink-3",
+  submitted: "bg-accent/10 text-accent",
+  approved:  "bg-info/10 text-info",
+  received:  "bg-success/10 text-success",
+  cancelled: "bg-danger/10 text-danger",
 };
 
 export default function SupplierDetailPage() {
@@ -26,81 +26,106 @@ export default function SupplierDetailPage() {
     if (!id) return;
     Promise.all([
       getSupplier(id).then(setSupplier),
-      listPurchaseOrders({ limit: 50 }).then(r =>
+      listPurchaseOrders({ limit: 100 }).then(r =>
         setOrders(r.items.filter(po => po.supplierId === id))
       ),
     ]).finally(() => setLoading(false));
   }, [id]);
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
-  const totalPOValue = orders.reduce((s, po) => s + po.lines.reduce((ls, l) => ls + l.qtyOrdered * l.unitPrice, 0), 0);
+  const totalPOValue = orders.reduce((s, po) =>
+    s + po.lines.reduce((ls, l) => ls + l.qtyOrdered * l.unitPrice, 0), 0
+  );
   const openOrders = orders.filter(po => po.status !== "received" && po.status !== "cancelled").length;
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (!supplier) return <div className="p-6 text-sm text-red-600">Supplier not found</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading…</div>;
+  if (!supplier) return <div className="p-6 text-sm text-danger">Supplier not found</div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <Breadcrumb items={[{ label: "MFG" }, { label: "Suppliers", href: "/mfg/suppliers" }, { label: supplier.name }]} />
+    <div className="flex h-full flex-col overflow-auto p-6 space-y-5">
+      <Breadcrumb items={[
+        { label: "MFG" },
+        { label: "Suppliers", href: "/mfg/suppliers" },
+        { label: supplier.name },
+      ]} />
 
-      <div className="rounded-lg border border-border bg-surface p-5 flex items-start justify-between">
+      {/* Header */}
+      <div className="rounded-md border border-line bg-paper p-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-xl font-semibold">{supplier.name}</h1>
-            <span className="font-mono text-xs text-muted-foreground">{supplier.code}</span>
-            {!supplier.active && <span className="px-2 py-0.5 rounded text-xs bg-zinc-100 text-zinc-500">Inactive</span>}
+            <h1 className="text-xl font-semibold text-ink">{supplier.name}</h1>
+            <span className="font-mono text-xs text-ink-3">{supplier.code}</span>
+            {!supplier.active && (
+              <span className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink-3">Inactive</span>
+            )}
           </div>
-          <div className="text-sm text-muted-foreground space-y-0.5">
+          <div className="space-y-0.5 text-sm text-ink-2">
             {supplier.contact && <div>{supplier.contact}</div>}
             {supplier.email && <div>{supplier.email}</div>}
             {supplier.phone && <div>{supplier.phone}</div>}
-            <div className="text-xs">Lead time: {supplier.leadTimeDays} days</div>
+            <div className="text-xs text-ink-3">Lead time: {supplier.leadTimeDays} days</div>
           </div>
         </div>
-        <button onClick={() => router.back()} className="text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded">← Back</button>
+        <button
+          onClick={() => router.back()}
+          className="rounded border border-line px-3 py-1.5 text-xs text-ink-3 hover:text-ink"
+        >
+          ← Back
+        </button>
       </div>
 
+      {/* KPIs */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Total POs</div>
-          <div className="text-2xl font-mono font-bold">{orders.length}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Open POs</div>
-          <div className="text-2xl font-mono font-bold text-amber-600">{openOrders}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Total PO Value</div>
-          <div className="text-2xl font-mono font-bold">{fmt(totalPOValue)}</div>
-        </div>
+        {[
+          { label: "Total POs", value: String(orders.length), tone: "" },
+          { label: "Open POs", value: String(openOrders), tone: openOrders > 0 ? "text-warning" : "" },
+          { label: "Total PO Value", value: fmt(totalPOValue), tone: "" },
+        ].map(({ label, value, tone }) => (
+          <div key={label} className="rounded-md border border-line bg-paper p-4">
+            <p className="text-[10px] uppercase tracking-widest text-ink-3">{label}</p>
+            <p className={`mt-1 font-mono text-2xl font-bold ${tone || "text-ink"}`}>{value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <div className="px-4 py-3 bg-muted/50 text-sm font-medium">Purchase Orders</div>
+      {/* Purchase Orders table */}
+      <div className="rounded-md border border-line overflow-hidden">
+        <div className="border-b border-line bg-surface-2 px-4 py-3">
+          <span className="text-sm font-medium text-ink">Purchase Orders ({orders.length})</span>
+        </div>
         <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
+          <thead className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">PO #</th>
-              <th className="px-4 py-2 text-left font-medium">Order Date</th>
-              <th className="px-4 py-2 text-left font-medium">Expected</th>
-              <th className="px-4 py-2 text-left font-medium">Status</th>
-              <th className="px-4 py-2 text-right font-medium">Lines</th>
-              <th className="px-4 py-2 text-right font-medium">Value</th>
+              <th className="px-4 py-2 text-left">PO #</th>
+              <th className="px-4 py-2 text-left">Order Date</th>
+              <th className="px-4 py-2 text-left">Expected</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right">Lines</th>
+              <th className="px-4 py-2 text-right">Value</th>
             </tr>
           </thead>
           <tbody>
-            {orders.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No purchase orders</td></tr>}
+            {orders.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-ink-3">No purchase orders</td></tr>
+            )}
             {orders.map(po => {
               const poVal = po.lines.reduce((s, l) => s + l.qtyOrdered * l.unitPrice, 0);
               return (
-                <tr key={po.id} onClick={() => router.push(`/procurement/purchase-orders/${po.id}`)}
-                  className="border-t border-border hover:bg-muted/20 cursor-pointer">
-                  <td className="px-4 py-3 font-mono text-xs">{po.poNumber}</td>
-                  <td className="px-4 py-3 text-xs">{po.orderDate?.slice(0, 10)}</td>
-                  <td className="px-4 py-3 text-xs">{po.expectedDate?.slice(0, 10) ?? "—"}</td>
-                  <td className="px-4 py-3"><span className={`px-1.5 py-0.5 rounded text-xs ${PO_STATUS_COLORS[po.status as POStatus] ?? "bg-zinc-100 text-zinc-600"}`}>{po.status}</span></td>
-                  <td className="px-4 py-3 text-right text-xs">{po.lines.length}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs">{fmt(poVal)}</td>
+                <tr
+                  key={po.id}
+                  onClick={() => router.push(`/procurement/purchase-orders/${po.id}`)}
+                  className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-ink">{po.poNumber}</td>
+                  <td className="px-4 py-3 text-xs text-ink-2">{po.orderDate?.slice(0, 10)}</td>
+                  <td className="px-4 py-3 text-xs text-ink-2">{po.expectedDate?.slice(0, 10) ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${PO_STATUS_COLORS[po.status as POStatus] ?? "bg-surface-2 text-ink-3"}`}>
+                      {po.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs text-ink-2">{po.lines.length}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-ink">{fmt(poVal)}</td>
                 </tr>
               );
             })}

@@ -25,7 +25,7 @@ const LEAVE_STATUS_COLORS: Record<LeaveStatus, string> = {
 };
 
 const PAYSLIP_STATUS_COLORS: Record<PayslipStatus, string> = {
-  draft:    "bg-zinc-100 text-zinc-500",
+  draft:    "bg-surface-2 text-ink-3",
   approved: "bg-blue-100 text-blue-700",
   paid:     "bg-green-100 text-green-700",
 };
@@ -201,7 +201,7 @@ export default function HRSelfServicePage() {
           <div className="border border-line overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/30 border-b border-line">
+                <tr className="bg-surface-2 border-b border-line">
                   <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Period</th>
                   <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-widest text-ink-3">Base Salary</th>
                   <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-widest text-ink-3">Allowances</th>
@@ -226,7 +226,7 @@ export default function HRSelfServicePage() {
                   </tr>
                 )}
                 {!loading && sortedPayslips.map(p => (
-                  <tr key={p.id} className="border-t border-line hover:bg-muted/20">
+                  <tr key={p.id} className="border-t border-line hover:bg-surface-2">
                     <td className="px-4 py-3 text-xs text-ink font-mono">
                       {formatPeriod(p.period_start, p.period_end)}
                     </td>
@@ -336,7 +336,7 @@ export default function HRSelfServicePage() {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="px-4 py-1.5 text-xs text-ink-3 border border-line rounded hover:bg-muted/30 transition-colors"
+                    className="px-4 py-1.5 text-xs text-ink-3 border border-line rounded hover:bg-surface-2 transition-colors"
                   >
                     Cancel
                   </button>
@@ -355,7 +355,7 @@ export default function HRSelfServicePage() {
             <div className="border border-line overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-muted/30 border-b border-line">
+                  <tr className="bg-surface-2 border-b border-line">
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Type</th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Start</th>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">End</th>
@@ -380,7 +380,7 @@ export default function HRSelfServicePage() {
                     </tr>
                   )}
                   {!loading && sortedLeaves.map(lr => (
-                    <tr key={lr.id} className="border-t border-line hover:bg-muted/20">
+                    <tr key={lr.id} className="border-t border-line hover:bg-surface-2">
                       <td className="px-4 py-3">
                         <span className="text-xs text-ink capitalize">
                           {lr.leave_type.replace("_", " ")}

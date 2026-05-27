@@ -1,182 +1,55 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, CheckCircle, ChevronRight } from "lucide-react";
-import { Button, Tag, TextArea } from "@pmplatform/ui-kit";
+import { RefreshCw, CheckCircle, XCircle, Inbox } from "lucide-react";
+import { Button, Tag } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import {
-  listHumanTasks, completeHumanTask, getInstance, listAllInstances,
-  type HumanTask, type WorkflowInstance,
+  listHumanTasks,
+  completeHumanTask,
+  type HumanTask,
 } from "@/lib/api/workflows";
-import { useAuth } from "@/lib/auth/AuthProvider";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(d?: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-function instanceStatusTone(s: string): "neutral" | "info" | "success" | "danger" {
-  if (s === "running") return "info";
-  if (s === "completed") return "success";
-  if (s === "failed") return "danger";
+function outcomeTone(outcome: string | null): "success" | "danger" | "warning" | "neutral" {
+  if (outcome === "approved") return "success";
+  if (outcome === "rejected") return "danger";
+  if (outcome === "needs_info") return "warning";
   return "neutral";
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ─── KPI tile ─────────────────────────────────────────────────────────────────
 
-interface ToastProps { message: string; onDone: () => void }
-
-function Toast({ message, onDone }: ToastProps) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 3000);
-    return () => clearTimeout(t);
-  }, [onDone]);
-
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-success bg-success/10 px-4 py-3 shadow-xl text-sm text-success">
-      <CheckCircle size={16} />
-      {message}
-    </div>
-  );
-}
-
-// ─── Complete slide-over ──────────────────────────────────────────────────────
-
-const OUTCOMES = ["approve", "reject", "needs_info"];
-
-interface CompleteSheetProps {
-  task: HumanTask;
-  instanceInfo: WorkflowInstance | null;
-  onClose: () => void;
-  onCompleted: () => void;
-}
-
-function CompleteSheet({ task, instanceInfo, onClose, onCompleted }: CompleteSheetProps) {
-  const [outcome, setOutcome] = useState("approve");
-  const [comment, setComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const prompt = String(task.form?.prompt ?? "Please review and respond.");
-  const fields = Array.isArray(task.form?.fields) ? task.form.fields as Array<{ name: string; label: string; type: string }> : [];
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
-      await completeHumanTask(task.id, {
-        outcome,
-        data: { comment: comment.trim() || undefined },
-      });
-      onCompleted();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSubmitting(false);
-    }
+function KpiTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "warning" | "success" | "danger" | "neutral";
+}) {
+  const toneClass: Record<string, string> = {
+    warning: "border-warning/30 bg-warning/5 text-warning",
+    success: "border-success/30 bg-success/5 text-success",
+    danger:  "border-danger/30  bg-danger/5  text-danger",
+    neutral: "border-line       bg-surface   text-ink-2",
   };
-
-  const isOverdue = task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
-
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-line bg-paper shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold text-ink">Complete Task</h2>
-            <p className="text-xs text-ink-3">Step: <span className="font-mono">{task.stepId}</span></p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded p-1 text-ink-3 hover:text-ink">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Instance context */}
-          {instanceInfo && (
-            <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-xs text-ink-3">
-              Instance: <span className="font-mono">{instanceInfo.id.slice(0, 12)}</span>
-              {" · "}
-              <Tag tone="warning">{instanceInfo.status}</Tag>
-            </div>
-          )}
-
-          {/* Prompt */}
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">Prompt</p>
-            <p className="text-sm text-ink">{prompt}</p>
-          </div>
-
-          {/* SLA */}
-          {task.slaDeadline && (
-            <p className={`text-xs ${isOverdue ? "text-danger font-medium" : "text-ink-3"}`}>
-              SLA deadline: {fmtDate(task.slaDeadline)}{isOverdue ? " — OVERDUE" : ""}
-            </p>
-          )}
-
-          {/* Dynamic form fields */}
-          {fields.map((field) => (
-            <div key={field.name}>
-              <label className="mb-1 block text-xs font-medium text-ink-2">{field.label}</label>
-              <input
-                type={field.type === "number" ? "number" : "text"}
-                className="w-full rounded border border-line bg-paper px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-                placeholder={field.label}
-              />
-            </div>
-          ))}
-
-          {/* Outcome */}
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-3">Outcome</label>
-            <div className="flex gap-2">
-              {OUTCOMES.map((o) => (
-                <button
-                  type="button"
-                  key={o}
-                  onClick={() => setOutcome(o)}
-                  className={`flex-1 rounded border py-1.5 text-xs font-medium capitalize transition-colors
-                    ${outcome === o
-                      ? "border-accent bg-accent text-white"
-                      : "border-line bg-paper text-ink-2 hover:border-accent/50 hover:text-ink"
-                    }`}
-                >
-                  {o.replace("_", " ")}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Comment */}
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-3">Comment</label>
-            <TextArea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={3}
-              placeholder="Optional comment…"
-            />
-          </div>
-
-          {error && (
-            <p className="text-xs text-danger">{error}</p>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit} disabled={submitting}>
-            <CheckCircle size={13} />
-            {submitting ? "Submitting…" : "Submit"}
-          </Button>
-        </div>
-      </div>
+    <div className={`rounded-sm border px-4 py-3 ${toneClass[tone]}`}>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">{label}</div>
+      <div className="mt-1 font-mono text-2xl tabular-nums">{value}</div>
     </div>
   );
 }
@@ -184,72 +57,60 @@ function CompleteSheet({ task, instanceInfo, onClose, onCompleted }: CompleteShe
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InboxPage() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState<"tasks" | "instances">("tasks");
   const [tasks, setTasks] = useState<HumanTask[]>([]);
-  const [total, setTotal] = useState(0);
-  const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [myTasksOnly, setMyTasksOnly] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<HumanTask | null>(null);
-  const [selectedInstance, setSelectedInstance] = useState<WorkflowInstance | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [completing, setCompleting] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: { status: string; assignee_id?: string; limit: number } = {
-        status: "open",
-        limit: 100,
-      };
-      if (myTasksOnly && user?.id) {
-        params.assignee_id = user.id;
-      }
-      const [taskResult, instanceResult] = await Promise.allSettled([
-        listHumanTasks(params),
-        listAllInstances({ limit: 100 }),
-      ]);
-      if (taskResult.status === "fulfilled") {
-        setTasks(taskResult.value.items);
-        setTotal(taskResult.value.total);
-      }
-      if (instanceResult.status === "fulfilled") {
-        setInstances(instanceResult.value.items);
-      }
-    } catch (e) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  }, [myTasksOnly, user]);
+      const { items } = await listHumanTasks({ limit: 200 });
+      setTasks(items);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const handleRowClick = async (task: HumanTask) => {
-    setSelectedTask(task);
-    setSelectedInstance(null);
-    setError(null);
+  const handleComplete = async (id: string, outcome: "approved" | "rejected") => {
+    setCompleting((prev) => ({ ...prev, [id]: true }));
     try {
-      const detail = await getInstance(task.instanceId);
-      setSelectedInstance(detail);
-    } catch (e) { setError((e as Error).message); }
+      await completeHumanTask(id, { outcome, data: {} });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setCompleting((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
-  const handleCompleted = async () => {
-    setSelectedTask(null);
-    setSelectedInstance(null);
-    setToast("Task completed; instance resumed.");
-    await load();
-  };
+  // KPI counts
+  const pending  = tasks.filter((t) => !t.outcome).length;
+  const approved = tasks.filter((t) => t.outcome === "approved").length;
+  const rejected = tasks.filter((t) => t.outcome === "rejected").length;
 
   const isOverdue = (task: HumanTask) =>
     !!task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
 
   return (
     <div className="flex h-full flex-col">
-      <Breadcrumb items={[{ label: "Home", href: "/pm/home" }, { label: "My Tasks (Approvals)" }]} />
+      <Breadcrumb
+        items={[{ label: "Home", href: "/pm/home" }, { label: "My Tasks (Approvals)" }]}
+      />
       <CommandBar
         actions={[
-          { id: "refresh", label: "Refresh", icon: <RefreshCw size={14} />, onClick: load },
+          {
+            id: "refresh",
+            label: "Refresh",
+            icon: <RefreshCw size={14} />,
+            onClick: load,
+          },
         ]}
       />
 
@@ -260,173 +121,121 @@ export default function InboxPage() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="mb-4 flex gap-1 border-b border-line">
-          {([
-            { key: "tasks" as const,     label: `My Tasks (${total})` },
-            { key: "instances" as const, label: `All Instances (${instances.length})` },
-          ]).map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === key
-                  ? "border-accent text-accent"
-                  : "border-transparent text-ink-3 hover:text-ink"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* KPI strip */}
+        <div className="mb-4 grid grid-cols-3 gap-3">
+          <KpiTile label="Pending" value={pending} tone="warning" />
+          <KpiTile label="Approved" value={approved} tone="success" />
+          <KpiTile label="Rejected" value={rejected} tone="danger" />
         </div>
 
-        {tab === "tasks" && (
-          <>
-            {/* Filter toggle */}
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex rounded-md border border-line overflow-hidden text-xs">
-                <button
-                  type="button"
-                  onClick={() => setMyTasksOnly(false)}
-                  className={`px-3 py-1.5 font-medium transition-colors
-                    ${!myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
-                >
-                  All Open Tasks
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMyTasksOnly(true)}
-                  className={`px-3 py-1.5 font-medium transition-colors border-l border-line
-                    ${myTasksOnly ? "bg-accent text-white" : "bg-paper text-ink-2 hover:bg-surface-2"}`}
-                >
-                  My Tasks
-                </button>
-              </div>
-              <span className="text-xs text-ink-3">{total} open task{total !== 1 ? "s" : ""}</span>
-            </div>
-
-            {loading && (
-              <div className="space-y-px">
-                {[1,2,3,4,5].map(i => (
-                  <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
-                ))}
-              </div>
-            )}
-
-            {!loading && (
-              <div className="overflow-auto rounded-md border border-line">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
-                      <th className="px-4 py-2 text-left">Step</th>
-                      <th className="px-4 py-2 text-left">Prompt</th>
-                      <th className="px-4 py-2 text-left">SLA Deadline</th>
-                      <th className="px-4 py-2 text-left">Created</th>
-                      <th className="px-4 py-2 text-left"><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tasks.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-12 text-center text-ink-3">
-                          <CheckCircle size={32} className="mx-auto mb-2 opacity-30" />
-                          <p>No pending tasks. You&apos;re all caught up.</p>
+        {/* Table */}
+        {loading ? (
+          <div className="space-y-px">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-auto rounded-md border border-line">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-surface-2 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
+                  <th className="px-4 py-2 text-left">Workflow</th>
+                  <th className="px-4 py-2 text-left">Step</th>
+                  <th className="px-4 py-2 text-left">Prompt</th>
+                  <th className="px-4 py-2 text-left">Created</th>
+                  <th className="px-4 py-2 text-left">SLA Deadline</th>
+                  <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-2 py-2 text-left"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-ink-3">
+                      <Inbox size={32} className="mx-auto mb-2 opacity-30" />
+                      <p>No tasks found. You have no pending approvals.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  tasks.map((task) => {
+                    const overdue = isOverdue(task);
+                    const isPending = !task.outcome;
+                    const busy = completing[task.id] ?? false;
+                    return (
+                      <tr
+                        key={task.id}
+                        className="border-b border-line last:border-0 hover:bg-surface-2"
+                      >
+                        {/* Workflow — instanceId truncated as proxy */}
+                        <td className="px-4 py-2.5 font-mono text-xs text-ink-3">
+                          {task.instanceId ? task.instanceId.slice(0, 8) + "…" : "—"}
                         </td>
-                      </tr>
-                    )}
-                    {tasks.map((task) => {
-                      const overdue = isOverdue(task);
-                      return (
-                        <tr
-                          key={task.id}
-                          className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
-                          onClick={() => handleRowClick(task)}
+                        {/* Step */}
+                        <td className="px-4 py-2.5 font-mono text-xs text-ink">
+                          {task.stepId || "—"}
+                        </td>
+                        {/* Prompt */}
+                        <td className="max-w-xs truncate px-4 py-2.5 text-xs text-ink-2">
+                          {String(task.form?.prompt ?? "—")}
+                        </td>
+                        {/* Created */}
+                        <td className="px-4 py-2.5 text-xs text-ink-3">
+                          {fmtDate(task.createdAt)}
+                        </td>
+                        {/* SLA Deadline */}
+                        <td
+                          className={`px-4 py-2.5 text-xs ${
+                            overdue ? "font-medium text-danger" : "text-ink-3"
+                          }`}
                         >
-                          <td className="px-4 py-2.5">
-                            <span className="font-mono text-xs text-ink">{task.stepId}</span>
-                          </td>
-                          <td className="max-w-xs truncate px-4 py-2.5 text-xs text-ink-2">
-                            {String(task.form?.prompt ?? "—")}
-                          </td>
-                          <td className={`px-4 py-2.5 text-xs ${overdue ? "text-danger font-medium" : "text-ink-3"}`}>
-                            {fmtDate(task.slaDeadline)}
-                            {overdue && <span className="ml-1">(overdue)</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(task.createdAt)}</td>
-                          <td className="px-4 py-2.5">
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleRowClick(task); }}>
-                              Complete
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-
-        {tab === "instances" && (
-          <>
-            {loading && (
-              <div className="space-y-px">
-                {[1,2,3,4,5].map(i => (
-                  <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
-                ))}
-              </div>
-            )}
-
-            {!loading && (
-              <div className="overflow-x-auto rounded-lg border border-line">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-2 text-ink-3">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium">Instance ID</th>
-                      <th className="px-4 py-2 text-left font-medium">Definition</th>
-                      <th className="px-4 py-2 text-left font-medium">Status</th>
-                      <th className="px-4 py-2 text-left font-medium">Started</th>
-                      <th className="px-4 py-2 text-left font-medium">Completed</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {instances.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-6 text-center text-ink-3">
-                          No workflow instances found.
+                          {fmtDate(task.slaDeadline)}
+                          {overdue && <span className="ml-1">(overdue)</span>}
+                        </td>
+                        {/* Status */}
+                        <td className="px-4 py-2.5">
+                          {isPending ? (
+                            <Tag tone="warning">pending</Tag>
+                          ) : (
+                            <Tag tone={outcomeTone(task.outcome)}>{task.outcome}</Tag>
+                          )}
+                        </td>
+                        {/* Actions */}
+                        <td className="px-4 py-2.5">
+                          {isPending && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                title="Approve"
+                                disabled={busy}
+                                onClick={() => handleComplete(task.id, "approved")}
+                                className="flex items-center gap-1 rounded border border-success/40 bg-success/5 px-2 py-1 text-[11px] font-medium text-success transition-colors hover:bg-success/15 disabled:opacity-50"
+                              >
+                                <CheckCircle size={12} />
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                title="Reject"
+                                disabled={busy}
+                                onClick={() => handleComplete(task.id, "rejected")}
+                                className="flex items-center gap-1 rounded border border-danger/40 bg-danger/5 px-2 py-1 text-[11px] font-medium text-danger transition-colors hover:bg-danger/15 disabled:opacity-50"
+                              >
+                                <XCircle size={12} />
+                                Reject
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
-                    ) : instances.map((inst) => (
-                      <tr key={inst.id} className="hover:bg-surface-2/50">
-                        <td className="px-4 py-2 font-mono text-xs text-ink-3">{inst.id.slice(0, 12)}…</td>
-                        <td className="px-4 py-2 font-mono text-xs text-ink-3">{inst.definitionId.slice(0, 12)}…</td>
-                        <td className="px-4 py-2">
-                          <Tag tone={instanceStatusTone(inst.status)} size="sm">{inst.status}</Tag>
-                        </td>
-                        <td className="px-4 py-2 text-ink-3">{fmtDate(inst.startedAt)}</td>
-                        <td className="px-4 py-2 text-ink-3">{fmtDate(inst.endedAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-
-      {selectedTask && (
-        <CompleteSheet
-          task={selectedTask}
-          instanceInfo={selectedInstance}
-          onClose={() => { setSelectedTask(null); setSelectedInstance(null); }}
-          onCompleted={handleCompleted}
-        />
-      )}
-
-      {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   );
 }

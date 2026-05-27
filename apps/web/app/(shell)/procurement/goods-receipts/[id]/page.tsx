@@ -14,7 +14,7 @@ export default function GoodsReceiptDetailPage() {
     getGoodsReceipt(id).then(setGr).catch(console.error).finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!gr) return <div className="p-8 text-destructive">Goods receipt not found.</div>;
 
   const totalOrdered = gr.lines.reduce((s, l) => s + l.qty_ordered, 0);
@@ -23,17 +23,17 @@ export default function GoodsReceiptDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/procurement/goods-receipts")} className="hover:underline">Goods Receipts</button>
         <span className="mx-2">/</span>
         <span>{gr.id.slice(0, 8)}…</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Goods Receipt</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-ink-3 mt-1">
               PO: {gr.po_code ?? gr.po_id} · {gr.supplier_name ?? "Unknown Supplier"}
             </p>
           </div>
@@ -50,18 +50,18 @@ export default function GoodsReceiptDetailPage() {
           { label: "Received At", value: gr.received_at ? gr.received_at.slice(0, 10) : "—" },
           { label: "Receive Rate", value: `${receiveRate}%` },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-semibold">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Lines ({gr.lines.length})</h2>
+      <div className="rounded-lg border border-line bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">Lines ({gr.lines.length})</h2>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-muted-foreground text-xs uppercase">
+            <tr className="text-left text-ink-3 text-xs uppercase">
               <th className="py-2 pr-4">Item</th>
               <th className="py-2 pr-4 text-right">Qty Ordered</th>
               <th className="py-2 pr-4 text-right">Qty Received</th>
@@ -72,12 +72,12 @@ export default function GoodsReceiptDetailPage() {
             {gr.lines.map((line, i) => {
               const pct = line.qty_ordered > 0 ? Math.round((line.qty_received / line.qty_ordered) * 100) : 0;
               return (
-                <tr key={i} className="border-t border-border">
+                <tr key={i} className="border-t border-line">
                   <td className="py-2 pr-4">{line.item_name ?? line.item_id}</td>
                   <td className="py-2 pr-4 text-right font-mono">{line.qty_ordered}</td>
                   <td className="py-2 pr-4 text-right font-mono">{line.qty_received}</td>
                   <td className="py-2 text-right">
-                    <span className={`text-xs font-semibold ${pct >= 100 ? "text-green-600" : pct > 0 ? "text-blue-600" : "text-muted-foreground"}`}>
+                    <span className={`text-xs font-semibold ${pct >= 100 ? "text-green-600" : pct > 0 ? "text-blue-600" : "text-ink-3"}`}>
                       {pct}%
                     </span>
                   </td>
@@ -86,7 +86,7 @@ export default function GoodsReceiptDetailPage() {
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-border font-semibold">
+            <tr className="border-t-2 border-line font-semibold">
               <td className="py-2 pr-4">Total</td>
               <td className="py-2 pr-4 text-right font-mono">{totalOrdered}</td>
               <td className="py-2 pr-4 text-right font-mono">{totalReceived}</td>
@@ -94,7 +94,7 @@ export default function GoodsReceiptDetailPage() {
             </tr>
           </tfoot>
         </table>
-        {gr.notes && <p className="mt-4 text-sm text-muted-foreground">Notes: {gr.notes}</p>}
+        {gr.notes && <p className="mt-4 text-sm text-ink-3">Notes: {gr.notes}</p>}
       </div>
     </div>
   );

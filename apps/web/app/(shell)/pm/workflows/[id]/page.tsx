@@ -19,7 +19,7 @@ import "reactflow/dist/style.css";
 import {
   Save, Upload, Play, Trash2, RefreshCw, ChevronRight, Eye, Clock,
   Zap, GitBranch, Globe, UserCheck, Timer, Bell, Square,
-  Variable, Plus, X, Check,
+  Variable, Plus, X, Check, Radio, ListPlus, FilePlus,
 } from "lucide-react";
 import { Button, Input, Tag, TextArea } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
@@ -33,14 +33,16 @@ import {
 // ─── Step type metadata ────────────────────────────────────────────────────────
 
 const STEP_TYPES = [
-  { type: "expression",    label: "Expression",    icon: Zap,        color: "text-warning" },
-  { type: "set_variable",  label: "Set Variable",  icon: Variable,   color: "text-info" },
-  { type: "switch",        label: "Switch",        icon: GitBranch,  color: "text-accent" },
-  { type: "http",          label: "HTTP",          icon: Globe,      color: "text-success" },
-  { type: "human_task",    label: "Human Task",    icon: UserCheck,  color: "text-signal" },
-  { type: "wait",          label: "Wait",          icon: Timer,      color: "text-ink-3" },
-  { type: "notification",  label: "Notification",  icon: Bell,       color: "text-info" },
-  { type: "end",           label: "End",           icon: Square,     color: "text-danger" },
+  { type: "expression",      label: "Expression",     icon: Zap,       color: "text-warning" },
+  { type: "set_variable",    label: "Set Variable",   icon: Variable,  color: "text-info" },
+  { type: "switch",          label: "Switch",         icon: GitBranch, color: "text-accent" },
+  { type: "http",            label: "HTTP",           icon: Globe,     color: "text-success" },
+  { type: "human_task",      label: "Human Task",     icon: UserCheck, color: "text-signal" },
+  { type: "create_task",     label: "Create Task",    icon: ListPlus,  color: "text-success" },
+  { type: "create_document", label: "Create Document",icon: FilePlus,  color: "text-accent" },
+  { type: "wait",            label: "Wait",           icon: Timer,     color: "text-ink-3" },
+  { type: "notification",    label: "Notification",   icon: Bell,      color: "text-info" },
+  { type: "end",             label: "End",            icon: Square,    color: "text-danger" },
 ];
 
 function getStepMeta(type: string) {
@@ -247,17 +249,51 @@ function PropPanel({ step, onChange }: PropPanelProps) {
           <div>
             <label className="mb-1 block font-medium text-ink-2">Cases (when conditions)</label>
             {((step.cases as Array<{ when: string; do: DslStep[] }>) ?? []).map((c, i) => (
-              <div key={i} className="mb-2 rounded border border-line p-2">
-                <Input
-                  value={c.when}
-                  onChange={(e) => {
-                    const cases = [...((step.cases as Array<{ when: string; do: DslStep[] }>) ?? [])];
-                    cases[i] = { ...cases[i], when: e.target.value };
-                    set("cases", cases);
-                  }}
-                  placeholder="e.g. input.amount > 1000 or default"
-                />
-                <p className="mt-1 text-[10px] text-ink-3">{c.do?.length ?? 0} sub-steps</p>
+              <div key={i} className="mb-2 rounded border border-line p-2 space-y-2">
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={c.when}
+                    onChange={(e) => {
+                      const cases = [...((step.cases as Array<{ when: string; do: DslStep[] }>) ?? [])];
+                      cases[i] = { ...cases[i], when: e.target.value };
+                      set("cases", cases);
+                    }}
+                    placeholder="e.g. var.needs_approval == true  or  default"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cases = [...((step.cases as Array<{ when: string; do: DslStep[] }>) ?? [])];
+                      cases.splice(i, 1);
+                      set("cases", cases);
+                    }}
+                    className="shrink-0 text-[10px] text-danger hover:text-danger/80"
+                    title="Remove case"
+                  >✕</button>
+                </div>
+                <div>
+                  <p className="mb-0.5 text-[10px] font-medium text-ink-3">Steps (JSON array)</p>
+                  <textarea
+                    rows={4}
+                    defaultValue={JSON.stringify(c.do ?? [], null, 2)}
+                    onBlur={(e) => {
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        if (Array.isArray(parsed)) {
+                          const cases = [...((step.cases as Array<{ when: string; do: DslStep[] }>) ?? [])];
+                          cases[i] = { ...cases[i], do: parsed };
+                          set("cases", cases);
+                          e.target.style.borderColor = "";
+                        }
+                      } catch {
+                        e.target.style.borderColor = "var(--danger)";
+                      }
+                    }}
+                    className="w-full rounded-sm border border-line bg-surface-2 px-2 py-1.5 font-mono text-[10px] text-ink focus:border-accent focus:outline-none"
+                    placeholder='[{"id":"step1","type":"human_task","form":{"prompt":"Approve?"}}]'
+                  />
+                  <p className="mt-0.5 text-[10px] text-ink-3">{c.do?.length ?? 0} step(s) · blur to apply</p>
+                </div>
               </div>
             ))}
             <button
@@ -369,6 +405,56 @@ function PropPanel({ step, onChange }: PropPanelProps) {
             <div>
               <label className="mb-1 block font-medium text-ink-2">To</label>
               <Input value={String(step.to ?? "")} onChange={(e) => set("to", e.target.value)} />
+            </div>
+          </>
+        )}
+
+        {step.type === "create_task" && (
+          <>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Project ID</label>
+              <Input value={String(step.project_id ?? "")} onChange={(e) => set("project_id", e.target.value)} placeholder="{{input.project_id}}" />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Task Title</label>
+              <Input value={String(step.task_title ?? "")} onChange={(e) => set("task_title", e.target.value)} placeholder="{{input.title}}" />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Assignee ID</label>
+              <Input value={String(step.task_assignee ?? "")} onChange={(e) => set("task_assignee", e.target.value)} placeholder="{{input.assignee_id}}" />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Priority</label>
+              <select
+                aria-label="Task priority"
+                value={String(step.task_priority ?? "med")}
+                onChange={(e) => set("task_priority", e.target.value)}
+                className="w-full rounded border border-line bg-paper px-2 py-1 text-xs text-ink"
+              >
+                {["low", "med", "high", "critical"].map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {step.type === "create_document" && (
+          <>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Project ID</label>
+              <Input value={String(step.project_id ?? "")} onChange={(e) => set("project_id", e.target.value)} placeholder="{{input.project_id}}" />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Document Title</label>
+              <Input value={String(step.doc_title ?? "")} onChange={(e) => set("doc_title", e.target.value)} placeholder="{{input.doc_title}}" />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Initial Content</label>
+              <TextArea
+                value={String(step.doc_content ?? "")}
+                onChange={(e) => set("doc_content", e.target.value)}
+                rows={3}
+                placeholder="Document body or template..."
+              />
             </div>
           </>
         )}
@@ -510,6 +596,16 @@ function fmtDuration(start: string | null, end: string | null): string {
   return `${(ms / 60000).toFixed(1)}m`;
 }
 
+type RunFilter = "all" | "running" | "paused" | "completed" | "failed";
+
+function statusDot(s: InstanceStatus) {
+  if (s === "running") return <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />;
+  if (s === "paused") return <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-warning" />;
+  if (s === "completed") return <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-success" />;
+  if (s === "failed") return <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-danger" />;
+  return <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-ink-3" />;
+}
+
 interface RunsTabProps {
   workflowId: string;
 }
@@ -519,12 +615,12 @@ function RunsTab({ workflowId }: RunsTabProps) {
   const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<RunFilter>("all");
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const { items } = await listInstances(workflowId, { limit: 50 });
+      const { items } = await listInstances(workflowId, { limit: 100 });
       setInstances(items);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -532,50 +628,96 @@ function RunsTab({ workflowId }: RunsTabProps) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-refresh every 5s when any run is active
+  useEffect(() => {
+    const hasActive = instances.some((i) => i.status === "running" || i.status === "paused");
+    if (!hasActive) return;
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
+  }, [instances, load]);
+
+  const filtered = filter === "all" ? instances : instances.filter((i) => i.status === filter);
+
   if (loading) return <div className="p-6 text-center text-sm text-ink-3">Loading runs…</div>;
 
   return (
-    <div className="overflow-auto p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs text-ink-3">{instances.length} runs</span>
-        <Button size="sm" variant="ghost" onClick={load}><RefreshCw size={12} /> Refresh</Button>
-      </div>
-      {error && (
-        <div className="mb-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
-          {error}
-        </div>
-      )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
-            <th className="px-4 py-2 text-left">Instance ID</th>
-            <th className="px-4 py-2 text-left">Status</th>
-            <th className="px-4 py-2 text-left">Trigger</th>
-            <th className="px-4 py-2 text-left">Started</th>
-            <th className="px-4 py-2 text-left">Ended</th>
-            <th className="px-4 py-2 text-left">Duration</th>
-          </tr>
-        </thead>
-        <tbody>
-          {instances.map((inst) => (
-            <tr
-              key={inst.id}
-              className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
-              onClick={() => router.push(`/pm/workflows/${workflowId}/runs/${inst.id}`)}
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Filter bar */}
+      <div className="flex items-center gap-1 border-b border-line bg-paper px-4 py-2">
+        {(["all", "running", "paused", "completed", "failed"] as RunFilter[]).map((f) => {
+          const count = f === "all" ? instances.length : instances.filter((i) => i.status === f).length;
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                filter === f
+                  ? "bg-accent/10 text-accent"
+                  : "text-ink-3 hover:bg-surface-2 hover:text-ink"
+              }`}
             >
-              <td className="px-4 py-2.5 font-mono text-xs text-ink">{inst.id.slice(0, 8)}</td>
-              <td className="px-4 py-2.5"><Tag tone={instTone(inst.status)}>{inst.status}</Tag></td>
-              <td className="px-4 py-2.5 text-xs text-ink-2">{inst.triggerKind || "manual"}</td>
-              <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(inst.startedAt)}</td>
-              <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(inst.endedAt)}</td>
-              <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDuration(inst.startedAt, inst.endedAt)}</td>
+              {f} {count > 0 && <span className="ml-0.5 opacity-60">({count})</span>}
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-ink-3">{filtered.length} run{filtered.length !== 1 ? "s" : ""}</span>
+          <Button size="sm" variant="ghost" onClick={load}><RefreshCw size={12} /> Refresh</Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        {error && (
+          <div className="m-4 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2 font-mono text-[11px] text-danger">
+            {error}
+          </div>
+        )}
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
+              <th className="px-4 py-2 text-left">Instance ID</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">Trigger</th>
+              <th className="px-4 py-2 text-left">Started</th>
+              <th className="px-4 py-2 text-left">Duration</th>
             </tr>
-          ))}
-          {instances.length === 0 && (
-            <tr><td colSpan={6} className="px-4 py-10 text-center text-xs text-ink-3">No runs yet. Click &ldquo;Run Once&rdquo; to start.</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filtered.map((inst) => (
+              <tr
+                key={inst.id}
+                className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                onClick={() => router.push(`/pm/workflows/${workflowId}/runs/${inst.id}`)}
+              >
+                <td className="px-4 py-2.5 font-mono text-xs text-ink">{inst.id.slice(0, 8)}</td>
+                <td className="px-4 py-2.5">
+                  <span className="flex items-center text-xs font-medium">
+                    {statusDot(inst.status as InstanceStatus)}
+                    <span className={
+                      inst.status === "running" ? "text-accent" :
+                      inst.status === "paused" ? "text-warning" :
+                      inst.status === "completed" ? "text-success" :
+                      inst.status === "failed" ? "text-danger" : "text-ink-3"
+                    }>{inst.status}</span>
+                    {inst.status === "paused" && (
+                      <span className="ml-1.5 rounded bg-warning/10 px-1 py-0.5 text-[10px] text-warning">awaiting</span>
+                    )}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-xs text-ink-2 capitalize">{inst.triggerKind || "manual"}</td>
+                <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDate(inst.startedAt)}</td>
+                <td className="px-4 py-2.5 text-xs text-ink-3">{fmtDuration(inst.startedAt, inst.endedAt ?? (inst.status === "running" ? new Date().toISOString() : null))}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-ink-3">
+                {instances.length === 0 ? "No runs yet. Click \"Run Once\" to start." : `No ${filter} runs.`}
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -725,9 +867,129 @@ function PublishModal({
   );
 }
 
+// ─── Trigger tab ────────────────────────────────────────────────────────────
+
+const EVENT_SUBJECTS = [
+  { value: "task.assigned",          label: "Task Assigned" },
+  { value: "task.blocked",           label: "Task Blocked" },
+  { value: "project.created",        label: "Project Created" },
+  { value: "project.updated",        label: "Project Updated" },
+  { value: "document.sign_requested",label: "Document Sign Requested" },
+  { value: "wo.released",            label: "Work Order Released" },
+  { value: "instance.completed",     label: "Workflow Instance Completed" },
+];
+
+interface TriggerTabProps {
+  def: WorkflowDef;
+  onSaved: (updated: WorkflowDef) => void;
+}
+
+function TriggerTab({ def, onSaved }: TriggerTabProps) {
+  const currentTrigger = (def.trigger ?? { type: "manual" }) as Record<string, string>;
+  const [triggerType, setTriggerType] = useState<"manual" | "event" | "schedule">(
+    (currentTrigger.type as "manual" | "event" | "schedule") ?? "manual"
+  );
+  const [eventSubject, setEventSubject] = useState(currentTrigger.event ?? "task.assigned");
+  const [cronExpr, setCronExpr] = useState(currentTrigger.cron ?? "0 9 * * MON");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const triggerPayload: Record<string, string> = { type: triggerType };
+      if (triggerType === "event") triggerPayload.event = eventSubject;
+      if (triggerType === "schedule") triggerPayload.cron = cronExpr;
+      const updated = await patchWorkflow(def.id, { trigger: triggerPayload, version: def.version });
+      onSaved(updated);
+      setMsg("Trigger saved");
+      setTimeout(() => setMsg(null), 2000);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-lg p-6 space-y-5">
+      <div>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Trigger Type</p>
+        <div className="flex flex-col gap-2">
+          {(["manual", "event", "schedule"] as const).map((t) => (
+            <label key={t} className="flex cursor-pointer items-center gap-3 rounded-md border border-line bg-paper px-3 py-2.5 hover:bg-surface-2">
+              <input
+                type="radio"
+                name="trigger-type"
+                value={t}
+                checked={triggerType === t}
+                onChange={() => setTriggerType(t)}
+                className="accent-accent"
+              />
+              <div>
+                <p className="text-sm font-medium capitalize text-ink">{t}</p>
+                <p className="text-xs text-ink-3">
+                  {t === "manual" && "Started manually via button or API"}
+                  {t === "event" && "Auto-starts when a NATS event matches"}
+                  {t === "schedule" && "Auto-starts on a cron schedule"}
+                </p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {triggerType === "event" && (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Event Subject</p>
+          <select
+            aria-label="Event subject"
+            value={eventSubject}
+            onChange={(e) => setEventSubject(e.target.value)}
+            className="w-full rounded border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            {EVENT_SUBJECTS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label} ({s.value})</option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-ink-3">
+            When a published workflow has this trigger set, it will auto-start whenever the event fires.
+          </p>
+        </div>
+      )}
+
+      {triggerType === "schedule" && (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Cron Expression</p>
+          <input
+            value={cronExpr}
+            onChange={(e) => setCronExpr(e.target.value)}
+            placeholder="0 9 * * MON"
+            className="w-full rounded border border-line bg-surface px-3 py-2 font-mono text-sm text-ink focus:border-accent focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-ink-3">Standard 5-field cron (min hour day month weekday)</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded bg-accent px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Trigger"}
+        </button>
+        {msg && <span className={`text-xs ${msg.includes("failed") || msg.includes("Error") ? "text-danger" : "text-success"}`}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type Tab = "designer" | "versions" | "runs";
+type Tab = "designer" | "versions" | "runs" | "trigger";
 
 export default function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -990,7 +1252,7 @@ export default function WorkflowDetailPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-0 border-b border-line bg-paper px-4">
-        {(["designer", "versions", "runs"] as Tab[]).map((t) => (
+        {(["designer", "versions", "runs", "trigger"] as Tab[]).map((t) => (
           <button
             type="button"
             key={t}
@@ -1004,6 +1266,7 @@ export default function WorkflowDetailPage() {
             {t === "designer" && <ChevronRight size={13} className="mr-1 inline" />}
             {t === "versions" && <Clock size={13} className="mr-1 inline" />}
             {t === "runs" && <Play size={13} className="mr-1 inline" />}
+            {t === "trigger" && <Radio size={13} className="mr-1 inline" />}
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
@@ -1081,6 +1344,12 @@ export default function WorkflowDetailPage() {
         )}
 
         {tab === "runs" && <RunsTab workflowId={def.id} />}
+
+        {tab === "trigger" && (
+          <div className="flex-1 overflow-auto">
+            <TriggerTab def={def} onSaved={setDef} />
+          </div>
+        )}
       </div>
 
       {/* Modals */}

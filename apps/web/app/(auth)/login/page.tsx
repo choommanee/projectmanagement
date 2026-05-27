@@ -193,7 +193,10 @@ function LoginForm() {
       <aside className="login-brand-panel hidden lg:flex w-120 flex-col justify-between bg-ink p-12 text-paper">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-sm bg-paper text-ink font-mono text-[13px] font-semibold">PM</span>
+            <span
+              className="grid h-9 w-9 place-items-center rounded-xl text-white font-mono text-[13px] font-bold"
+              style={{ background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)" }}
+            >PM</span>
             <span className="font-semibold tracking-tight">PM Platform</span>
           </div>
         </div>
@@ -219,17 +222,47 @@ function LoginForm() {
 
       {/* Right form panel */}
       <main className="relative flex flex-1 items-center justify-center bg-paper p-6">
-        <div className="w-full max-w-105">
+        <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-8 text-center">
-            <span className="grid h-10 w-10 mx-auto place-items-center rounded-sm bg-ink text-paper font-mono text-sm">PM</span>
+            <span
+              className="grid h-10 w-10 mx-auto place-items-center rounded-xl text-white font-mono text-sm font-bold"
+              style={{ background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)" }}
+            >PM</span>
           </div>
 
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="mt-1 text-sm text-ink-3">Welcome back. Sign in to your workspace.</p>
 
+          {/* Demo quick-login */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setErrors({});
+              setBusy(true);
+              try {
+                const res = await fetch("/api/auth/login", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ tenant_slug: "demo-co", email: "demo@demo.co", password: "DemoPass#2026" }),
+                });
+                if (!res.ok) { setErrors({ form: `Demo login failed (${res.status})` }); return; }
+                router.push(nextPath);
+              } catch {
+                setErrors({ form: "Cannot reach identity service." });
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="mt-4 w-full rounded-lg border border-accent/25 bg-accent-soft px-3 py-2.5 text-left text-[12px] text-ink-2 transition-all duration-150 hover:border-accent/50 hover:bg-accent-muted hover:text-ink disabled:opacity-50 shadow-xs"
+          >
+            <span className="font-mono font-semibold text-accent">▶ Demo login</span>
+            <span className="ml-2 text-ink-3">demo-co · demo@demo.co</span>
+          </button>
+
           {/* Mode tabs */}
-          <div className="mt-6 grid grid-cols-3 gap-1 rounded-sm bg-surface-2 p-1">
+          <div className="mt-4 grid grid-cols-3 gap-1 rounded-sm bg-surface-2 p-1">
             {modeTabs.map((t) => (
               <button
                 key={t.id}

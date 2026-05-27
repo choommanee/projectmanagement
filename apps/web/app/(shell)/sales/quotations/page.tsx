@@ -157,7 +157,7 @@ export default function SalesQuotationsPage() {
           <button
             key={opt.value}
             onClick={() => setStatusFilter(opt.value)}
-            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${statusFilter === opt.value ? "bg-accent text-white" : "bg-surface-2 text-ink hover:bg-surface-3"}`}
+            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${statusFilter === opt.value ? "bg-accent text-white" : "bg-surface-2 text-ink hover:bg-surface-2"}`}
           >
             {opt.label}
           </button>

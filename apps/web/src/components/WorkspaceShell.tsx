@@ -44,6 +44,8 @@ import { DocCover } from "@/components/DocCover";
 import { WorkspaceDashboard } from "@/components/WorkspaceDashboard";
 import { RTMView } from "@/components/RTMView";
 import { ADRVotingPanel } from "@/components/ADRVotingPanel";
+import { SignaturePanel } from "@/components/SignaturePanel";
+import { RunWorkflowButton } from "@/components/RunWorkflowButton";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -580,6 +582,13 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
 
               <SaveTag status={saving} />
 
+              <RunWorkflowButton
+                context={{
+                  document_id: openDoc.id,
+                  document_title: openDoc.title,
+                }}
+              />
+
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
@@ -631,6 +640,8 @@ export function WorkspaceShell({ projectId, kind, allowedTypes, workspaceName }:
                   onStatusChange={(s) => void changeStatus(s)}
                 />
               )}
+              {/* E-signature panel */}
+              <SignaturePanel documentId={openDoc.id} />
             </div>
 
             {/* Footer */}

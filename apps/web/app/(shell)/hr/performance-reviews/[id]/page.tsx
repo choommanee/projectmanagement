@@ -55,11 +55,11 @@ export default function PerformanceReviewDetailPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!review) return <div className="p-8 text-destructive">Review not found.</div>;
 
   const statusColors: Record<ReviewStatus, string> = {
-    draft: "bg-muted text-muted-foreground",
+    draft: "bg-muted text-ink-3",
     self_review: "bg-blue-100 text-blue-800",
     manager_review: "bg-purple-100 text-purple-800",
     completed: "bg-green-100 text-green-800",
@@ -76,17 +76,17 @@ export default function PerformanceReviewDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/hr/performance-reviews")} className="hover:underline">Performance Reviews</button>
         <span className="mx-2">/</span>
         <span>{review.employeeName}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{review.employeeName}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Review Period: {review.reviewPeriod}</p>
+            <p className="text-sm text-ink-3 mt-1">Review Period: {review.reviewPeriod}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[review.status]}`}>
             {review.status.replace("_", " ")}
@@ -103,26 +103,26 @@ export default function PerformanceReviewDetailPage() {
       </div>
 
       {/* Overall Rating */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Overall Rating</h2>
+      <div className="rounded-lg border border-line bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">Overall Rating</h2>
         <div className="flex gap-2">
           {RATINGS.map(r => (
             <button key={r} onClick={() => setOverallRating(r)}
-              className={`w-10 h-10 rounded text-sm font-semibold border transition-colors ${overallRating === r ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
+              className={`w-10 h-10 rounded text-sm font-semibold border transition-colors ${overallRating === r ? "bg-primary text-primary-foreground border-primary" : "border-line hover:bg-surface-2"}`}>
               {r}
             </button>
           ))}
-          {overallRating && <span className="self-center text-sm text-muted-foreground">{ratingLabel(overallRating)}</span>}
+          {overallRating && <span className="self-center text-sm text-ink-3">{ratingLabel(overallRating)}</span>}
         </div>
       </div>
 
       {/* Goals */}
       {review.goals.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Goals</h2>
+        <div className="rounded-lg border border-line bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">Goals</h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground text-xs uppercase">
+              <tr className="text-left text-ink-3 text-xs uppercase">
                 <th className="py-2 pr-4">Description</th>
                 <th className="py-2 pr-4 text-right">Weight</th>
                 <th className="py-2 pr-4 text-center">Self</th>
@@ -131,7 +131,7 @@ export default function PerformanceReviewDetailPage() {
             </thead>
             <tbody>
               {review.goals.map(g => (
-                <tr key={g.id} className="border-t border-border">
+                <tr key={g.id} className="border-t border-line">
                   <td className="py-2 pr-4">{g.description}</td>
                   <td className="py-2 pr-4 text-right font-mono">{g.weight}%</td>
                   <td className="py-2 pr-4 text-center">{g.selfRating ?? "—"}</td>
@@ -145,15 +145,15 @@ export default function PerformanceReviewDetailPage() {
 
       {/* Comments */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">Self Comments</label>
+        <div className="rounded-lg border border-line bg-card p-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-3 block mb-2">Self Comments</label>
           <textarea value={selfComments} onChange={e => setSelfComments(e.target.value)} rows={4}
-            className="w-full text-sm bg-background border border-border rounded px-3 py-2 resize-none" />
+            className="w-full text-sm bg-surface border border-line rounded px-3 py-2 resize-none" />
         </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">Manager Comments</label>
+        <div className="rounded-lg border border-line bg-card p-4">
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-3 block mb-2">Manager Comments</label>
           <textarea value={managerComments} onChange={e => setManagerComments(e.target.value)} rows={4}
-            className="w-full text-sm bg-background border border-border rounded px-3 py-2 resize-none" />
+            className="w-full text-sm bg-surface border border-line rounded px-3 py-2 resize-none" />
         </div>
       </div>
     </div>

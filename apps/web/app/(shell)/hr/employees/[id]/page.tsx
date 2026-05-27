@@ -10,16 +10,16 @@ import {
 type Tab = "overview" | "payslips" | "leave";
 
 const LEAVE_COLORS: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700",
-  approved: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-600",
-  cancelled: "bg-zinc-100 text-zinc-500",
+  pending:   "bg-warning/10 text-warning",
+  approved:  "bg-success/10 text-success",
+  rejected:  "bg-danger/10 text-danger",
+  cancelled: "bg-surface-2 text-ink-3",
 };
 
 const PAYSLIP_COLORS: Record<string, string> = {
-  draft: "bg-zinc-100 text-zinc-600",
-  approved: "bg-blue-100 text-blue-700",
-  paid: "bg-green-100 text-green-700",
+  draft:    "bg-surface-2 text-ink-3",
+  approved: "bg-accent/10 text-accent",
+  paid:     "bg-success/10 text-success",
 };
 
 export default function EmployeeDetailPage() {
@@ -42,92 +42,124 @@ export default function EmployeeDetailPage() {
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (!employee) return <div className="p-6 text-sm text-red-600">Employee not found</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading…</div>;
+  if (!employee) return <div className="p-6 text-sm text-danger">Employee not found</div>;
 
   const totalDaysLeave = leaves.filter(l => l.status === "approved").reduce((s, l) => s + l.days, 0);
   const lastPayslip = payslips[0];
 
   return (
-    <div className="p-6 space-y-6">
-      <Breadcrumb items={[{ label: "HR" }, { label: "Employees", href: "/hr/employees" }, { label: `${employee.firstName} ${employee.lastName}` }]} />
+    <div className="flex h-full flex-col overflow-auto p-6 space-y-5">
+      <Breadcrumb items={[
+        { label: "HR" },
+        { label: "Employees", href: "/hr/employees" },
+        { label: `${employee.firstName} ${employee.lastName}` },
+      ]} />
 
-      <div className="rounded-lg border border-border bg-surface p-5 flex items-start justify-between">
+      {/* Header card */}
+      <div className="rounded-md border border-line bg-paper p-5 flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-xl font-semibold">{employee.firstName} {employee.lastName}</h1>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${employee.status === "active" ? "bg-green-100 text-green-700" : "bg-zinc-100 text-zinc-500"}`}>{employee.status}</span>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-xl font-semibold text-ink">{employee.firstName} {employee.lastName}</h1>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${employee.status === "active" ? "bg-success/10 text-success" : "bg-surface-2 text-ink-3"}`}>
+              {employee.status}
+            </span>
           </div>
-          <div className="text-sm text-muted-foreground space-y-0.5">
-            <div className="font-mono text-xs">{employee.empNo}</div>
+          <div className="space-y-0.5 text-sm text-ink-2">
+            <div className="font-mono text-xs text-ink-3">{employee.empNo}</div>
             {employee.positionName && <div>{employee.positionName}</div>}
             {employee.departmentName && <div>{employee.departmentName}</div>}
             <div>{employee.email}</div>
             <div className="text-xs">Hired: {employee.hireDate?.slice(0, 10)}</div>
           </div>
         </div>
-        <button onClick={() => router.back()} className="text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded">← Back</button>
+        <button
+          onClick={() => router.back()}
+          className="rounded border border-line px-3 py-1.5 text-xs text-ink-3 hover:text-ink"
+        >
+          ← Back
+        </button>
       </div>
 
+      {/* KPI row */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Payslips</div>
-          <div className="text-2xl font-mono font-bold">{payslips.length}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Leave Days (approved)</div>
-          <div className="text-2xl font-mono font-bold">{totalDaysLeave}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Last Net Pay</div>
-          <div className="text-2xl font-mono font-bold text-green-600">{lastPayslip ? fmt(lastPayslip.net_pay) : "—"}</div>
-        </div>
+        {[
+          { label: "Payslips", value: String(payslips.length), tone: "" },
+          { label: "Leave Days (approved)", value: String(totalDaysLeave), tone: "" },
+          { label: "Last Net Pay", value: lastPayslip ? fmt(lastPayslip.net_pay) : "—", tone: "text-success" },
+        ].map(({ label, value, tone }) => (
+          <div key={label} className="rounded-md border border-line bg-paper p-4">
+            <p className="text-[10px] uppercase tracking-widest text-ink-3">{label}</p>
+            <p className={`mt-1 font-mono text-2xl font-bold ${tone || "text-ink"}`}>{value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="flex gap-1 border-b border-border">
+      {/* Tabs */}
+      <div className="flex border-b border-line">
         {(["overview", "payslips", "leave"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${tab === t ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-            {t}{t === "payslips" ? ` (${payslips.length})` : t === "leave" ? ` (${leaves.length})` : ""}
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`border-b-2 px-4 py-2 text-sm font-medium capitalize transition-colors ${
+              tab === t ? "border-accent text-accent" : "border-transparent text-ink-3 hover:text-ink"
+            }`}
+          >
+            {t}
+            {t === "payslips" ? ` (${payslips.length})` : t === "leave" ? ` (${leaves.length})` : ""}
           </button>
         ))}
       </div>
 
       {tab === "overview" && (
-        <div className="rounded-lg border border-border bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
-          <div><span className="text-muted-foreground">Employee #:</span> <span className="font-mono">{employee.empNo}</span></div>
-          <div><span className="text-muted-foreground">Status:</span> {employee.status}</div>
-          <div><span className="text-muted-foreground">Department:</span> {employee.departmentName ?? "—"}</div>
-          <div><span className="text-muted-foreground">Position:</span> {employee.positionName ?? "—"}</div>
-          <div><span className="text-muted-foreground">Email:</span> {employee.email}</div>
-          <div><span className="text-muted-foreground">Hire Date:</span> {employee.hireDate?.slice(0, 10)}</div>
-          {employee.terminationDate && <div><span className="text-muted-foreground">Termination:</span> {employee.terminationDate?.slice(0, 10)}</div>}
+        <div className="rounded-md border border-line bg-paper p-5 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+          {[
+            ["Employee #", employee.empNo],
+            ["Status", employee.status],
+            ["Department", employee.departmentName ?? "—"],
+            ["Position", employee.positionName ?? "—"],
+            ["Email", employee.email],
+            ["Hire Date", employee.hireDate?.slice(0, 10)],
+            ...(employee.terminationDate ? [["Termination", employee.terminationDate?.slice(0, 10)]] : []),
+          ].map(([label, value]) => (
+            <div key={label}>
+              <span className="text-ink-3">{label}: </span>
+              <span className="font-medium text-ink">{value}</span>
+            </div>
+          ))}
         </div>
       )}
 
       {tab === "payslips" && (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-md border border-line overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
+            <thead className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">Period</th>
-                <th className="px-4 py-2 text-right font-medium">Base</th>
-                <th className="px-4 py-2 text-right font-medium">Allowances</th>
-                <th className="px-4 py-2 text-right font-medium">Deductions</th>
-                <th className="px-4 py-2 text-right font-medium">Net Pay</th>
-                <th className="px-4 py-2 text-left font-medium">Status</th>
+                <th className="px-4 py-2 text-left">Period</th>
+                <th className="px-4 py-2 text-right">Base</th>
+                <th className="px-4 py-2 text-right">Allowances</th>
+                <th className="px-4 py-2 text-right">Deductions</th>
+                <th className="px-4 py-2 text-right">Net Pay</th>
+                <th className="px-4 py-2 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
-              {payslips.length === 0 && <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No payslips</td></tr>}
+              {payslips.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-ink-3">No payslips</td></tr>
+              )}
               {payslips.map(p => (
-                <tr key={p.id} className="border-t border-border hover:bg-muted/20">
-                  <td className="px-4 py-3 text-xs">{p.period_start?.slice(0, 7)} → {p.period_end?.slice(0, 7)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs">{fmt(p.base_salary)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-green-700">+{fmt(p.allowances)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs text-red-600">-{fmt(p.deductions)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs font-bold">{fmt(p.net_pay)}</td>
-                  <td className="px-4 py-3"><span className={`px-1.5 py-0.5 rounded text-xs ${PAYSLIP_COLORS[p.status] ?? ""}`}>{p.status}</span></td>
+                <tr key={p.id} className="border-b border-line last:border-0 hover:bg-surface-2">
+                  <td className="px-4 py-3 text-xs text-ink">{p.period_start?.slice(0, 7)} → {p.period_end?.slice(0, 7)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-ink">{fmt(p.base_salary)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-success">+{fmt(p.allowances)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-danger">-{fmt(p.deductions)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs font-bold text-ink">{fmt(p.net_pay)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${PAYSLIP_COLORS[p.status] ?? "bg-surface-2 text-ink-3"}`}>
+                      {p.status}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -136,26 +168,32 @@ export default function EmployeeDetailPage() {
       )}
 
       {tab === "leave" && (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-md border border-line overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
+            <thead className="border-b border-line bg-surface-2 text-xs font-medium uppercase tracking-wide text-ink-3">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">Type</th>
-                <th className="px-4 py-2 text-left font-medium">From</th>
-                <th className="px-4 py-2 text-left font-medium">To</th>
-                <th className="px-4 py-2 text-right font-medium">Days</th>
-                <th className="px-4 py-2 text-left font-medium">Status</th>
+                <th className="px-4 py-2 text-left">Type</th>
+                <th className="px-4 py-2 text-left">From</th>
+                <th className="px-4 py-2 text-left">To</th>
+                <th className="px-4 py-2 text-right">Days</th>
+                <th className="px-4 py-2 text-left">Status</th>
               </tr>
             </thead>
             <tbody>
-              {leaves.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No leave requests</td></tr>}
+              {leaves.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-ink-3">No leave requests</td></tr>
+              )}
               {leaves.map(l => (
-                <tr key={l.id} className="border-t border-border hover:bg-muted/20">
-                  <td className="px-4 py-3 text-xs capitalize">{l.leave_type.replace("_", " ")}</td>
-                  <td className="px-4 py-3 text-xs">{l.start_date?.slice(0, 10)}</td>
-                  <td className="px-4 py-3 text-xs">{l.end_date?.slice(0, 10)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-xs">{l.days}</td>
-                  <td className="px-4 py-3"><span className={`px-1.5 py-0.5 rounded text-xs ${LEAVE_COLORS[l.status] ?? ""}`}>{l.status}</span></td>
+                <tr key={l.id} className="border-b border-line last:border-0 hover:bg-surface-2">
+                  <td className="px-4 py-3 text-xs capitalize text-ink">{l.leave_type.replace("_", " ")}</td>
+                  <td className="px-4 py-3 text-xs text-ink-2">{l.start_date?.slice(0, 10)}</td>
+                  <td className="px-4 py-3 text-xs text-ink-2">{l.end_date?.slice(0, 10)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-ink">{l.days}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${LEAVE_COLORS[l.status] ?? "bg-surface-2 text-ink-3"}`}>
+                      {l.status}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

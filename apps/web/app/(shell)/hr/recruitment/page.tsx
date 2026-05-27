@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/hr";
 
 const JOB_STATUS_COLORS: Record<JobStatus, string> = {
-  draft: "bg-zinc-100 text-zinc-600",
+  draft: "bg-surface-2 text-ink-3",
   open: "bg-green-100 text-green-700",
   on_hold: "bg-amber-100 text-amber-700",
   closed: "bg-zinc-200 text-zinc-500",
@@ -97,33 +97,33 @@ export default function RecruitmentPage() {
           </div>
 
           {showNewJob && (
-            <div className="rounded border border-border bg-surface p-3 space-y-2">
+            <div className="rounded border border-line bg-surface p-3 space-y-2">
               <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Job title"
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" />
               <input type="number" value={newOpenings} onChange={e => setNewOpenings(e.target.value)} placeholder="Openings"
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" min="1" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" min="1" />
               <div className="flex gap-2">
                 <button onClick={handleCreateJob} className="px-2 py-1 text-xs rounded bg-accent text-white">Create</button>
-                <button onClick={() => setShowNewJob(false)} className="px-2 py-1 text-xs rounded border border-border">Cancel</button>
+                <button onClick={() => setShowNewJob(false)} className="px-2 py-1 text-xs rounded border border-line">Cancel</button>
               </div>
             </div>
           )}
 
           <div className="space-y-1">
-            {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
+            {loading && <div className="text-sm text-ink-3">Loading…</div>}
             {jobs.map(job => (
               <div key={job.id}
                 onClick={() => router.push('/hr/recruitment/' + job.id)}
-                className={`rounded-lg border p-3 cursor-pointer transition-colors ${selected?.id === job.id ? "border-accent bg-accent/5" : "border-border hover:bg-muted/30"}`}>
+                className={`rounded-lg border p-3 cursor-pointer transition-colors ${selected?.id === job.id ? "border-accent bg-accent/5" : "border-line hover:bg-surface-2"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-sm font-medium">{job.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{job.departmentName || "—"} · {job.openings} opening{job.openings !== 1 ? "s" : ""}</div>
+                    <div className="text-xs text-ink-3 mt-0.5">{job.departmentName || "—"} · {job.openings} opening{job.openings !== 1 ? "s" : ""}</div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`px-1.5 py-0.5 rounded text-xs ${JOB_STATUS_COLORS[job.status]}`}>{job.status}</span>
                     <button onClick={e => { e.stopPropagation(); toggleJobStatus(job); }}
-                      className="text-xs text-muted-foreground hover:text-foreground">
+                      className="text-xs text-ink-3 hover:text-ink">
                       {job.status === "open" ? "Close" : "Open"}
                     </button>
                   </div>
@@ -142,14 +142,14 @@ export default function RecruitmentPage() {
           </div>
 
           {selected && showNewApplicant && (
-            <div className="rounded border border-border bg-surface p-3 space-y-2">
+            <div className="rounded border border-line bg-surface p-3 space-y-2">
               <input value={appName} onChange={e => setAppName(e.target.value)} placeholder="Full name"
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" />
               <input value={appEmail} onChange={e => setAppEmail(e.target.value)} placeholder="Email"
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" />
               <div className="flex gap-2">
                 <button onClick={handleAddApplicant} className="px-2 py-1 text-xs rounded bg-accent text-white">Add</button>
-                <button onClick={() => setShowNewApplicant(false)} className="px-2 py-1 text-xs rounded border border-border">Cancel</button>
+                <button onClick={() => setShowNewApplicant(false)} className="px-2 py-1 text-xs rounded border border-line">Cancel</button>
               </div>
             </div>
           )}
@@ -163,12 +163,12 @@ export default function RecruitmentPage() {
                     <div className={`rounded-t px-3 py-1.5 text-xs font-semibold ${STAGE_COLORS[stage]}`}>
                       {stage.charAt(0).toUpperCase() + stage.slice(1)} ({stageApps.length})
                     </div>
-                    <div className="rounded-b border border-t-0 border-border bg-surface p-2 space-y-1 min-h-[48px]">
+                    <div className="rounded-b border border-t-0 border-line bg-surface p-2 space-y-1 min-h-[48px]">
                       {stageApps.map(app => (
-                        <div key={app.id} className="flex items-center justify-between rounded border border-border px-2 py-1.5 bg-background">
+                        <div key={app.id} className="flex items-center justify-between rounded border border-line px-2 py-1.5 bg-surface">
                           <div>
                             <div className="text-xs font-medium">{app.name}</div>
-                            <div className="text-xs text-muted-foreground">{app.email}</div>
+                            <div className="text-xs text-ink-3">{app.email}</div>
                           </div>
                           {stage !== "hired" && (
                             <button onClick={() => advanceStage(app)}
@@ -184,7 +184,7 @@ export default function RecruitmentPage() {
               })}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground py-8 text-center">Click a job posting to view applicants</div>
+            <div className="text-sm text-ink-3 py-8 text-center">Click a job posting to view applicants</div>
           )}
         </div>
       </div>

@@ -90,7 +90,7 @@ export default function ProductionCalendarPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setWeekOffset(o => o - 1)}
-          className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
+          className="px-3 py-1.5 text-xs rounded border border-line hover:bg-surface-2"
         >
           &larr; Prev
         </button>
@@ -101,14 +101,14 @@ export default function ProductionCalendarPage() {
         </span>
         <button
           onClick={() => setWeekOffset(o => o + 1)}
-          className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
+          className="px-3 py-1.5 text-xs rounded border border-line hover:bg-surface-2"
         >
           Next &rarr;
         </button>
         {weekOffset !== 0 && (
           <button
             onClick={() => setWeekOffset(0)}
-            className="px-3 py-1.5 text-xs rounded border border-border text-accent hover:bg-accent/10"
+            className="px-3 py-1.5 text-xs rounded border border-line text-accent hover:bg-accent/10"
           >
             Today
           </button>
@@ -122,15 +122,15 @@ export default function ProductionCalendarPage() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-ink-3">Loading...</div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+            <thead className="bg-surface-2">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground w-40 border-b border-border">Work Center</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-ink-3 w-40 border-b border-line">Work Center</th>
                 {weeks.map(w => (
-                  <th key={weekKey(w)} className="px-3 py-2 text-left text-xs font-medium text-muted-foreground min-w-[180px] border-b border-border">
+                  <th key={weekKey(w)} className="px-3 py-2 text-left text-xs font-medium text-ink-3 min-w-[180px] border-b border-line">
                     {w.toLocaleDateString("en", { month: "short", day: "numeric" })}
                     {" – "}
                     {addWeeks(w, 1).toLocaleDateString("en", { month: "short", day: "numeric" })}
@@ -141,13 +141,13 @@ export default function ProductionCalendarPage() {
             <tbody>
               {visibleRows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-ink-3">
                     No work orders scheduled in this period
                   </td>
                 </tr>
               )}
               {visibleRows.map(row => (
-                <tr key={row.id} className="border-t border-border align-top">
+                <tr key={row.id} className="border-t border-line align-top">
                   <td className="px-4 py-3 font-medium text-xs whitespace-nowrap">{row.name}</td>
                   {weeks.map(w => {
                     const wos = grid.get(row.id)?.get(weekKey(w)) ?? [];

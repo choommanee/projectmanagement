@@ -24,11 +24,11 @@ export default function BomDetailPage() {
     } finally { setSaving(false); }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!bom) return <div className="p-8 text-destructive">BOM not found.</div>;
 
   const statusColors: Record<BOMStatus, string> = {
-    draft: "bg-muted text-muted-foreground",
+    draft: "bg-muted text-ink-3",
     active: "bg-green-100 text-green-800",
     obsolete: "bg-gray-200 text-gray-500",
   };
@@ -37,17 +37,17 @@ export default function BomDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/mfg/bom")} className="hover:underline">BOM</button>
         <span className="mx-2">/</span>
         <span>v{bom.version} — {bom.itemId}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">BOM v{bom.version}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-ink-3 mt-1">
               Item: {bom.itemId}
               {bom.isDefault && <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Default</span>}
             </p>
@@ -73,21 +73,21 @@ export default function BomDetailPage() {
           { label: "Effective From", value: bom.effectiveFrom ?? "—" },
           { label: "Effective To", value: bom.effectiveTo ?? "—" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-lg font-semibold font-mono">{value}</p>
           </div>
         ))}
       </div>
 
       {lines.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+        <div className="rounded-lg border border-line bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">
             BOM Lines ({lines.length})
           </h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground text-xs uppercase">
+              <tr className="text-left text-ink-3 text-xs uppercase">
                 <th className="py-2 pr-4">Component</th>
                 <th className="py-2 pr-4 text-right">Qty</th>
                 <th className="py-2 pr-4 text-right">Scrap %</th>
@@ -97,12 +97,12 @@ export default function BomDetailPage() {
             </thead>
             <tbody>
               {lines.sort((a, b) => a.sortOrder - b.sortOrder).map(line => (
-                <tr key={line.id} className="border-t border-border">
+                <tr key={line.id} className="border-t border-line">
                   <td className="py-2 pr-4 font-mono text-xs">{line.childItemId}</td>
                   <td className="py-2 pr-4 text-right font-mono">{line.qty}</td>
                   <td className="py-2 pr-4 text-right font-mono">{line.scrapPct}%</td>
                   <td className="py-2 pr-4">{line.isPhantom ? "Yes" : "No"}</td>
-                  <td className="py-2 text-muted-foreground text-xs">{line.notes || "—"}</td>
+                  <td className="py-2 text-ink-3 text-xs">{line.notes || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -111,8 +111,8 @@ export default function BomDetailPage() {
       )}
 
       {bom.notes && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Notes</p>
+        <div className="rounded-lg border border-line bg-card p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-wide mb-2">Notes</p>
           <p className="text-sm">{bom.notes}</p>
         </div>
       )}

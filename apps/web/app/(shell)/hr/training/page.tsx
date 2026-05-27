@@ -210,7 +210,7 @@ export default function HRTrainingPage() {
             className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
               statusFilter === opt.value
                 ? "bg-accent text-white"
-                : "bg-surface-2 text-ink hover:bg-surface-3"
+                : "bg-surface-2 text-ink hover:bg-surface-2"
             }`}
           >
             {opt.label}
@@ -219,11 +219,11 @@ export default function HRTrainingPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-ink-muted">
+            <thead className="bg-surface-2 text-ink-3">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Employee</th>
                 <th className="px-4 py-2 text-left font-medium">Course</th>
@@ -237,7 +237,7 @@ export default function HRTrainingPage() {
             <tbody className="divide-y divide-line">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                  <td colSpan={7} className="px-4 py-6 text-center text-ink-3">
                     No training records found.
                   </td>
                 </tr>
@@ -257,18 +257,18 @@ export default function HRTrainingPage() {
                         {rec.employee_name ?? rec.employee_id}
                       </td>
                       <td className="px-4 py-2">{rec.course_name}</td>
-                      <td className="px-4 py-2 text-ink-muted">{rec.provider ?? "—"}</td>
-                      <td className="px-4 py-2 text-ink-muted">
+                      <td className="px-4 py-2 text-ink-3">{rec.provider ?? "—"}</td>
+                      <td className="px-4 py-2 text-ink-3">
                         {rec.started_at ? new Date(rec.started_at).toLocaleDateString() : "—"}
                       </td>
                       <td
                         className={`px-4 py-2 ${
-                          expiring ? "text-warning font-semibold" : "text-ink-muted"
+                          expiring ? "text-warning font-semibold" : "text-ink-3"
                         }`}
                       >
                         {rec.expiry_date ? new Date(rec.expiry_date).toLocaleDateString() : "—"}
                       </td>
-                      <td className="px-4 py-2 font-mono text-xs text-ink-muted">
+                      <td className="px-4 py-2 font-mono text-xs text-ink-3">
                         {rec.certificate_no ?? "—"}
                       </td>
                       <td className="px-4 py-2">

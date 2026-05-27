@@ -27,11 +27,11 @@ export default function PayslipDetailPage() {
     try { setPs(await markPayslipPaid(ps.id)); } finally { setSaving(false); }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!ps) return <div className="p-8 text-destructive">Payslip not found.</div>;
 
   const statusColors: Record<PayslipStatus, string> = {
-    draft: "bg-muted text-muted-foreground",
+    draft: "bg-muted text-ink-3",
     approved: "bg-blue-100 text-blue-800",
     paid: "bg-green-100 text-green-800",
   };
@@ -41,17 +41,17 @@ export default function PayslipDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/hr/payroll")} className="hover:underline">Payslips</button>
         <span className="mx-2">/</span>
         <span>{ps.period_start} – {ps.period_end}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Payslip</h1>
-            <p className="text-sm text-muted-foreground mt-1">{ps.period_start} – {ps.period_end}</p>
+            <p className="text-sm text-ink-3 mt-1">{ps.period_start} – {ps.period_end}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[ps.status]}`}>
             {ps.status}
@@ -84,15 +84,15 @@ export default function PayslipDetailPage() {
           { label: "Approved By", value: ps.approved_by ?? "—" },
           { label: "Paid At", value: ps.paid_at ? ps.paid_at.slice(0, 10) : "—" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-semibold font-mono">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Pay Summary</h2>
+      <div className="rounded-lg border border-line bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">Pay Summary</h2>
         <table className="w-full text-sm">
           <tbody>
             {[
@@ -102,7 +102,7 @@ export default function PayslipDetailPage() {
               { label: "Deductions", amount: -ps.deductions, type: "negative" },
               { label: "Net Pay", amount: ps.net_pay, type: "total" },
             ].map(({ label, amount, type }) => (
-              <tr key={label} className={`border-t border-border ${type === "total" ? "font-semibold" : ""}`}>
+              <tr key={label} className={`border-t border-line ${type === "total" ? "font-semibold" : ""}`}>
                 <td className="py-2 pr-4">{label}</td>
                 <td className={`py-2 text-right font-mono ${type === "negative" ? "text-destructive" : type === "positive" ? "text-green-600" : ""}`}>
                   {amount < 0 ? `-${fmt(-amount)}` : fmt(amount)}

@@ -72,27 +72,27 @@ export default function PipelinePage() {
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading...</div>;
 
   return (
     <div className="p-6 space-y-6">
       <Breadcrumb items={[{ label: "Sales" }, { label: "Pipeline" }]} />
 
       <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Total Pipeline</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Total Pipeline</div>
           <div className="text-xl font-mono font-bold">{fmt(totalPipeline)}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Won</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Won</div>
           <div className="text-xl font-mono font-bold text-green-600">{fmt(wonValue)}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Open Deals</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Open Deals</div>
           <div className="text-xl font-mono font-bold">{opps.filter(o => !["won", "lost"].includes(o.stage)).length}</div>
         </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-xs text-muted-foreground mb-1">Win Rate</div>
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="text-xs text-ink-3 mb-1">Win Rate</div>
           <div className="text-xl font-mono font-bold">
             {opps.filter(o => ["won", "lost"].includes(o.stage)).length === 0 ? "—" :
               Math.round(opps.filter(o => o.stage === "won").length / opps.filter(o => ["won", "lost"].includes(o.stage)).length * 100) + "%"}
@@ -107,36 +107,36 @@ export default function PipelinePage() {
       </div>
 
       {showNew && (
-        <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+        <div className="rounded-lg border border-line bg-surface p-4 space-y-3">
           <h3 className="text-sm font-medium">New Opportunity</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Title</label>
+              <label className="text-xs text-ink-3 block mb-1">Title</label>
               <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" placeholder="Opportunity title" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" placeholder="Opportunity title" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Customer</label>
+              <label className="text-xs text-ink-3 block mb-1">Customer</label>
               <select value={newCustomerId} onChange={e => setNewCustomerId(e.target.value)}
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background">
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface">
                 <option value="">Select customer...</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Value (THB)</label>
+              <label className="text-xs text-ink-3 block mb-1">Value (THB)</label>
               <input type="number" value={newValue} onChange={e => setNewValue(e.target.value)}
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" placeholder="0" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" placeholder="0" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Expected Close</label>
+              <label className="text-xs text-ink-3 block mb-1">Expected Close</label>
               <input type="date" value={newCloseDate} onChange={e => setNewCloseDate(e.target.value)}
-                className="w-full text-sm border border-border rounded px-2 py-1.5 bg-background" />
+                className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleCreate} className="px-3 py-1.5 text-xs rounded bg-accent text-white hover:bg-accent/90">Create</button>
-            <button onClick={() => setShowNew(false)} className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted">Cancel</button>
+            <button onClick={() => setShowNew(false)} className="px-3 py-1.5 text-xs rounded border border-line hover:bg-surface-2">Cancel</button>
           </div>
         </div>
       )}
@@ -149,16 +149,16 @@ export default function PipelinePage() {
             <div key={stage} className="min-w-[160px]">
               <div className={`rounded-t-lg px-3 py-2 ${STAGE_HEADER_COLORS[stage]}`}>
                 <div className="text-xs font-semibold">{STAGE_LABELS[stage]}</div>
-                <div className="text-xs text-muted-foreground">{cards.length} · {fmt(stageTotal)}</div>
+                <div className="text-xs text-ink-3">{cards.length} · {fmt(stageTotal)}</div>
               </div>
-              <div className="rounded-b-lg border border-t-0 border-border bg-surface min-h-[200px] p-2 space-y-2">
+              <div className="rounded-b-lg border border-t-0 border-line bg-surface min-h-[200px] p-2 space-y-2">
                 {cards.map(opp => (
-                  <div key={opp.id} className="rounded border border-border bg-paper p-2 space-y-1">
+                  <div key={opp.id} className="rounded border border-line bg-paper p-2 space-y-1">
                     <div className="text-xs font-medium leading-tight">{opp.title}</div>
-                    <div className="text-xs text-muted-foreground">{opp.customerName}</div>
+                    <div className="text-xs text-ink-3">{opp.customerName}</div>
                     <div className="text-xs font-mono font-semibold">{fmt(opp.value)}</div>
                     {opp.expectedCloseDate && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-ink-3">
                         Close: {new Date(opp.expectedCloseDate).toLocaleDateString()}
                       </div>
                     )}
@@ -166,7 +166,7 @@ export default function PipelinePage() {
                       {STAGES.indexOf(stage) > 0 && STAGES.indexOf(stage) < STAGES.length - 2 && (
                         <button
                           onClick={() => moveStage(opp, STAGES[STAGES.indexOf(stage) - 1])}
-                          className="flex-1 text-xs py-0.5 rounded border border-border hover:bg-muted"
+                          className="flex-1 text-xs py-0.5 rounded border border-line hover:bg-surface-2"
                         >←</button>
                       )}
                       {STAGES.indexOf(stage) < STAGES.length - 2 && (

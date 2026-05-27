@@ -150,7 +150,7 @@ export default function BomExplorerPage() {
             {bomsLoading ? (
               <div className="space-y-px p-1">
                 {[1,2,3].map(i => (
-                  <div key={i} className="h-14 animate-pulse rounded border-b border-border bg-surface-2" />
+                  <div key={i} className="h-14 animate-pulse rounded border-b border-line bg-surface-2" />
                 ))}
               </div>
             ) : boms.length === 0 ? (
@@ -189,7 +189,7 @@ export default function BomExplorerPage() {
             {selectedBom && bomDetailLoading && (
               <div className="space-y-2">
                 {[1,2,3,4].map(i => (
-                  <div key={i} className="h-8 animate-pulse rounded border border-border bg-surface-2" />
+                  <div key={i} className="h-8 animate-pulse rounded border border-line bg-surface-2" />
                 ))}
               </div>
             )}

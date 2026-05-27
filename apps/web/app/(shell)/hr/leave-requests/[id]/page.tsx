@@ -46,7 +46,7 @@ export default function LeaveRequestDetailPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!lr) return <div className="p-8 text-destructive">Leave request not found.</div>;
 
   const statusColors: Record<string, string> = {
@@ -58,19 +58,19 @@ export default function LeaveRequestDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/hr/leave-requests")} className="hover:underline">Leave Requests</button>
         <span className="mx-2">/</span>
         <span>{lr.id.slice(0, 8)}…</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold capitalize">{lr.leave_type.replace("_", " ")} Leave</h1>
-            <p className="text-sm text-muted-foreground mt-1">{lr.start_date} → {lr.end_date} · {lr.days} day{lr.days !== 1 ? "s" : ""}</p>
+            <p className="text-sm text-ink-3 mt-1">{lr.start_date} → {lr.end_date} · {lr.days} day{lr.days !== 1 ? "s" : ""}</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[lr.status] ?? "bg-muted text-muted-foreground"}`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[lr.status] ?? "bg-muted text-ink-3"}`}>
             {lr.status}
           </span>
         </div>
@@ -92,7 +92,7 @@ export default function LeaveRequestDetailPage() {
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
               placeholder="Rejection reason…"
-              className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-background"
+              className="flex-1 px-3 py-1.5 text-sm border border-line rounded bg-surface"
             />
             <button onClick={handleReject} disabled={saving || !rejectReason.trim()}
               className="px-4 py-1.5 text-sm bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 disabled:opacity-50">
@@ -111,16 +111,16 @@ export default function LeaveRequestDetailPage() {
           { label: "Status", value: lr.status },
           { label: "Approved By", value: lr.approved_by ?? "—" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-medium capitalize">{value}</p>
           </div>
         ))}
       </div>
 
       {lr.reason && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Reason</p>
+        <div className="rounded-lg border border-line bg-card p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-wide mb-2">Reason</p>
           <p className="text-sm">{lr.reason}</p>
         </div>
       )}

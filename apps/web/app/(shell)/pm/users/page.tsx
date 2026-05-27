@@ -114,29 +114,29 @@ function InviteDialog({ onClose, onInvited }: { onClose: () => void; onInvited: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <form onSubmit={submit} className="bg-background border-2 border-border w-full max-w-md p-6 space-y-4">
+      <form onSubmit={submit} className="bg-paper border-2 border-line w-full max-w-md p-6 space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-widest">Invite User</h2>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Email *</label>
+          <label className="text-xs text-ink-3">Email *</label>
           <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="alice@example.com" required />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Display Name</label>
+          <label className="text-xs text-ink-3">Display Name</label>
           <Input value={form.display_name} onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))} placeholder="Alice Smith" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Temporary Password *</label>
+          <label className="text-xs text-ink-3">Temporary Password *</label>
           <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 chars" required />
         </div>
         <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Roles</label>
+          <label className="text-xs text-ink-3">Roles</label>
           <div className="flex flex-wrap gap-1.5">
             {ROLES.map(r => (
               <button
                 key={r}
                 type="button"
                 onClick={() => toggleRole(r)}
-                className={`px-2 py-0.5 text-xs border font-mono transition-colors ${form.roles.includes(r) ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground"}`}
+                className={`px-2 py-0.5 text-xs border font-mono transition-colors ${form.roles.includes(r) ? "bg-ink text-background border-ink" : "border-line text-ink-3 hover:border-ink"}`}
               >
                 {r}
               </button>
@@ -176,7 +176,7 @@ function EditRolesDialog({ user, onClose, onSaved }: { user: AppUser; onClose: (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-background border-2 border-border w-full max-w-sm p-6 space-y-4">
+      <div className="bg-paper border-2 border-line w-full max-w-sm p-6 space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-widest">Edit Roles — {user.email}</h2>
         <div className="flex flex-wrap gap-1.5">
           {ROLES.map(r => (
@@ -184,7 +184,7 @@ function EditRolesDialog({ user, onClose, onSaved }: { user: AppUser; onClose: (
               key={r}
               type="button"
               onClick={() => toggleRole(r)}
-              className={`px-2 py-0.5 text-xs border font-mono transition-colors ${roles.includes(r) ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:border-foreground"}`}
+              className={`px-2 py-0.5 text-xs border font-mono transition-colors ${roles.includes(r) ? "bg-ink text-background border-ink" : "border-line text-ink-3 hover:border-ink"}`}
             >
               {r}
             </button>
@@ -238,7 +238,7 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col h-full">
       <Breadcrumb items={[{ label: "Users" }]} />
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-line">
         <Input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -260,7 +260,7 @@ export default function UsersPage() {
 
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="border-b-2 border-border">
+            <tr className="border-b-2 border-line">
               <th className="text-left py-2 px-3 text-xs uppercase tracking-widest font-semibold">User</th>
               <th className="text-left py-2 px-3 text-xs uppercase tracking-widest font-semibold">Roles</th>
               <th className="text-left py-2 px-3 text-xs uppercase tracking-widest font-semibold">Status</th>
@@ -271,24 +271,24 @@ export default function UsersPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">Loading…</td>
+                <td colSpan={5} className="py-8 text-center text-ink-3 text-xs">Loading…</td>
               </tr>
             )}
             {!loading && displayed.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">No users found</td>
+                <td colSpan={5} className="py-8 text-center text-ink-3 text-xs">No users found</td>
               </tr>
             )}
             {displayed.map(u => (
-              <tr key={u.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+              <tr key={u.id} className="border-b border-line hover:bg-surface-2/30 transition-colors">
                 <td className="py-2 px-3">
                   <div className="font-medium">{u.displayName}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{u.email}</div>
+                  <div className="text-xs text-ink-3 font-mono">{u.email}</div>
                 </td>
                 <td className="py-2 px-3">
                   <div className="flex flex-wrap gap-1">
                     {u.roles.length === 0
-                      ? <span className="text-xs text-muted-foreground">—</span>
+                      ? <span className="text-xs text-ink-3">—</span>
                       : u.roles.map(r => <Tag key={r} tone={roleTone(r)} size="sm">{r}</Tag>)
                     }
                   </div>
@@ -301,14 +301,14 @@ export default function UsersPage() {
                     {u.status}
                   </Tag>
                 </td>
-                <td className="py-2 px-3 font-mono text-xs text-muted-foreground">
+                <td className="py-2 px-3 font-mono text-xs text-ink-3">
                   {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
                 </td>
                 <td className="py-2 px-3">
                   <div className="flex gap-2 justify-end">
                     <button
                       onClick={() => setEditUser(u)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-xs text-ink-3 hover:text-ink transition-colors"
                     >
                       Edit roles
                     </button>

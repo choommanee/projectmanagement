@@ -81,7 +81,7 @@ export default function AgingPage() {
       <div className="flex gap-1">
         {(["AR", "AP"] as InvType[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm rounded-md border transition-colors ${tab === t ? "bg-accent text-white border-accent" : "border-border text-muted-foreground hover:bg-muted"}`}>
+            className={`px-4 py-2 text-sm rounded-md border transition-colors ${tab === t ? "bg-accent text-white border-accent" : "border-line text-ink-3 hover:bg-surface-2"}`}>
             {t === "AR" ? "Accounts Receivable" : "Accounts Payable"}
           </button>
         ))}
@@ -89,8 +89,8 @@ export default function AgingPage() {
 
       <div className="grid grid-cols-5 gap-3">
         {BUCKET_LABELS.map(b => (
-          <div key={b} className="rounded-lg border border-border bg-surface p-3">
-            <div className="text-xs text-muted-foreground mb-1">
+          <div key={b} className="rounded-lg border border-line bg-surface p-3">
+            <div className="text-xs text-ink-3 mb-1">
               {b === "current" ? "Current" : `${b} days`}
             </div>
             <div className={`text-lg font-mono font-semibold ${BUCKET_COLORS[b]}`}>
@@ -100,17 +100,17 @@ export default function AgingPage() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-border bg-surface px-4 py-3 flex items-center justify-between">
+      <div className="rounded-lg border border-line bg-surface px-4 py-3 flex items-center justify-between">
         <span className="text-sm font-medium">Total Outstanding</span>
         <span className="text-xl font-mono font-bold">{fmt(grandTotal)}</span>
       </div>
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-ink-3">Loading...</div>
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-line overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
+            <thead className="bg-surface-2 text-xs text-ink-3 uppercase">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">{tab === "AR" ? "Customer" : "Supplier"}</th>
                 {BUCKET_LABELS.map(b => (
@@ -123,13 +123,13 @@ export default function AgingPage() {
             </thead>
             <tbody>
               {byCounterparty.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No outstanding invoices</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-3">No outstanding invoices</td></tr>
               )}
               {byCounterparty.map(row => (
-                <tr key={row.name} className="border-t border-border hover:bg-muted/30">
+                <tr key={row.name} className="border-t border-line hover:bg-surface-2">
                   <td className="px-4 py-3 font-medium">{row.name}</td>
                   {BUCKET_LABELS.map(b => (
-                    <td key={b} className={`px-4 py-3 text-right font-mono text-xs ${row[b] > 0 ? BUCKET_COLORS[b] : "text-muted-foreground"}`}>
+                    <td key={b} className={`px-4 py-3 text-right font-mono text-xs ${row[b] > 0 ? BUCKET_COLORS[b] : "text-ink-3"}`}>
                       {fmt(row[b])}
                     </td>
                   ))}
@@ -137,7 +137,7 @@ export default function AgingPage() {
                 </tr>
               ))}
               {byCounterparty.length > 0 && (
-                <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+                <tr className="border-t-2 border-line bg-surface-2 font-semibold">
                   <td className="px-4 py-3">Total</td>
                   {BUCKET_LABELS.map(b => (
                     <td key={b} className={`px-4 py-3 text-right font-mono text-xs ${BUCKET_COLORS[b]}`}>

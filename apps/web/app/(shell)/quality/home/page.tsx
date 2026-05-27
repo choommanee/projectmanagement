@@ -136,10 +136,10 @@ export default function QualityDashboardPage() {
 
         {/* Recent NCRs table */}
         <div className="border border-line overflow-hidden">
-          <div className="px-4 py-3 bg-muted/50 text-xs font-medium uppercase tracking-widest text-ink-3">Recent NCRs</div>
+          <div className="px-4 py-3 bg-surface-2 text-xs font-medium uppercase tracking-widest text-ink-3">Recent NCRs</div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-t border-line bg-muted/30">
+              <tr className="border-t border-line bg-surface-2">
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Description</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Severity</th>
                 <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-widest text-ink-3">Qty</th>
@@ -156,12 +156,12 @@ export default function QualityDashboardPage() {
                 </tr>
               )}
               {recentNcrs.map(ncr => (
-                <tr key={ncr.id} className="border-t border-line hover:bg-muted/20">
+                <tr key={ncr.id} className="border-t border-line hover:bg-surface-2">
                   <td className="px-4 py-3 text-xs text-ink">{ncr.description || "—"}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-                        ncr.severity >= 3 ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-600"
+                        ncr.severity >= 3 ? "bg-red-100 text-red-700" : "bg-surface-2 text-ink-3"
                       }`}
                     >
                       {ncr.severity}

@@ -29,7 +29,7 @@ export default function ShipmentDetailPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!ship) return <div className="p-8 text-destructive">Shipment not found.</div>;
 
   const statusColors: Record<ShipmentStatus, string> = {
@@ -44,22 +44,22 @@ export default function ShipmentDetailPage() {
     { from: ["pending"], to: "packed", label: "Mark Packed", color: "bg-blue-600 text-white hover:bg-blue-700" },
     { from: ["packed"], to: "shipped", label: "Mark Shipped", color: "bg-purple-600 text-white hover:bg-purple-700" },
     { from: ["shipped"], to: "delivered", label: "Mark Delivered", color: "bg-green-600 text-white hover:bg-green-700" },
-    { from: ["shipped", "delivered"], to: "returned", label: "Return", color: "border border-border hover:bg-muted" },
+    { from: ["shipped", "delivered"], to: "returned", label: "Return", color: "border border-line hover:bg-surface-2" },
   ];
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/sales/shipments")} className="hover:underline">Shipments</button>
         <span className="mx-2">/</span>
         <span>{ship.shipmentNumber}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{ship.shipmentNumber}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{ship.customerName ?? "Customer"} · SO: {ship.soNumber ?? ship.soId}</p>
+            <p className="text-sm text-ink-3 mt-1">{ship.customerName ?? "Customer"} · SO: {ship.soNumber ?? ship.soId}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[ship.status]}`}>
             {ship.status}
@@ -86,8 +86,8 @@ export default function ShipmentDetailPage() {
           { label: "Created", value: ship.createdAt ? ship.createdAt.slice(0, 10) : "—" },
           { label: "Notes", value: ship.notes || "—" },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-medium">{value}</p>
           </div>
         ))}

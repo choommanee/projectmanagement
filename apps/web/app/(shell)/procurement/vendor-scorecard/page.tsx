@@ -94,14 +94,14 @@ export default function VendorScorecardPage() {
       />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Vendor Scorecard</h1>
-        <div className="flex items-center gap-2 text-sm text-ink-muted">
+        <div className="flex items-center gap-2 text-sm text-ink-3">
           <span>Sort by:</span>
           {(["score", "totalPOs", "totalValue"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSortBy(s)}
               className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                sortBy === s ? "bg-accent text-white" : "bg-surface-2 hover:bg-surface-3"
+                sortBy === s ? "bg-accent text-white" : "bg-surface-2 hover:bg-surface-2"
               }`}
             >
               {s === "score" ? "Grade" : s === "totalPOs" ? "# POs" : "Value"}
@@ -111,7 +111,7 @@ export default function VendorScorecardPage() {
       </div>
 
       {/* Grade legend */}
-      <div className="flex gap-3 text-xs text-ink-muted">
+      <div className="flex gap-3 text-xs text-ink-3">
         {[
           { g: "A", desc: "≥ 90% on-time" },
           { g: "B", desc: "75–89%" },
@@ -128,13 +128,13 @@ export default function VendorScorecardPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : sorted.length === 0 ? (
-        <p className="text-sm text-ink-muted">No supplier data with purchase orders.</p>
+        <p className="text-sm text-ink-3">No supplier data with purchase orders.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-ink-muted">
+            <thead className="bg-surface-2 text-ink-3">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Supplier</th>
                 <th className="px-4 py-2 text-right font-medium">Total POs</th>
@@ -152,7 +152,7 @@ export default function VendorScorecardPage() {
                   <td className="px-4 py-2 text-right font-mono">{receivedPOs}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <div className="w-20 h-1.5 rounded-full bg-surface-3">
+                      <div className="w-20 h-1.5 rounded-full bg-surface-2">
                         <div
                           className={`h-1.5 rounded-full ${
                             onTimeRate >= 0.9

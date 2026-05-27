@@ -16,10 +16,13 @@ import {
 import { ProjectTasksTab } from "@/components/ProjectTasksTab";
 import { GanttChart } from "@/components/GanttChart";
 import { TaskSheet } from "@/components/TaskSheet";
+import { WBSTree } from "@/components/WBSTree";
 import { listTasksForProject, type Task } from "@/lib/api/tasks";
 import { listSprintsForProject, type Sprint } from "@/lib/api/sprints";
 import { listAudit, type AuditEvent } from "@/lib/api/audit";
+import { listDepsForProject, type Dependency } from "@/lib/api/tasks";
 import { UserPicker } from "@/components/UserPicker";
+import { RunWorkflowButton } from "@/components/RunWorkflowButton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,12 +83,13 @@ function statusTone(s: Project["status"]): "success" | "warning" | "neutral" | "
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "tasks" | "gantt" | "sprints" | "activity";
+type TabId = "overview" | "tasks" | "gantt" | "wbs" | "sprints" | "activity";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "tasks", label: "Tasks" },
   { id: "gantt", label: "Gantt" },
+  { id: "wbs", label: "WBS" },
   { id: "sprints", label: "Sprints" },
   { id: "activity", label: "Activity" },
 ];
@@ -122,8 +126,13 @@ export default function ProjectDetailPage({
 
   // Gantt state
   const [ganttTasks, setGanttTasks] = useState<Task[]>([]);
+  const [ganttDeps, setGanttDeps] = useState<Dependency[]>([]);
   const [ganttLoading, setGanttLoading] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  // WBS state
+  const [wbsTasks, setWbsTasks] = useState<Task[]>([]);
+  const [wbsLoading, setWbsLoading] = useState(false);
 
   const fetchProject = useCallback(async () => {
     setLoading(true);
@@ -155,10 +164,22 @@ export default function ProjectDetailPage({
   useEffect(() => {
     if (tab !== "gantt" || !id) return;
     setGanttLoading(true);
-    listTasksForProject(id, { limit: 200 })
-      .then(({ items }) => setGanttTasks(items))
+    Promise.all([
+      listTasksForProject(id, { limit: 200 }),
+      listDepsForProject(id),
+    ])
+      .then(([{ items }, deps]) => { setGanttTasks(items); setGanttDeps(deps); })
       .catch(() => {})
       .finally(() => setGanttLoading(false));
+  }, [tab, id]);
+
+  useEffect(() => {
+    if (tab !== "wbs" || !id) return;
+    setWbsLoading(true);
+    listTasksForProject(id, { limit: 500 })
+      .then(({ items }) => setWbsTasks(items))
+      .catch(() => {})
+      .finally(() => setWbsLoading(false));
   }, [tab, id]);
 
   const dirty = form && baseline.current ? isDirty(form, baseline.current) : false;
@@ -330,17 +351,20 @@ export default function ProjectDetailPage({
       )}
 
       {/* Header card */}
-      <div className="border-b border-line bg-paper px-4 py-3">
+      <div className="border-b border-line bg-linear-to-r from-paper via-surface to-paper px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <span className="font-mono text-[11px] uppercase tracking-wider text-ink-3">
               {project.code}
             </span>
-            <h1 className="mt-0.5 truncate text-xl font-semibold text-ink">
+            <h1 className="mt-0.5 truncate text-xl font-semibold text-ink" title={project.name}>
               {project.name}
             </h1>
           </div>
-          <div className="shrink-0 pt-1">
+          <div className="flex shrink-0 items-center gap-2 pt-1">
+            <RunWorkflowButton
+              context={{ project_id: project.id, project_name: project.name }}
+            />
             <Tag tone={statusTone(project.status)} dot>
               {project.status.replace("_", " ")}
             </Tag>
@@ -360,8 +384,8 @@ export default function ProjectDetailPage({
             onClick={() => setTab(t.id)}
             className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] font-medium transition-colors ${
               tab === t.id
-                ? "border-accent text-ink"
-                : "border-transparent text-ink-3 hover:text-ink-2"
+                ? "border-accent text-accent"
+                : "border-transparent text-ink-3 hover:text-ink"
             }`}
           >
             {t.label}
@@ -388,6 +412,7 @@ export default function ProjectDetailPage({
             ) : (
               <GanttChart
                 tasks={ganttTasks}
+                deps={ganttDeps}
                 onTaskClick={(t) => setSelectedTaskId(t.id)}
               />
             )}
@@ -397,8 +422,24 @@ export default function ProjectDetailPage({
                 onClose={() => setSelectedTaskId(null)}
                 onChanged={() => {
                   setSelectedTaskId(null);
-                  listTasksForProject(id, { limit: 200 }).then(({ items }) => setGanttTasks(items)).catch(() => {});
+                  Promise.all([listTasksForProject(id, { limit: 200 }), listDepsForProject(id)])
+                    .then(([{ items }, deps]) => { setGanttTasks(items); setGanttDeps(deps); })
+                    .catch(() => {});
                 }}
+              />
+            )}
+          </div>
+        )}
+        {tab === "wbs" && (
+          <div>
+            {wbsLoading ? (
+              <div className="flex items-center justify-center h-48 text-sm text-ink-3">
+                Loading…
+              </div>
+            ) : (
+              <WBSTree
+                tasks={wbsTasks}
+                onSelectTask={(taskId) => router.push(`/pm/tasks/${taskId}`)}
               />
             )}
           </div>
@@ -622,7 +663,9 @@ function ProjectSprintsTab({ projectId }: { projectId: string }) {
                     <Tag tone={sprintStatusTone(sp.status)} dot>{sp.status}</Tag>
                   </td>
                   <td className="px-3 py-2 text-xs text-ink-2">
-                    {sp.startDate ? sp.startDate.slice(0, 10) : "—"} → {sp.endDate ? sp.endDate.slice(0, 10) : "—"}
+                    {sp.startDate ? sp.startDate.slice(0, 10) : "—"}
+                    <span className="mx-1 text-ink-3">–</span>
+                    {sp.endDate ? sp.endDate.slice(0, 10) : "—"}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-ink-2">{sp.capacityPts > 0 ? `${sp.capacityPts} pts` : "—"}</td>
                 </tr>
@@ -694,7 +737,7 @@ function ProjectActivityTab({ projectId }: { projectId: string }) {
                   <td className="px-3 py-2">
                     <Tag tone={ev.result === "denied" || ev.result === "error" ? "danger" : "success"}>{ev.result || "ok"}</Tag>
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs text-ink-3">{ev.userId ? `${ev.userId.slice(0, 8)}…` : "system"}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-ink-3" title={ev.userId ?? undefined}>{ev.userId ? `${ev.userId.slice(0, 8)}…` : "system"}</td>
                 </tr>
               ))}
             </tbody>

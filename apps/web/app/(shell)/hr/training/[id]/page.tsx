@@ -28,7 +28,7 @@ export default function TrainingRecordDetailPage() {
     setSaving(false);
   }
 
-  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (loading) return <div className="p-6 text-sm text-ink-3">Loading…</div>;
   if (!record) return <div className="p-6 text-sm text-red-600">Training record not found</div>;
 
   const isExpired = record.expiry_date && new Date(record.expiry_date) < new Date();
@@ -38,7 +38,7 @@ export default function TrainingRecordDetailPage() {
     in_progress: "bg-amber-100 text-amber-700",
     completed: "bg-green-100 text-green-700",
     failed: "bg-red-100 text-red-600",
-    cancelled: "bg-zinc-100 text-zinc-500",
+    cancelled: "bg-surface-2 text-ink-3",
     expired: "bg-red-100 text-red-600",
   };
 
@@ -47,14 +47,14 @@ export default function TrainingRecordDetailPage() {
       <Breadcrumb items={[{ label: "HR" }, { label: "Training", href: "/hr/training" }, { label: record.course_name }]} />
 
       {/* Header */}
-      <div className="rounded-lg border border-border bg-surface p-5 flex items-start justify-between">
+      <div className="rounded-lg border border-line bg-surface p-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-xl font-semibold">{record.course_name}</h1>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[record.status] ?? "bg-zinc-100 text-zinc-600"}`}>{record.status}</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[record.status] ?? "bg-surface-2 text-ink-3"}`}>{record.status}</span>
             {isExpired && <span className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-600">Expired</span>}
           </div>
-          <div className="text-sm text-muted-foreground space-y-0.5">
+          <div className="text-sm text-ink-3 space-y-0.5">
             {record.employee_name && <div className="font-medium text-foreground">{record.employee_name}</div>}
             {record.provider && <div>Provider: {record.provider}</div>}
             {record.started_at && <div>Started: {record.started_at.slice(0, 10)}</div>}
@@ -62,17 +62,17 @@ export default function TrainingRecordDetailPage() {
             {record.expiry_date && <div className={isExpired ? "text-red-600" : ""}>Expires: {record.expiry_date.slice(0, 10)}</div>}
           </div>
         </div>
-        <button onClick={() => router.back()} className="text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded">← Back</button>
+        <button onClick={() => router.back()} className="text-xs text-ink-3 hover:text-ink border border-line px-3 py-1.5 rounded">← Back</button>
       </div>
 
       {/* Certificate & actions */}
-      <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <div className="rounded-lg border border-line bg-surface p-5 space-y-4">
         <h3 className="text-sm font-medium">Completion</h3>
         <div className="flex items-end gap-3">
           <div className="flex-1">
-            <label className="text-xs text-muted-foreground">Certificate No.</label>
+            <label className="text-xs text-ink-3">Certificate No.</label>
             <input value={certNo} onChange={e => setCertNo(e.target.value)} placeholder="e.g. CERT-2024-001"
-              className="w-full mt-0.5 text-sm border border-border rounded px-2 py-1.5 bg-background" />
+              className="w-full mt-0.5 text-sm border border-line rounded px-2 py-1.5 bg-surface" />
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -98,14 +98,14 @@ export default function TrainingRecordDetailPage() {
       </div>
 
       {/* Details */}
-      <div className="rounded-lg border border-border bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-muted-foreground">Employee:</span> {record.employee_name ?? record.employee_id}</div>
-        <div><span className="text-muted-foreground">Provider:</span> {record.provider ?? "—"}</div>
-        <div><span className="text-muted-foreground">Started:</span> {record.started_at?.slice(0, 10) ?? "—"}</div>
-        <div><span className="text-muted-foreground">Completed:</span> {record.completed_at?.slice(0, 10) ?? "—"}</div>
-        <div><span className="text-muted-foreground">Certificate:</span> {record.certificate_no ?? "—"}</div>
-        <div><span className="text-muted-foreground">Expires:</span> <span className={isExpired ? "text-red-600 font-medium" : ""}>{record.expiry_date?.slice(0, 10) ?? "—"}</span></div>
-        {record.notes && <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {record.notes}</div>}
+      <div className="rounded-lg border border-line bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
+        <div><span className="text-ink-3">Employee:</span> {record.employee_name ?? record.employee_id}</div>
+        <div><span className="text-ink-3">Provider:</span> {record.provider ?? "—"}</div>
+        <div><span className="text-ink-3">Started:</span> {record.started_at?.slice(0, 10) ?? "—"}</div>
+        <div><span className="text-ink-3">Completed:</span> {record.completed_at?.slice(0, 10) ?? "—"}</div>
+        <div><span className="text-ink-3">Certificate:</span> {record.certificate_no ?? "—"}</div>
+        <div><span className="text-ink-3">Expires:</span> <span className={isExpired ? "text-red-600 font-medium" : ""}>{record.expiry_date?.slice(0, 10) ?? "—"}</span></div>
+        {record.notes && <div className="col-span-2"><span className="text-ink-3">Notes:</span> {record.notes}</div>}
       </div>
     </div>
   );

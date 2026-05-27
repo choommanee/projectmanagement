@@ -52,7 +52,7 @@ export function WorklogPanel({ taskId, estimateMd }: Props) {
           { label: "Logged",    value: `${totalLogged.toFixed(1)}d` },
           { label: "Remaining", value: `${remaining.toFixed(1)}d` },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-md border border-line bg-surface-2 px-3 py-2">
+          <div key={label} className="rounded-md border border-line bg-paper px-3 py-2">
             <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3">{label}</p>
             <p className="font-mono text-sm font-semibold text-ink">{value}</p>
           </div>
@@ -84,15 +84,17 @@ export function WorklogPanel({ taskId, estimateMd }: Props) {
           <Button
             size="sm"
             variant="primary"
+            aria-label="Log time"
             disabled={!loggedMd || isNaN(parseFloat(loggedMd)) || parseFloat(loggedMd) <= 0 || mutation.isPending}
             loading={mutation.isPending}
             onClick={() => mutation.mutate()}
           >
             <Plus size={14} />
+            Log
           </Button>
         </div>
         {mutation.isError && (
-          <p className="text-xs text-danger">{String(mutation.error)}</p>
+          <p className="text-xs text-danger">{(mutation.error as Error)?.message ?? String(mutation.error)}</p>
         )}
       </div>
 

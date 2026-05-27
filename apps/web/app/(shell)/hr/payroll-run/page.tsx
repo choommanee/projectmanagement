@@ -86,11 +86,11 @@ export default function PayrollRunPage() {
       }]} />
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-ink-muted">
+            <thead className="bg-surface-2 text-ink-3">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Period</th>
                 <th className="px-4 py-2 text-right font-medium">Employees</th>
@@ -102,7 +102,7 @@ export default function PayrollRunPage() {
             </thead>
             <tbody className="divide-y divide-line">
               {runs.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No payroll runs. Click &quot;New Run&quot; to start one.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-3">No payroll runs. Click &quot;New Run&quot; to start one.</td></tr>
               ) : runs.map((run) => (
                 <tr key={run.id} className="hover:bg-surface-2/50 cursor-pointer" onClick={() => router.push('/hr/payroll-run/' + run.id)}>
                   <td className="px-4 py-2 font-medium">
@@ -113,8 +113,8 @@ export default function PayrollRunPage() {
                   <td className="px-4 py-2">
                     <Tag tone={statusTone(run.status)} size="sm">{run.status}</Tag>
                   </td>
-                  <td className="px-4 py-2 text-ink-muted">{new Date(run.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-2 text-ink-muted">{run.completed_at ? new Date(run.completed_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-2 text-ink-3">{new Date(run.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-2 text-ink-3">{run.completed_at ? new Date(run.completed_at).toLocaleDateString() : "—"}</td>
                 </tr>
               ))}
             </tbody>

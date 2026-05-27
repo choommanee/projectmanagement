@@ -235,7 +235,7 @@ export default function TraceabilityPage() {
             {selectedItem && lotsLoading && (
               <div className="space-y-px p-1">
                 {[1,2,3].map(i => (
-                  <div key={i} className="h-12 animate-pulse border-b border-border bg-surface-2" />
+                  <div key={i} className="h-12 animate-pulse border-b border-line bg-surface-2" />
                 ))}
               </div>
             )}
@@ -291,7 +291,7 @@ export default function TraceabilityPage() {
             {traceLoading && (
               <div className="space-y-px p-4">
                 {[1,2,3,4,5,6].map(i => (
-                  <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+                  <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
                 ))}
               </div>
             )}

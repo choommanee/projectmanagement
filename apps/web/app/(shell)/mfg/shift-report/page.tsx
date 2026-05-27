@@ -91,7 +91,7 @@ export default function ShiftReportPage() {
       {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap">
         <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium text-ink-muted">Date</span>
+          <span className="font-medium text-ink-3">Date</span>
           <input
             type="date"
             value={selectedDate}
@@ -122,7 +122,7 @@ export default function ShiftReportPage() {
           { label: "Completion %", value: `${summary.completionRate}%`, color: summary.completionRate >= 80 ? "text-success" : summary.completionRate >= 50 ? "text-warning" : "text-danger" },
         ].map((tile) => (
           <div key={tile.label} className="rounded-sm border border-line bg-surface p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{tile.label}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-3">{tile.label}</p>
             <p className={`font-mono text-2xl font-bold tabular-nums ${tile.color}`}>{tile.value}</p>
           </div>
         ))}
@@ -130,16 +130,16 @@ export default function ShiftReportPage() {
 
       {/* Work order list */}
       <div>
-        <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-semibold text-ink-3 uppercase tracking-wide mb-3">
           {shiftLabel} Shift — {selectedDate} ({shiftWOs.length} work orders)
         </h2>
 
         {loading ? (
-          <p className="text-sm text-ink-muted">Loading…</p>
+          <p className="text-sm text-ink-3">Loading…</p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-ink-muted">
+              <thead className="bg-surface-2 text-ink-3">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">WO Code</th>
                   <th className="px-4 py-2 text-left font-medium">Item</th>
@@ -151,11 +151,11 @@ export default function ShiftReportPage() {
               </thead>
               <tbody className="divide-y divide-line">
                 {shiftWOs.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-muted">No work orders found for this shift.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-3">No work orders found for this shift.</td></tr>
                 ) : shiftWOs.map((wo) => (
                   <tr key={wo.id} className="hover:bg-surface-2/50">
                     <td className="px-4 py-2 font-mono text-xs">{wo.code ?? wo.id.slice(0, 8)}</td>
-                    <td className="px-4 py-2 text-ink-muted font-mono text-xs">{wo.itemId ?? "—"}</td>
+                    <td className="px-4 py-2 text-ink-3 font-mono text-xs">{wo.itemId ?? "—"}</td>
                     <td className="px-4 py-2 text-right font-mono">{wo.qty ?? "—"}</td>
                     <td className="px-4 py-2">
                       <Tag
@@ -165,8 +165,8 @@ export default function ShiftReportPage() {
                         {wo.status}
                       </Tag>
                     </td>
-                    <td className="px-4 py-2 text-ink-muted font-mono text-xs">{wo.workCenterId ?? "—"}</td>
-                    <td className="px-4 py-2 text-ink-muted">
+                    <td className="px-4 py-2 text-ink-3 font-mono text-xs">{wo.workCenterId ?? "—"}</td>
+                    <td className="px-4 py-2 text-ink-3">
                       {wo.updatedAt ? new Date(wo.updatedAt).toLocaleTimeString() : "—"}
                     </td>
                   </tr>

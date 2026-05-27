@@ -9,6 +9,14 @@ async function makeHeaders(): Promise<Headers | NextResponse> {
   return h;
 }
 
+export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
+  const r = await fetch(`${HR_URL}/v1/training/${id}`, { headers: h });
+  return new NextResponse(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const h = await makeHeaders();

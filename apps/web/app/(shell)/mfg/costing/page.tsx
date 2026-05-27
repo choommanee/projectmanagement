@@ -126,13 +126,13 @@ export default function ItemCostingPage() {
       />
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading items and BOMs…</p>
+        <p className="text-sm text-ink-3">Loading items and BOMs…</p>
       ) : (
         <div className="flex gap-4">
           {/* Item list */}
           <div className="flex-1 overflow-x-auto rounded-lg border border-line">
             <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-ink-muted">
+              <thead className="bg-surface-2 text-ink-3">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Code</th>
                   <th className="px-4 py-2 text-left font-medium">Name</th>
@@ -146,7 +146,7 @@ export default function ItemCostingPage() {
               <tbody className="divide-y divide-line">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                    <td colSpan={7} className="px-4 py-6 text-center text-ink-3">
                       No items with BOM data or standard cost.
                     </td>
                   </tr>
@@ -199,19 +199,19 @@ export default function ItemCostingPage() {
                 <h3 className="font-semibold text-sm leading-tight">{selected.name} — BOM</h3>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-ink-muted hover:text-ink text-xs flex-shrink-0"
+                  className="text-ink-3 hover:text-ink text-xs flex-shrink-0"
                 >
                   ✕
                 </button>
               </div>
               {selectedEntry?.header && (
-                <p className="text-xs text-ink-muted mb-2">
+                <p className="text-xs text-ink-3 mb-2">
                   BOM v{selectedEntry.header.version} ·{" "}
                   <span className="capitalize">{selectedEntry.header.status}</span>
                 </p>
               )}
               {selectedLines.length === 0 ? (
-                <p className="text-xs text-ink-muted">No BOM lines loaded.</p>
+                <p className="text-xs text-ink-3">No BOM lines loaded.</p>
               ) : (
                 <div className="flex flex-col gap-2">
                   {selectedLines.map((l, i) => {
@@ -222,7 +222,7 @@ export default function ItemCostingPage() {
                         className="flex flex-col gap-0.5 rounded border border-line bg-surface-2 px-3 py-2 text-xs"
                       >
                         <span className="font-medium font-mono">{l.childItemId}</span>
-                        <div className="flex justify-between text-ink-muted">
+                        <div className="flex justify-between text-ink-3">
                           <span>
                             Qty: {l.qty}
                             {l.scrapPct > 0 && (
@@ -250,7 +250,7 @@ export default function ItemCostingPage() {
                     </div>
                   )}
                   {selectedStdCost > 0 && (
-                    <div className="flex justify-between text-sm text-ink-muted">
+                    <div className="flex justify-between text-sm text-ink-3">
                       <span>Standard Cost</span>
                       <span className="font-mono">{fmt(selectedStdCost)}</span>
                     </div>

@@ -189,7 +189,7 @@ export async function listQuotes(params?: { status?: string; customer_id?: strin
   const r = await apiFetch(`${SVC}/quotations?${q}`);
   if (!r.ok) return [];
   const d = await r.json();
-  return Array.isArray(d) ? d : d?.quotes ?? [];
+  return Array.isArray(d) ? d : (d?.items ?? d?.quotes ?? []);
 }
 
 export async function getQuote(id: string): Promise<Quote> {
@@ -264,7 +264,7 @@ export async function listSalesInvoices(params?: { status?: string }): Promise<S
   const r = await apiFetch(`/api/sales/invoices${q}`);
   if (!r.ok) return [];
   const d = await r.json();
-  return Array.isArray(d) ? d : d?.invoices ?? [];
+  return Array.isArray(d) ? d : (d?.items ?? d?.invoices ?? []);
 }
 
 export async function createSalesInvoice(body: {

@@ -37,12 +37,12 @@ export default function MfgApqpDetailPage() {
     } finally { setSaving(false); }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!proj) return <div className="p-8 text-destructive">APQP project not found.</div>;
 
   const phaseIdx = PHASES.indexOf(proj.phase);
   const statusColors: Record<ApqpStatus, string> = {
-    not_started: "bg-muted text-muted-foreground",
+    not_started: "bg-muted text-ink-3",
     in_progress: "bg-blue-100 text-blue-800",
     complete: "bg-green-100 text-green-800",
     blocked: "bg-red-100 text-red-800",
@@ -50,17 +50,17 @@ export default function MfgApqpDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/mfg/apqp")} className="hover:underline">APQP</button>
         <span className="mx-2">/</span>
         <span>{proj.name}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{proj.name}</h1>
-            <p className="text-sm text-muted-foreground mt-1">Phase: <span className="capitalize font-medium">{proj.phase}</span> · Target: {proj.targetDate ?? "—"}</p>
+            <p className="text-sm text-ink-3 mt-1">Phase: <span className="capitalize font-medium">{proj.phase}</span> · Target: {proj.targetDate ?? "—"}</p>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${statusColors[proj.status]}`}>
             {proj.status.replace("_", " ")}
@@ -88,27 +88,27 @@ export default function MfgApqpDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">Phase Progress</h2>
+      <div className="rounded-lg border border-line bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">Phase Progress</h2>
         <div className="flex gap-1">
           {PHASES.map((ph, i) => (
             <div key={ph} className={`flex-1 h-2 rounded-full ${i <= phaseIdx ? "bg-primary" : "bg-muted"}`} />
           ))}
         </div>
-        <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+        <div className="mt-2 flex justify-between text-xs text-ink-3">
           <span className="capitalize">{PHASES[0]}</span>
           <span className="capitalize">{PHASES[PHASES.length - 1]}</span>
         </div>
       </div>
 
       {proj.milestones && proj.milestones.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+        <div className="rounded-lg border border-line bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">
             Milestones ({proj.milestones.length})
           </h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground text-xs uppercase">
+              <tr className="text-left text-ink-3 text-xs uppercase">
                 <th className="py-2 pr-4">Milestone</th>
                 <th className="py-2 pr-4">Due Date</th>
                 <th className="py-2">Completed</th>
@@ -116,14 +116,14 @@ export default function MfgApqpDetailPage() {
             </thead>
             <tbody>
               {proj.milestones.map((m, i) => (
-                <tr key={i} className="border-t border-border">
+                <tr key={i} className="border-t border-line">
                   <td className="py-2 pr-4 font-medium">{m.name}</td>
-                  <td className="py-2 pr-4 text-muted-foreground">{m.due || "—"}</td>
+                  <td className="py-2 pr-4 text-ink-3">{m.due || "—"}</td>
                   <td className="py-2">
                     {m.done ? (
                       <span className="text-green-600 font-medium">✓</span>
                     ) : (
-                      <span className="text-muted-foreground">Pending</span>
+                      <span className="text-ink-3">Pending</span>
                     )}
                   </td>
                 </tr>

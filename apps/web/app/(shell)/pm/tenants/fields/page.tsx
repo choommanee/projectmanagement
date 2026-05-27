@@ -99,7 +99,7 @@ export default function CustomFieldsPage() {
       />
 
       {/* Entity type tabs */}
-      <div className="flex gap-1 border-b border-border px-4 py-2">
+      <div className="flex gap-1 border-b border-line px-4 py-2">
         {ENTITY_TYPES.map((e) => (
           <button
             key={e}
@@ -117,7 +117,7 @@ export default function CustomFieldsPage() {
 
       {/* Add field inline form */}
       {showForm && (
-        <div className="border-b border-border bg-surface-2 p-4">
+        <div className="border-b border-line bg-surface-2 p-4">
           <p className="mb-3 text-sm font-medium">
             New field for <strong>{entityType.replace("_", " ")}</strong>
           </p>
@@ -147,7 +147,7 @@ export default function CustomFieldsPage() {
                 onChange={(e) =>
                   setForm({ ...form, fieldType: e.target.value as FieldType })
                 }
-                className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm"
               >
                 {FIELD_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -206,7 +206,7 @@ export default function CustomFieldsPage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-10 animate-pulse border-b border-border bg-surface-2"
+                className="h-10 animate-pulse border-b border-line bg-surface-2"
               />
             ))}
           </div>
@@ -224,7 +224,7 @@ export default function CustomFieldsPage() {
           </div>
         ) : (
           <>
-            <div className="flex border-b border-border bg-surface-2 px-4 py-1.5 text-xs font-medium text-fgMuted">
+            <div className="flex border-b border-line bg-surface-2 px-4 py-1.5 text-xs font-medium text-fgMuted">
               <span className="w-44">Key</span>
               <span className="flex-1">Label</span>
               <span className="w-24">Type</span>
@@ -234,7 +234,7 @@ export default function CustomFieldsPage() {
             {fields.map((f) => (
               <div
                 key={f.id}
-                className="flex items-center border-b border-border px-4 py-2 text-sm hover:bg-surface-2"
+                className="flex items-center border-b border-line px-4 py-2 text-sm hover:bg-surface-2"
               >
                 <span className="w-44 font-mono text-xs text-fgMuted">
                   {f.fieldKey}

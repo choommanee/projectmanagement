@@ -181,3 +181,16 @@ export async function removeDependency(depId: string): Promise<void> {
   const r = await fetch(`/api/dependencies/${depId}`, { method: "DELETE" });
   if (!r.ok) throw new Error(`dep remove failed: ${r.status}`);
 }
+
+export async function listDepsForProject(projectId: string): Promise<Dependency[]> {
+  const r = await fetch(`/api/projects/${projectId}/task-dependencies`);
+  if (!r.ok) return [];
+  const raw = await r.json() as Record<string, unknown>[];
+  return (raw ?? []).map(d => ({
+    id:            String(d["id"] ?? ""),
+    predecessorId: String(d["predecessorId"] ?? ""),
+    successorId:   String(d["successorId"] ?? ""),
+    type:          (d["type"] ?? "fs") as DepType,
+    lagDays:       Number(d["lagDays"] ?? 0),
+  }));
+}

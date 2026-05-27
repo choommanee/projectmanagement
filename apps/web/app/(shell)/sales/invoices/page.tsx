@@ -194,24 +194,24 @@ export default function SalesInvoicesPage() {
             className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
               statusFilter === opt.value
                 ? "bg-accent text-white"
-                : "bg-surface-2 text-ink hover:bg-surface-3"
+                : "bg-surface-2 text-ink hover:bg-surface-2"
             }`}
           >
             {opt.label}
           </button>
         ))}
-        <span className="ml-auto text-sm text-ink-muted">
+        <span className="ml-auto text-sm text-ink-3">
           Outstanding:{" "}
           <span className="font-mono font-semibold text-ink">{fmt(totalOutstanding)}</span>
         </span>
       </div>
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-ink-muted">
+            <thead className="bg-surface-2 text-ink-3">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Code</th>
                 <th className="px-4 py-2 text-left font-medium">Customer</th>
@@ -225,7 +225,7 @@ export default function SalesInvoicesPage() {
             <tbody className="divide-y divide-line">
               {invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                  <td colSpan={7} className="px-4 py-6 text-center text-ink-3">
                     No invoices found.
                   </td>
                 </tr>
@@ -236,10 +236,10 @@ export default function SalesInvoicesPage() {
                     <td className="px-4 py-2 font-medium">
                       {inv.customer_name ?? inv.customer_id}
                     </td>
-                    <td className="px-4 py-2 text-ink-muted">
+                    <td className="px-4 py-2 text-ink-3">
                       {new Date(inv.issue_date).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-2 text-ink-muted">
+                    <td className="px-4 py-2 text-ink-3">
                       {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "—"}
                     </td>
                     <td className="px-4 py-2 text-right font-mono font-semibold">

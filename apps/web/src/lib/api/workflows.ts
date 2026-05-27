@@ -402,6 +402,35 @@ export async function listAllInstances(params?: {
   };
 }
 
+// ─── Workflow Templates ────────────────────────────────────────────────────
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  definition: Record<string, unknown>;
+  isSystem: boolean;
+  createdAt: string;
+}
+
+export async function listWorkflowTemplates(): Promise<WorkflowTemplate[]> {
+  const r = await apiFetch(`${SVC}/workflow-templates`);
+  if (!r.ok) return [];
+  const body = await r.json();
+  return (body.items as WorkflowTemplate[] | null) ?? [];
+}
+
+export async function createWorkflowFromTemplate(templateId: string, name: string): Promise<WorkflowDef> {
+  const r = await apiFetch(`${SVC}/workflow-templates/${templateId}/use`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!r.ok) throw new Error(`create from template failed: ${r.status}`);
+  return normWorkflowDef(await r.json());
+}
+
 export async function cancelInstance(id: string): Promise<void> {
   const r = await apiFetch(`${SVC}/instances/${id}/cancel`, {
     method: "POST",

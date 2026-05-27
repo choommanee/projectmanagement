@@ -264,7 +264,7 @@ export default function InspectionsPage() {
         {loading && !inspections.length ? (
           <div className="space-y-px">
             {[1,2,3,4,5].map(i => (
-              <div key={i} className="h-10 animate-pulse border-b border-border bg-surface-2" />
+              <div key={i} className="h-10 animate-pulse border-b border-line bg-surface-2" />
             ))}
           </div>
         ) : (

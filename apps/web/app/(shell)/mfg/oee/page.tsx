@@ -78,7 +78,7 @@ export default function OEEDashboardPage() {
       <h1 className="text-xl font-semibold">Overall Equipment Effectiveness</h1>
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <>
           {/* Overall KPIs */}
@@ -95,7 +95,7 @@ export default function OEEDashboardPage() {
               <span className={`text-5xl font-mono font-bold ${oeeColor(overall.oee)}`}>
                 {pct(overall.oee)}
               </span>
-              <span className="text-sm text-ink-muted mt-1">Overall OEE</span>
+              <span className="text-sm text-ink-3 mt-1">Overall OEE</span>
             </div>
             <div className="flex-1 pl-6 border-l border-line">
               <div className="flex flex-col gap-3">
@@ -110,7 +110,7 @@ export default function OEEDashboardPage() {
                 ].map((m) => (
                   <div key={m.label} className="flex items-center gap-3">
                     <span className="w-28 text-sm font-medium">{m.label}</span>
-                    <div className="flex-1 h-2 rounded-full bg-surface-3 overflow-hidden">
+                    <div className="flex-1 h-2 rounded-full bg-surface-2 overflow-hidden">
                       <div
                         className={`h-2 rounded-full ${barColor(m.value)}`}
                         style={{ width: pct(m.value) }}
@@ -119,7 +119,7 @@ export default function OEEDashboardPage() {
                     <span className={`w-12 text-right font-mono text-sm font-semibold ${oeeColor(m.value)}`}>
                       {pct(m.value)}
                     </span>
-                    <span className="text-xs text-ink-muted hidden sm:block">{m.desc}</span>
+                    <span className="text-xs text-ink-3 hidden sm:block">{m.desc}</span>
                   </div>
                 ))}
               </div>
@@ -128,12 +128,12 @@ export default function OEEDashboardPage() {
 
           {/* Per Work Center */}
           <div>
-            <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wide mb-3">
+            <h2 className="text-sm font-semibold text-ink-3 uppercase tracking-wide mb-3">
               By Work Center
             </h2>
             <div className="overflow-x-auto rounded-lg border border-line">
               <table className="w-full text-sm">
-                <thead className="bg-surface-2 text-ink-muted">
+                <thead className="bg-surface-2 text-ink-3">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Work Center</th>
                     <th className="px-4 py-2 text-right font-medium">WOs</th>
@@ -147,7 +147,7 @@ export default function OEEDashboardPage() {
                 <tbody className="divide-y divide-line">
                   {perWC.filter((r) => r.total > 0).length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-ink-muted">
+                      <td colSpan={7} className="px-4 py-6 text-center text-ink-3">
                         {workCenters.length === 0
                           ? "No work centers configured."
                           : "No work order data per work center."}

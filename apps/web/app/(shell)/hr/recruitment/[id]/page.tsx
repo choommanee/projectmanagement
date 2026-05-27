@@ -33,13 +33,13 @@ export default function JobPostingDetailPage() {
     } finally { setMoving(null); }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
   if (!job) return <div className="p-8 text-destructive">Job posting not found.</div>;
 
   const statusColors: Record<JobStatus, string> = {
     open: "bg-green-100 text-green-800",
     closed: "bg-gray-200 text-gray-500",
-    draft: "bg-muted text-muted-foreground",
+    draft: "bg-muted text-ink-3",
     on_hold: "bg-yellow-100 text-yellow-800",
   };
 
@@ -54,17 +54,17 @@ export default function JobPostingDetailPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <nav className="text-sm text-muted-foreground">
+      <nav className="text-sm text-ink-3">
         <button onClick={() => router.push("/hr/recruitment")} className="hover:underline">Recruitment</button>
         <span className="mx-2">/</span>
         <span>{job.title}</span>
       </nav>
 
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-line bg-card p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{job.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-ink-3 mt-1">
               {job.departmentName} · {job.positionName}
             </p>
           </div>
@@ -73,7 +73,7 @@ export default function JobPostingDetailPage() {
           </span>
         </div>
         {job.description && (
-          <p className="mt-3 text-sm text-muted-foreground">{job.description}</p>
+          <p className="mt-3 text-sm text-ink-3">{job.description}</p>
         )}
       </div>
 
@@ -84,34 +84,34 @@ export default function JobPostingDetailPage() {
           { label: "Department", value: job.departmentName },
           { label: "Position", value: job.positionName },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-lg border border-line bg-card p-4">
+            <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>
             <p className="mt-1 text-sm font-semibold">{value}</p>
           </div>
         ))}
       </div>
 
       {/* Pipeline kanban columns */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+      <div className="rounded-lg border border-line bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">
           Applicant Pipeline ({applicants.length})
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {STAGES.map(stage => {
             const stageApplicants = applicants.filter(a => a.stage === stage);
             return (
-              <div key={stage} className="rounded-lg border border-border bg-muted/20 p-3">
+              <div key={stage} className="rounded-lg border border-line bg-surface-2 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${stageColors[stage]}`}>
                     {stage}
                   </span>
-                  <span className="text-xs text-muted-foreground">{stageApplicants.length}</span>
+                  <span className="text-xs text-ink-3">{stageApplicants.length}</span>
                 </div>
                 <div className="space-y-2">
                   {stageApplicants.map(a => (
-                    <div key={a.id} className="bg-card rounded border border-border p-2 text-xs">
+                    <div key={a.id} className="bg-card rounded border border-line p-2 text-xs">
                       <p className="font-medium truncate">{a.name}</p>
-                      <p className="text-muted-foreground truncate">{a.email}</p>
+                      <p className="text-ink-3 truncate">{a.email}</p>
                     </div>
                   ))}
                 </div>
@@ -123,11 +123,11 @@ export default function JobPostingDetailPage() {
 
       {/* Applicant table */}
       {applicants.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">All Applicants</h2>
+        <div className="rounded-lg border border-line bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3 mb-4">All Applicants</h2>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-muted-foreground text-xs uppercase">
+              <tr className="text-left text-ink-3 text-xs uppercase">
                 <th className="py-2 pr-4">Name</th>
                 <th className="py-2 pr-4">Email</th>
                 <th className="py-2 pr-4">Stage</th>
@@ -139,9 +139,9 @@ export default function JobPostingDetailPage() {
                 const currentIdx = STAGES.indexOf(a.stage);
                 const nextStage = currentIdx < STAGES.length - 1 ? STAGES[currentIdx + 1] : null;
                 return (
-                  <tr key={a.id} className="border-t border-border">
+                  <tr key={a.id} className="border-t border-line">
                     <td className="py-2 pr-4 font-medium">{a.name}</td>
-                    <td className="py-2 pr-4 text-muted-foreground">{a.email}</td>
+                    <td className="py-2 pr-4 text-ink-3">{a.email}</td>
                     <td className="py-2 pr-4">
                       <span className={`px-2 py-0.5 rounded text-xs capitalize ${stageColors[a.stage]}`}>
                         {a.stage}
@@ -151,7 +151,7 @@ export default function JobPostingDetailPage() {
                       {nextStage && nextStage !== "rejected" && (
                         <button onClick={() => moveApplicant(a.id, nextStage)}
                           disabled={moving === a.id}
-                          className="px-2 py-0.5 text-xs border border-border rounded hover:bg-muted disabled:opacity-50 capitalize">
+                          className="px-2 py-0.5 text-xs border border-line rounded hover:bg-surface-2 disabled:opacity-50 capitalize">
                           → {nextStage}
                         </button>
                       )}
