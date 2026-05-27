@@ -190,6 +190,12 @@ export async function ensureWorkspace(projectId: string, kind: WorkspaceKind, na
   return normWs(await r.json());
 }
 
+export async function getWorkspace(id: string): Promise<Workspace> {
+  const r = await fetch(`/api/workspaces/${id}`, { cache: "no-store" });
+  if (!r.ok) throw new Error(`getWorkspace: ${r.status}`);
+  return normWs(await r.json());
+}
+
 // Documents
 export async function listDocuments(params: { workspace_id?: string; project_id?: string; type?: DocumentType; status?: DocumentStatus; q?: string; limit?: number; offset?: number }): Promise<{ items: DocSummary[]; total: number }> {
   const qs = new URLSearchParams();

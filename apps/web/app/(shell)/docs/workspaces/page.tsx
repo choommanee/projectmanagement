@@ -96,7 +96,7 @@ export default function WorkspacesPage() {
                   <tr
                     key={ws.id}
                     className="border-b border-line last:border-0 hover:bg-surface-2 cursor-pointer transition-colors"
-                    onClick={() => router.push(`${WS_ROUTES[ws.kind]}/${ws.projectId}`)}
+                    onClick={() => router.push('/docs/workspaces/' + ws.id)}
                   >
                     <td className="px-4 py-2.5 font-medium text-ink">{ws.name}</td>
                     <td className="px-4 py-2.5">
