@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Tag } from "@pmplatform/ui-kit";
@@ -289,6 +290,7 @@ function ApqpDetailPane({ project, itemMap, onClose, onUpdated, onDeleted }: {
 }
 
 export default function ApqpPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ApqpProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -379,7 +381,7 @@ export default function ApqpPage() {
               {filtered.map(p => {
                 const item = itemMap.get(p.itemId);
                 return (
-                  <tr key={p.id} onClick={() => setSelected(p)}
+                  <tr key={p.id} onClick={() => router.push('/mfg/apqp/' + p.id)}
                     className="cursor-pointer border-b border-line hover:bg-surface-2">
                     <td className="px-4 py-2 font-medium text-ink">{p.name}</td>
                     <td className="px-4 py-2">
