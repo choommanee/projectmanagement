@@ -240,7 +240,7 @@ export default function DocumentsPage() {
                     <tr
                       key={doc.id}
                       className="border-b border-line last:border-0 hover:bg-surface-2 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/pm/ba/${ws?.projectId ?? ""}#doc-${doc.id}`)}
+                      onClick={() => router.push('/docs/documents/' + doc.id)}
                     >
                       <td className="px-4 py-2.5 font-medium text-ink">{doc.title}</td>
                       <td className="px-4 py-2.5">
