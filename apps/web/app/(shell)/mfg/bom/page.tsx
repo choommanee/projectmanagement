@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Tag } from "@pmplatform/ui-kit";
@@ -12,6 +13,7 @@ import {
 } from "@/lib/api/mfg";
 
 export default function BomExplorerPage() {
+  const router = useRouter();
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -160,7 +162,7 @@ export default function BomExplorerPage() {
                 {boms.map(bom => (
                   <li key={bom.id}
                     className={`cursor-pointer border-b border-line px-3 py-2.5 hover:bg-surface-2 ${selectedBom?.id === bom.id ? "bg-accent-soft/20 border-l-2 border-l-accent" : ""}`}
-                    onClick={() => handleSelectBom(bom)}>
+                    onClick={() => { handleSelectBom(bom); router.push('/mfg/bom/' + bom.id); }}>
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-xs font-semibold">v{bom.version}</span>
                       <Tag tone={bom.status === "active" ? "success" : "neutral"} dot>{bom.status}</Tag>
