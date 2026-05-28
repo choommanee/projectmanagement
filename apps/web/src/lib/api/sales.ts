@@ -187,14 +187,31 @@ export interface Quote {
   created_at?: string;
 }
 
+function normQuote(r: Record<string, unknown>): Quote {
+  const gp = (k: string) => r[k] ?? r[k[0].toUpperCase() + k.slice(1)];
+  return {
+    id: String(r.id ?? r["ID"] ?? ""),
+    code: gp("code") ? String(gp("code")) : undefined,
+    customer_id: String(r.customer_id ?? r["CustomerID"] ?? ""),
+    customer_name: gp("customer_name") ? String(gp("customer_name")) : undefined,
+    title: gp("title") ? String(gp("title")) : undefined,
+    valid_until: (r.valid_until ?? r["ValidUntil"]) ? String(r.valid_until ?? r["ValidUntil"]) : undefined,
+    status: ((r.status ?? r["Status"]) ?? "draft") as QuoteStatus,
+    total_amount: (r.total_amount ?? r["TotalAmount"]) != null ? Number(r.total_amount ?? r["TotalAmount"]) : undefined,
+    notes: gp("notes") ? String(gp("notes")) : undefined,
+    created_at: (r.created_at ?? r["CreatedAt"]) ? String(r.created_at ?? r["CreatedAt"]) : undefined,
+  };
+}
+
 export async function listQuotes(params?: { status?: string; customer_id?: string }): Promise<Quote[]> {
   const q = new URLSearchParams();
   if (params?.status) q.set("status", params.status);
   if (params?.customer_id) q.set("customer_id", params.customer_id);
   const r = await apiFetch(`${SVC}/quotations?${q}`);
   if (!r.ok) return [];
-  const d = await r.json();
-  return Array.isArray(d) ? d : (d?.items ?? d?.quotes ?? []);
+  const d = await r.json() as { items?: unknown[] } | unknown[];
+  const items = Array.isArray(d) ? d : ((d as { items?: unknown[] })?.items ?? []);
+  return (items as Record<string, unknown>[]).map(normQuote);
 }
 
 export async function getQuote(id: string): Promise<Quote> {
@@ -281,12 +298,31 @@ export interface SalesInvoice {
   created_at?: string;
 }
 
+function normInvoice(r: Record<string, unknown>): SalesInvoice {
+  return {
+    id: String(r.id ?? r["ID"] ?? ""),
+    code: (r.code ?? r["Code"]) ? String(r.code ?? r["Code"]) : undefined,
+    so_id: (r.so_id ?? r["SOID"] ?? r["SoID"]) ? String(r.so_id ?? r["SOID"] ?? r["SoID"]) : undefined,
+    customer_id: String(r.customer_id ?? r["CustomerID"] ?? ""),
+    customer_name: (r.customer_name ?? r["CustomerName"]) ? String(r.customer_name ?? r["CustomerName"]) : undefined,
+    issue_date: String(r.issue_date ?? r["IssueDate"] ?? ""),
+    due_date: (r.due_date ?? r["DueDate"]) ? String(r.due_date ?? r["DueDate"]) : undefined,
+    status: ((r.status ?? r["Status"]) ?? "draft") as InvoiceStatus,
+    subtotal: (r.subtotal ?? r["Subtotal"]) != null ? Number(r.subtotal ?? r["Subtotal"]) : undefined,
+    tax: (r.tax ?? r["Tax"]) != null ? Number(r.tax ?? r["Tax"]) : undefined,
+    total: (r.total ?? r["Total"]) != null ? Number(r.total ?? r["Total"]) : undefined,
+    notes: (r.notes ?? r["Notes"]) ? String(r.notes ?? r["Notes"]) : undefined,
+    created_at: (r.created_at ?? r["CreatedAt"]) ? String(r.created_at ?? r["CreatedAt"]) : undefined,
+  };
+}
+
 export async function listSalesInvoices(params?: { status?: string }): Promise<SalesInvoice[]> {
   const q = params?.status ? `?status=${params.status}` : "";
   const r = await apiFetch(`/api/sales/invoices${q}`);
   if (!r.ok) return [];
-  const d = await r.json();
-  return Array.isArray(d) ? d : (d?.items ?? d?.invoices ?? []);
+  const d = await r.json() as { items?: unknown[] } | unknown[];
+  const items = Array.isArray(d) ? d : ((d as { items?: unknown[] })?.items ?? []);
+  return (items as Record<string, unknown>[]).map(normInvoice);
 }
 
 export async function createSalesInvoice(body: {
@@ -428,7 +464,7 @@ export interface Opportunity {
 
 function normOpportunity(r: Record<string, unknown>): Opportunity {
   return {
-    id: String(r.id ?? ""),
+    id: String(r.id ?? r["ID"] ?? ""),
     title: String(g(r, "title") ?? ""),
     customerId: String(gid(r, "customerId", "customer_id") ?? r["CustomerID"] ?? ""),
     customerName: String(gid(r, "customerName", "customer_name") ?? ""),
