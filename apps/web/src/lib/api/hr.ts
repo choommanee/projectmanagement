@@ -489,11 +489,16 @@ export async function rejectLeaveRequest(id: string, reason: string): Promise<Le
 
 export interface PayrollRun {
   id: string;
-  period_start: string;
-  period_end: string;
+  period: string;
+  period_start?: string;
+  period_end?: string;
   status: "draft" | "processing" | "completed" | "cancelled";
-  total_employees: number;
-  total_net_pay: number;
+  total_employees?: number;
+  total_net_pay?: number;
+  total_gross?: number;
+  total_deductions?: number;
+  total_net?: number;
+  employee_count?: number;
   created_at: string;
   completed_at?: string;
 }
@@ -502,10 +507,12 @@ export async function listPayrollRuns(): Promise<PayrollRun[]> {
   const r = await apiFetch(`${SVC}/payroll-runs`);
   if (!r.ok) return [];
   const d = await r.json() as unknown;
-  return Array.isArray(d) ? (d as PayrollRun[]) : ((d as Record<string, unknown>)?.runs as PayrollRun[] ?? []);
+  if (Array.isArray(d)) return d as PayrollRun[];
+  const obj = d as Record<string, unknown>;
+  return (Array.isArray(obj.items) ? obj.items : Array.isArray(obj.runs) ? obj.runs : []) as PayrollRun[];
 }
 
-export async function createPayrollRun(body: { period_start: string; period_end: string }): Promise<PayrollRun> {
+export async function createPayrollRun(body: { period: string; status?: string }): Promise<PayrollRun> {
   const r = await apiFetch(`${SVC}/payroll-runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -515,38 +522,70 @@ export async function createPayrollRun(body: { period_start: string; period_end:
   return r.json() as Promise<PayrollRun>;
 }
 
+export async function updatePayrollRun(id: string, patch: { status: string }): Promise<PayrollRun> {
+  const r = await apiFetch(`${SVC}/payroll-runs/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<PayrollRun>;
+}
+
+export async function deletePayrollRun(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/payroll-runs/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error(`deletePayrollRun: ${r.status}`);
+}
+
 export async function getPayrollRun(id: string): Promise<PayrollRun> {
   const r = await apiFetch(`${SVC}/payroll-runs/${id}`);
   if (!r.ok) throw new Error(`getPayrollRun: ${r.status}`);
   return r.json();
 }
 
-// ─── training records ──────────────────────────────────────────────────────
+// ─── training sessions (hr-svc /v1/training) ──────────────────────────────
 
-export type TrainingStatus = "enrolled" | "in_progress" | "completed" | "expired";
+export type TrainingStatus = "planned" | "active" | "completed" | "cancelled";
+
+// Legacy alias kept for any existing usage
+export type TrainingRecordStatus = TrainingStatus;
 
 export interface TrainingRecord {
   id: string;
-  employee_id: string;
+  tenant_id?: string;
+  title: string;
+  description?: string;
+  trainer?: string;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  status: TrainingStatus;
+  max_participants?: number;
+  created_at?: string;
+  updated_at?: string;
+  // Legacy fields kept for backward compat (old employee-training model)
+  employee_id?: string;
   employee_name?: string;
-  course_name: string;
+  course_name?: string;
   provider?: string;
   started_at?: string;
   completed_at?: string;
   expiry_date?: string;
-  status: TrainingStatus;
   certificate_no?: string;
   notes?: string;
 }
 
-export async function listTrainingRecords(params?: { employee_id?: string; status?: string }): Promise<TrainingRecord[]> {
+export async function listTrainingRecords(params?: { employee_id?: string; status?: string; q?: string }): Promise<TrainingRecord[]> {
   const q = new URLSearchParams();
   if (params?.employee_id) q.set("employee_id", params.employee_id);
   if (params?.status) q.set("status", params.status);
+  if (params?.q) q.set("q", params.q);
   const r = await apiFetch(`${SVC}/training?${q}`);
   if (!r.ok) return [];
   const d = await r.json() as unknown;
-  return Array.isArray(d) ? (d as TrainingRecord[]) : ((d as Record<string, unknown>)?.records as TrainingRecord[] ?? []);
+  if (Array.isArray(d)) return d as TrainingRecord[];
+  const obj = d as Record<string, unknown>;
+  return (Array.isArray(obj.items) ? obj.items : Array.isArray(obj.records) ? obj.records : []) as TrainingRecord[];
 }
 
 export async function getTrainingRecord(id: string): Promise<TrainingRecord> {
@@ -555,7 +594,16 @@ export async function getTrainingRecord(id: string): Promise<TrainingRecord> {
   return r.json() as Promise<TrainingRecord>;
 }
 
-export async function createTrainingRecord(body: Omit<TrainingRecord, "id" | "employee_name">): Promise<TrainingRecord> {
+export async function createTrainingRecord(body: {
+  title: string;
+  description?: string;
+  trainer?: string;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  status?: string;
+  max_participants?: number;
+}): Promise<TrainingRecord> {
   const r = await apiFetch(`${SVC}/training`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -565,13 +613,24 @@ export async function createTrainingRecord(body: Omit<TrainingRecord, "id" | "em
   return r.json() as Promise<TrainingRecord>;
 }
 
-export async function updateTrainingStatus(id: string, status: TrainingStatus, certificate_no?: string): Promise<void> {
+export async function updateTrainingRecord(id: string, patch: { status: string }): Promise<TrainingRecord> {
   const r = await apiFetch(`${SVC}/training/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ status, certificate_no }),
+    body: JSON.stringify(patch),
   });
   if (!r.ok) throw new Error(await r.text());
+  return r.json() as Promise<TrainingRecord>;
+}
+
+export async function deleteTrainingRecord(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/training/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error(`deleteTrainingRecord: ${r.status}`);
+}
+
+// Legacy alias
+export async function updateTrainingStatus(id: string, status: TrainingStatus): Promise<void> {
+  await updateTrainingRecord(id, { status });
 }
 
 // ─── Performance Reviews ────────────────────────────────────────────────────
@@ -679,6 +738,11 @@ export async function getPerformanceReview(id: string): Promise<PerformanceRevie
   return normReview(await r.json());
 }
 
+export async function deletePerformanceReview(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/performance-reviews/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error(`deletePerformanceReview: ${r.status}`);
+}
+
 // ─── Recruitment ────────────────────────────────────────────────────────────
 
 export type JobStatus = "open" | "closed" | "draft" | "on_hold";
@@ -771,6 +835,11 @@ export async function getJobPosting(id: string): Promise<JobPosting> {
   const r = await apiFetch(`${SVC}/jobs/${id}`);
   if (!r.ok) throw new Error(`getJobPosting: ${r.status}`);
   return normJobPosting(await r.json());
+}
+
+export async function deleteJobPosting(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/jobs/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error(`deleteJobPosting: ${r.status}`);
 }
 
 export async function updateJobPosting(id: string, patch: Partial<{ status: JobStatus; openings: number; description: string }>): Promise<JobPosting> {

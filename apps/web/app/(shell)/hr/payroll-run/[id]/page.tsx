@@ -62,10 +62,10 @@ export default function PayrollRunDetailPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Total Employees", value: String(run.total_employees) },
-          { label: "Total Net Pay", value: fmt(run.total_net_pay) },
-          { label: "Period Start", value: run.period_start },
-          { label: "Period End", value: run.period_end },
+          { label: "Total Employees", value: String(run.employee_count ?? run.total_employees ?? "—") },
+          { label: "Total Net Pay", value: fmt(run.total_net ?? run.total_net_pay ?? 0) },
+          { label: "Period", value: run.period ?? run.period_start ?? "—" },
+          { label: "Status", value: run.status },
         ].map(({ label, value }) => (
           <div key={label} className="rounded-lg border border-line bg-card p-4">
             <p className="text-xs text-ink-3 uppercase tracking-wide">{label}</p>

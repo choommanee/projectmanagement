@@ -7,84 +7,71 @@ import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
 import {
   listTrainingRecords,
   createTrainingRecord,
-  listEmployees,
+  updateTrainingRecord,
+  deleteTrainingRecord,
   type TrainingRecord,
-  type Employee,
 } from "@/lib/api/hr";
 
 const STATUS_OPTS = [
   { value: "", label: "All" },
-  { value: "enrolled", label: "Enrolled" },
-  { value: "in_progress", label: "In Progress" },
+  { value: "planned", label: "Planned" },
+  { value: "active", label: "Active" },
   { value: "completed", label: "Completed" },
-  { value: "expired", label: "Expired" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
-function statusTone(s: string): "neutral" | "info" | "success" | "danger" | "warning" {
-  if (s === "enrolled") return "neutral";
-  if (s === "in_progress") return "info";
-  if (s === "completed") return "success";
-  if (s === "expired") return "danger";
-  return "neutral";
-}
+const STATUS_VALUES = ["planned", "active", "completed", "cancelled"] as const;
 
-function empDisplayName(emp: Employee): string {
-  return `${emp.firstName} ${emp.lastName}`.trim() || emp.empNo || emp.id;
+function statusTone(s: string): "neutral" | "info" | "success" | "danger" | "warning" {
+  if (s === "planned") return "neutral";
+  if (s === "active") return "info";
+  if (s === "completed") return "success";
+  if (s === "cancelled") return "danger";
+  return "neutral";
 }
 
 function NewTrainingDialog({
   open,
-  employees,
   onClose,
   onCreated,
 }: {
   open: boolean;
-  employees: Employee[];
   onClose: () => void;
   onCreated: (r: TrainingRecord) => void;
 }) {
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState({
-    employee_id: "",
-    course_name: "",
-    provider: "",
-    started_at: today,
-    expiry_date: "",
-    notes: "",
+    title: "",
+    trainer: "",
+    location: "",
+    start_date: today,
+    end_date: "",
+    max_participants: "20",
+    status: "planned",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setForm({
-        employee_id: employees[0]?.id ?? "",
-        course_name: "",
-        provider: "",
-        started_at: today,
-        expiry_date: "",
-        notes: "",
-      });
+      setForm({ title: "", trainer: "", location: "", start_date: today, end_date: "", max_participants: "20", status: "planned" });
       setError(null);
     }
-  }, [open, employees, today]);
+  }, [open, today]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.employee_id || !form.course_name) {
-      setError("Employee and course name required");
-      return;
-    }
+    if (!form.title) { setError("Title is required"); return; }
     setLoading(true);
     try {
       const rec = await createTrainingRecord({
-        employee_id: form.employee_id,
-        course_name: form.course_name,
-        provider: form.provider || undefined,
-        started_at: form.started_at || undefined,
-        expiry_date: form.expiry_date || undefined,
-        notes: form.notes || undefined,
-        status: "enrolled",
+        title: form.title,
+        trainer: form.trainer || undefined,
+        location: form.location || undefined,
+        start_date: form.start_date || undefined,
+        end_date: form.end_date || undefined,
+        max_participants: form.max_participants ? parseInt(form.max_participants) : undefined,
+        status: form.status,
       });
       onCreated(rec);
     } catch (err) {
@@ -95,62 +82,143 @@ function NewTrainingDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="New Training Record">
-      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+    <Dialog open={open} onClose={onClose} title="New Training Session">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[380px]">
         {error && <p className="text-sm text-danger">{error}</p>}
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Employee *</span>
-          <select
-            value={form.employee_id}
-            onChange={(e) => setForm((f) => ({ ...f, employee_id: e.target.value }))}
-            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
-          >
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {empDisplayName(emp)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Course Name *</span>
+          <span className="font-medium">Title *</span>
           <Input
-            value={form.course_name}
-            onChange={(e) => setForm((f) => ({ ...f, course_name: e.target.value }))}
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             placeholder="ISO 9001 Internal Auditor…"
             required
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Provider</span>
+          <span className="font-medium">Trainer</span>
           <Input
-            value={form.provider}
-            onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-            placeholder="TÜV, SGS, internal…"
+            value={form.trainer}
+            onChange={(e) => setForm((f) => ({ ...f, trainer: e.target.value }))}
+            placeholder="John Smith"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Start Date</span>
+          <span className="font-medium">Location</span>
           <Input
-            type="date"
-            value={form.started_at}
-            onChange={(e) => setForm((f) => ({ ...f, started_at: e.target.value }))}
+            value={form.location}
+            onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+            placeholder="Bangkok / Online"
           />
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Start Date</span>
+            <Input
+              type="date"
+              value={form.start_date}
+              onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">End Date</span>
+            <Input
+              type="date"
+              value={form.end_date}
+              onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+            />
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Max Participants</span>
+            <Input
+              type="number"
+              value={form.max_participants}
+              onChange={(e) => setForm((f) => ({ ...f, max_participants: e.target.value }))}
+              min="1"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Status</span>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {STATUS_VALUES.map((s) => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Create Session"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function EditTrainingDialog({
+  record,
+  onClose,
+  onUpdated,
+}: {
+  record: TrainingRecord | null;
+  onClose: () => void;
+  onUpdated: (r: TrainingRecord) => void;
+}) {
+  const [status, setStatus] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (record) {
+      setStatus(record.status);
+      setError(null);
+    }
+  }, [record]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!record) return;
+    setLoading(true);
+    try {
+      const updated = await updateTrainingRecord(record.id, { status });
+      onUpdated(updated);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={record !== null} onClose={onClose} title="Edit Training Session">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[320px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        {record && (
+          <div className="text-sm text-ink-2 font-medium border-b border-line pb-2 mb-1">{record.title}</div>
+        )}
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Expiry Date</span>
-          <Input
-            type="date"
-            value={form.expiry_date}
-            onChange={(e) => setForm((f) => ({ ...f, expiry_date: e.target.value }))}
-          />
+          <span className="font-medium">Status</span>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {STATUS_VALUES.map((s) => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
         </label>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" size="sm" type="button" onClick={onClose}>
-            Cancel
-          </Button>
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
           <Button variant="primary" size="sm" type="submit" disabled={loading}>
-            {loading ? "Saving…" : "Add Record"}
+            {loading ? "Saving…" : "Save Changes"}
           </Button>
         </div>
       </form>
@@ -161,44 +229,47 @@ function NewTrainingDialog({
 export default function HRTrainingPage() {
   const router = useRouter();
   const [records, setRecords] = useState<TrainingRecord[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [editing, setEditing] = useState<TrainingRecord | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.allSettled([
-      listTrainingRecords(statusFilter ? { status: statusFilter } : undefined),
-      listEmployees(),
-    ])
-      .then(([rr, er]) => {
-        setRecords(rr.status === "fulfilled" ? rr.value : []);
-        setEmployees(er.status === "fulfilled" ? er.value.items : []);
-      })
+    listTrainingRecords(statusFilter ? { status: statusFilter } : undefined)
+      .then(setRecords)
+      .catch(() => setRecords([]))
       .finally(() => setLoading(false));
   }, [statusFilter]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  const expiringSoon = records.filter((r) => {
-    if (!r.expiry_date) return false;
-    const days = (new Date(r.expiry_date).getTime() - Date.now()) / 86400000;
-    return days >= 0 && days <= 30;
-  }).length;
+  async function handleDelete(rec: TrainingRecord) {
+    if (!confirm(`Cancel "${rec.title}"? This cannot be undone.`)) return;
+    setDeleting(rec.id);
+    setDeleteError(null);
+    try {
+      await deleteTrainingRecord(rec.id);
+      setRecords((prev) => prev.filter((r) => r.id !== rec.id));
+    } catch (err) {
+      setDeleteError(String(err));
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <Breadcrumb items={[{ label: "HR", href: "/hr/home" }, { label: "Training Records" }]} />
+      <Breadcrumb items={[{ label: "HR", href: "/hr/home" }, { label: "Training Sessions" }]} />
       <CommandBar
-        actions={[{ id: "new", label: "+ Add Record", variant: "primary" as const, onClick: () => setNewOpen(true) }]}
+        actions={[{ id: "new", label: "+ New Session", variant: "primary" as const, onClick: () => setNewOpen(true) }]}
       />
 
-      {expiringSoon > 0 && (
-        <div className="rounded border border-warning/30 bg-warning/5 px-4 py-2 text-sm text-warning">
-          ⚠ {expiringSoon} certification{expiringSoon > 1 ? "s" : ""} expiring within 30 days
+      {deleteError && (
+        <div className="rounded border border-danger/30 bg-danger/5 px-4 py-2 text-sm text-danger">
+          {deleteError}
         </div>
       )}
 
@@ -225,60 +296,64 @@ export default function HRTrainingPage() {
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-ink-3">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">Employee</th>
-                <th className="px-4 py-2 text-left font-medium">Course</th>
-                <th className="px-4 py-2 text-left font-medium">Provider</th>
-                <th className="px-4 py-2 text-left font-medium">Started</th>
-                <th className="px-4 py-2 text-left font-medium">Expires</th>
-                <th className="px-4 py-2 text-left font-medium">Cert #</th>
+                <th className="px-4 py-2 text-left font-medium">Title</th>
+                <th className="px-4 py-2 text-left font-medium">Trainer</th>
+                <th className="px-4 py-2 text-left font-medium">Location</th>
+                <th className="px-4 py-2 text-left font-medium">Start</th>
+                <th className="px-4 py-2 text-left font-medium">End</th>
+                <th className="px-4 py-2 text-right font-medium">Max</th>
                 <th className="px-4 py-2 text-left font-medium">Status</th>
+                <th className="px-4 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-ink-3">
-                    No training records found.
+                  <td colSpan={8} className="px-4 py-6 text-center text-ink-3">
+                    No training sessions found.
                   </td>
                 </tr>
               ) : (
-                records.map((rec) => {
-                  const expiring =
-                    rec.expiry_date &&
-                    (new Date(rec.expiry_date).getTime() - Date.now()) / 86400000 <= 30 &&
-                    (new Date(rec.expiry_date).getTime() - Date.now()) / 86400000 >= 0;
-                  return (
-                    <tr
-                      key={rec.id}
-                      onClick={() => router.push('/hr/training/' + rec.id)}
-                      className={`hover:bg-surface-2/50 cursor-pointer ${expiring ? "bg-warning/5" : ""}`}
-                    >
-                      <td className="px-4 py-2 font-medium">
-                        {rec.employee_name ?? rec.employee_id}
-                      </td>
-                      <td className="px-4 py-2">{rec.course_name}</td>
-                      <td className="px-4 py-2 text-ink-3">{rec.provider ?? "—"}</td>
-                      <td className="px-4 py-2 text-ink-3">
-                        {rec.started_at ? new Date(rec.started_at).toLocaleDateString() : "—"}
-                      </td>
-                      <td
-                        className={`px-4 py-2 ${
-                          expiring ? "text-warning font-semibold" : "text-ink-3"
-                        }`}
-                      >
-                        {rec.expiry_date ? new Date(rec.expiry_date).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="px-4 py-2 font-mono text-xs text-ink-3">
-                        {rec.certificate_no ?? "—"}
-                      </td>
-                      <td className="px-4 py-2">
-                        <Tag tone={statusTone(rec.status)} size="sm">
-                          {rec.status}
-                        </Tag>
-                      </td>
-                    </tr>
-                  );
-                })
+                records.map((rec) => (
+                  <tr
+                    key={rec.id}
+                    className="hover:bg-surface-2/50 cursor-pointer"
+                    onClick={() => router.push("/hr/training/" + rec.id)}
+                  >
+                    <td className="px-4 py-2 font-medium">{rec.title}</td>
+                    <td className="px-4 py-2 text-ink-3">{rec.trainer ?? "—"}</td>
+                    <td className="px-4 py-2 text-ink-3">{rec.location ?? "—"}</td>
+                    <td className="px-4 py-2 text-ink-3">
+                      {rec.start_date ? new Date(rec.start_date).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-ink-3">
+                      {rec.end_date ? new Date(rec.end_date).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono text-xs text-ink-3">
+                      {rec.max_participants ?? "—"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <Tag tone={statusTone(rec.status)} size="sm">{rec.status}</Tag>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setEditing(rec)}
+                          className="rounded border border-line px-2 py-1 text-xs text-ink-2 hover:bg-surface-2 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rec)}
+                          disabled={deleting === rec.id || rec.status === "cancelled"}
+                          className="rounded border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/5 disabled:opacity-40 transition-colors"
+                        >
+                          {deleting === rec.id ? "…" : "Cancel"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -287,11 +362,19 @@ export default function HRTrainingPage() {
 
       <NewTrainingDialog
         open={newOpen}
-        employees={employees}
         onClose={() => setNewOpen(false)}
         onCreated={(rec) => {
           setRecords((p) => [rec, ...p]);
           setNewOpen(false);
+        }}
+      />
+
+      <EditTrainingDialog
+        record={editing}
+        onClose={() => setEditing(null)}
+        onUpdated={(updated) => {
+          setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          setEditing(null);
         }}
       />
     </div>

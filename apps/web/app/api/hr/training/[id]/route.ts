@@ -26,3 +26,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const r = await fetch(`${HR_URL}/v1/training/${id}`, { method: "PATCH", headers: h, body });
   return new NextResponse(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
 }
+
+export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
+  h.set("content-type", "application/json");
+  // Backend has no DELETE; soft-delete by setting status=cancelled
+  const r = await fetch(`${HR_URL}/v1/training/${id}`, {
+    method: "PATCH",
+    headers: h,
+    body: JSON.stringify({ status: "cancelled" }),
+  });
+  return new NextResponse(r.status === 204 ? null : await r.text(), { status: r.status });
+}

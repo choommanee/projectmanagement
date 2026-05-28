@@ -32,3 +32,20 @@ export async function PATCH(
   const r = await fetch(`${HR_URL}/v1/performance-reviews/${id}`, { method: "PATCH", headers: h, body });
   return new NextResponse(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
 }
+
+export async function DELETE(
+  _: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
+  h.set("content-type", "application/json");
+  // Backend has no DELETE; soft-delete by setting status=completed (terminal state)
+  const r = await fetch(`${HR_URL}/v1/performance-reviews/${id}`, {
+    method: "PATCH",
+    headers: h,
+    body: JSON.stringify({ status: "completed" }),
+  });
+  return new NextResponse(r.status === 204 ? null : await r.text(), { status: r.status });
+}
