@@ -146,3 +146,61 @@ func (s *PayrollRunStore) UpdateStatus(ctx context.Context, tid, id uuid.UUID, s
 	}
 	return s.GetByID(ctx, tid, id)
 }
+
+type UpdatePayrollRunInput struct {
+	Status          *domain.PayrunStatus `json:"status,omitempty"`
+	TotalGross      *float64             `json:"total_gross,omitempty"`
+	TotalDeductions *float64             `json:"total_deductions,omitempty"`
+	TotalNet        *float64             `json:"total_net,omitempty"`
+	EmployeeCount   *int                 `json:"employee_count,omitempty"`
+}
+
+func (s *PayrollRunStore) Update(ctx context.Context, tid, id uuid.UUID, in UpdatePayrollRunInput) (*domain.PayrollRun, error) {
+	sets := []string{}
+	args := []any{id, tid}
+	idx := 3
+	if in.Status != nil {
+		sets = append(sets, fmt.Sprintf("status=$%d", idx))
+		args = append(args, *in.Status)
+		idx++
+	}
+	if in.TotalGross != nil {
+		sets = append(sets, fmt.Sprintf("total_gross=$%d", idx))
+		args = append(args, *in.TotalGross)
+		idx++
+	}
+	if in.TotalDeductions != nil {
+		sets = append(sets, fmt.Sprintf("total_deductions=$%d", idx))
+		args = append(args, *in.TotalDeductions)
+		idx++
+	}
+	if in.TotalNet != nil {
+		sets = append(sets, fmt.Sprintf("total_net=$%d", idx))
+		args = append(args, *in.TotalNet)
+		idx++
+	}
+	if in.EmployeeCount != nil {
+		sets = append(sets, fmt.Sprintf("employee_count=$%d", idx))
+		args = append(args, *in.EmployeeCount)
+		idx++
+	}
+	if len(sets) == 0 {
+		return s.GetByID(ctx, tid, id)
+	}
+	sets = append(sets, "updated_at=now()")
+	sql := "UPDATE payroll_run SET " + strings.Join(sets, ", ") + " WHERE id=$1 AND tenant_id=$2"
+	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetByID(ctx, tid, id)
+}

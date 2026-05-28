@@ -115,7 +115,14 @@ func getTraining(svc *service.Service) http.HandlerFunc {
 }
 
 type patchTrainingReq struct {
-	Status string `json:"status"`
+	Title           *string `json:"title,omitempty"`
+	Description     *string `json:"description,omitempty"`
+	Trainer         *string `json:"trainer,omitempty"`
+	Location        *string `json:"location,omitempty"`
+	StartDate       *string `json:"start_date,omitempty"`
+	EndDate         *string `json:"end_date,omitempty"`
+	Status          *string `json:"status,omitempty"`
+	MaxParticipants *int    `json:"max_participants,omitempty"`
 }
 
 func patchTraining(svc *service.Service) http.HandlerFunc {
@@ -134,11 +141,28 @@ func patchTraining(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Status == "" {
-			writeErr(w, 400, errors.New("status required"))
-			return
+		in := store.UpdateTrainingInput{
+			Title:           req.Title,
+			Description:     req.Description,
+			Trainer:         req.Trainer,
+			Location:        req.Location,
+			MaxParticipants: req.MaxParticipants,
 		}
-		tr, err := svc.Training.UpdateStatus(r.Context(), tid, id, domain.TrainingStatus(req.Status))
+		if req.Status != nil {
+			s := domain.TrainingStatus(*req.Status)
+			in.Status = &s
+		}
+		if req.StartDate != nil {
+			if t, err := time.Parse("2006-01-02", *req.StartDate); err == nil {
+				in.StartDate = &t
+			}
+		}
+		if req.EndDate != nil {
+			if t, err := time.Parse("2006-01-02", *req.EndDate); err == nil {
+				in.EndDate = &t
+			}
+		}
+		tr, err := svc.UpdateTraining(r.Context(), tid, id, in)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeErr(w, 404, err)
@@ -254,7 +278,14 @@ func getJob(svc *service.Service) http.HandlerFunc {
 }
 
 type patchJobReq struct {
-	Status string `json:"status"`
+	Title        *string  `json:"title,omitempty"`
+	Description  *string  `json:"description,omitempty"`
+	Requirements *string  `json:"requirements,omitempty"`
+	Status       *string  `json:"status,omitempty"`
+	SalaryMin    *float64 `json:"salary_min,omitempty"`
+	SalaryMax    *float64 `json:"salary_max,omitempty"`
+	Openings     *int     `json:"openings,omitempty"`
+	ClosesDate   *string  `json:"closes_date,omitempty"`
 }
 
 func patchJob(svc *service.Service) http.HandlerFunc {
@@ -273,11 +304,23 @@ func patchJob(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Status == "" {
-			writeErr(w, 400, errors.New("status required"))
-			return
+		in := store.UpdateJobInput{
+			Title:        req.Title,
+			Description:  req.Description,
+			Requirements: req.Requirements,
+			SalaryMin:    req.SalaryMin,
+			SalaryMax:    req.SalaryMax,
 		}
-		job, err := svc.Jobs.UpdateStatus(r.Context(), tid, id, domain.JobStatus(req.Status))
+		if req.Status != nil {
+			s := domain.JobStatus(*req.Status)
+			in.Status = &s
+		}
+		if req.ClosesDate != nil {
+			if t, err := time.Parse("2006-01-02", *req.ClosesDate); err == nil {
+				in.ClosesDate = &t
+			}
+		}
+		job, err := svc.UpdateJob(r.Context(), tid, id, in)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeErr(w, 404, err)
@@ -492,7 +535,10 @@ func getPerformanceReview(svc *service.Service) http.HandlerFunc {
 }
 
 type patchReviewReq struct {
-	Status string `json:"status"`
+	Status          *string `json:"status,omitempty"`
+	Score           *int    `json:"score,omitempty"`
+	Comments        *string `json:"comments,omitempty"`
+	ManagerComments *string `json:"manager_comments,omitempty"`
 }
 
 func patchPerformanceReview(svc *service.Service) http.HandlerFunc {
@@ -511,11 +557,16 @@ func patchPerformanceReview(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Status == "" {
-			writeErr(w, 400, errors.New("status required"))
-			return
+		in := store.UpdateReviewInput{
+			Score:           req.Score,
+			Comments:        req.Comments,
+			ManagerComments: req.ManagerComments,
 		}
-		rv, err := svc.PerformanceReviews.UpdateStatus(r.Context(), tid, id, domain.ReviewStatus(req.Status))
+		if req.Status != nil {
+			s := domain.ReviewStatus(*req.Status)
+			in.Status = &s
+		}
+		rv, err := svc.UpdatePerformanceReview(r.Context(), tid, id, in)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeErr(w, 404, err)
@@ -616,7 +667,11 @@ func getPayrollRun(svc *service.Service) http.HandlerFunc {
 }
 
 type patchPayrollRunReq struct {
-	Status string `json:"status"`
+	Status          *string  `json:"status,omitempty"`
+	TotalGross      *float64 `json:"total_gross,omitempty"`
+	TotalDeductions *float64 `json:"total_deductions,omitempty"`
+	TotalNet        *float64 `json:"total_net,omitempty"`
+	EmployeeCount   *int     `json:"employee_count,omitempty"`
 }
 
 func patchPayrollRun(svc *service.Service) http.HandlerFunc {
@@ -635,11 +690,17 @@ func patchPayrollRun(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.Status == "" {
-			writeErr(w, 400, errors.New("status required"))
-			return
+		in := store.UpdatePayrollRunInput{
+			TotalGross:      req.TotalGross,
+			TotalDeductions: req.TotalDeductions,
+			TotalNet:        req.TotalNet,
+			EmployeeCount:   req.EmployeeCount,
 		}
-		pr, err := svc.PayrollRuns.UpdateStatus(r.Context(), tid, id, domain.PayrunStatus(req.Status))
+		if req.Status != nil {
+			s := domain.PayrunStatus(*req.Status)
+			in.Status = &s
+		}
+		pr, err := svc.UpdatePayrollRun(r.Context(), tid, id, in)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeErr(w, 404, err)

@@ -1,6 +1,11 @@
 package service
 
 import (
+	"context"
+
+	"github.com/google/uuid"
+
+	"github.com/pmplatform/services/hr-svc/internal/domain"
 	"github.com/pmplatform/services/hr-svc/internal/store"
 )
 
@@ -39,4 +44,20 @@ func New(
 		PerformanceReviews: performanceReviews,
 		PayrollRuns:        payrollRuns,
 	}
+}
+
+func (s *Service) UpdateTraining(ctx context.Context, tid, id uuid.UUID, in store.UpdateTrainingInput) (*domain.Training, error) {
+	return s.Training.Update(ctx, tid, id, in)
+}
+
+func (s *Service) UpdateJob(ctx context.Context, tid, id uuid.UUID, in store.UpdateJobInput) (*domain.JobPosting, error) {
+	return s.Jobs.Update(ctx, tid, id, in)
+}
+
+func (s *Service) UpdatePerformanceReview(ctx context.Context, tid, id uuid.UUID, in store.UpdateReviewInput) (*domain.PerformanceReview, error) {
+	return s.PerformanceReviews.Update(ctx, tid, id, in)
+}
+
+func (s *Service) UpdatePayrollRun(ctx context.Context, tid, id uuid.UUID, in store.UpdatePayrollRunInput) (*domain.PayrollRun, error) {
+	return s.PayrollRuns.Update(ctx, tid, id, in)
 }

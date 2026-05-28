@@ -153,3 +153,56 @@ func (s *PerformanceReviewStore) UpdateStatus(ctx context.Context, tid, id uuid.
 	}
 	return s.GetByID(ctx, tid, id)
 }
+
+type UpdateReviewInput struct {
+	Status          *domain.ReviewStatus `json:"status,omitempty"`
+	Score           *int                 `json:"score,omitempty"`
+	Comments        *string              `json:"comments,omitempty"`
+	ManagerComments *string              `json:"manager_comments,omitempty"`
+	ReviewedAt      *time.Time           `json:"reviewed_at,omitempty"`
+}
+
+func (s *PerformanceReviewStore) Update(ctx context.Context, tid, id uuid.UUID, in UpdateReviewInput) (*domain.PerformanceReview, error) {
+	sets := []string{}
+	args := []any{id, tid}
+	idx := 3
+	if in.Status != nil {
+		sets = append(sets, fmt.Sprintf("status=$%d", idx))
+		args = append(args, *in.Status)
+		idx++
+	}
+	if in.Score != nil {
+		sets = append(sets, fmt.Sprintf("overall_rating=$%d", idx))
+		args = append(args, *in.Score)
+		idx++
+	}
+	if in.Comments != nil {
+		sets = append(sets, fmt.Sprintf("self_comments=$%d", idx))
+		args = append(args, *in.Comments)
+		idx++
+	}
+	if in.ManagerComments != nil {
+		sets = append(sets, fmt.Sprintf("manager_comments=$%d", idx))
+		args = append(args, *in.ManagerComments)
+		idx++
+	}
+	if len(sets) == 0 {
+		return s.GetByID(ctx, tid, id)
+	}
+	sets = append(sets, "updated_at=now()")
+	sql := "UPDATE performance_review SET " + strings.Join(sets, ", ") + " WHERE id=$1 AND tenant_id=$2"
+	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetByID(ctx, tid, id)
+}

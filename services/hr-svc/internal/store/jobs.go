@@ -155,6 +155,76 @@ func (s *JobStore) UpdateStatus(ctx context.Context, tid, id uuid.UUID, status d
 	return s.GetByID(ctx, tid, id)
 }
 
+type UpdateJobInput struct {
+	Title        *string           `json:"title,omitempty"`
+	Description  *string           `json:"description,omitempty"`
+	Requirements *string           `json:"requirements,omitempty"`
+	Status       *domain.JobStatus `json:"status,omitempty"`
+	SalaryMin    *float64          `json:"salary_min,omitempty"`
+	SalaryMax    *float64          `json:"salary_max,omitempty"`
+	ClosesDate   *time.Time        `json:"closes_date,omitempty"`
+}
+
+func (s *JobStore) Update(ctx context.Context, tid, id uuid.UUID, in UpdateJobInput) (*domain.JobPosting, error) {
+	sets := []string{}
+	args := []any{id, tid}
+	idx := 3
+	if in.Title != nil {
+		sets = append(sets, fmt.Sprintf("title=$%d", idx))
+		args = append(args, *in.Title)
+		idx++
+	}
+	if in.Description != nil {
+		sets = append(sets, fmt.Sprintf("description=$%d", idx))
+		args = append(args, *in.Description)
+		idx++
+	}
+	if in.Requirements != nil {
+		sets = append(sets, fmt.Sprintf("requirements=$%d", idx))
+		args = append(args, *in.Requirements)
+		idx++
+	}
+	if in.Status != nil {
+		sets = append(sets, fmt.Sprintf("status=$%d", idx))
+		args = append(args, *in.Status)
+		idx++
+	}
+	if in.SalaryMin != nil {
+		sets = append(sets, fmt.Sprintf("salary_min=$%d", idx))
+		args = append(args, *in.SalaryMin)
+		idx++
+	}
+	if in.SalaryMax != nil {
+		sets = append(sets, fmt.Sprintf("salary_max=$%d", idx))
+		args = append(args, *in.SalaryMax)
+		idx++
+	}
+	if in.ClosesDate != nil {
+		sets = append(sets, fmt.Sprintf("closes_date=$%d", idx))
+		args = append(args, *in.ClosesDate)
+		idx++
+	}
+	if len(sets) == 0 {
+		return s.GetByID(ctx, tid, id)
+	}
+	sets = append(sets, "updated_at=now()")
+	sql := "UPDATE job_posting SET " + strings.Join(sets, ", ") + " WHERE id=$1 AND tenant_id=$2"
+	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.GetByID(ctx, tid, id)
+}
+
 // ---- Applicants ----
 
 const applicantSelect = `
