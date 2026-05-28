@@ -53,11 +53,24 @@ export async function proxyHeaders(): Promise<Headers | { error: string; status:
   const jar = await cookies();
   let at = jar.get("access_token")?.value ?? null;
 
-  // Auto-refresh if expired or missing
+  // Auto-refresh if expired or missing — persist new token back to cookie
   if (isTokenExpiredOrMissing(at)) {
     const rt = jar.get("refresh_token")?.value;
     if (rt) {
       at = await refreshAccessToken(rt);
+      if (at) {
+        try {
+          jar.set("access_token", at, {
+            httpOnly: true,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 15 * 60,
+          });
+        } catch {
+          // cookies().set() may throw outside a mutable context — ignore
+        }
+      }
     }
   }
 
