@@ -428,7 +428,10 @@ export async function createWorkflowFromTemplate(templateId: string, name: strin
     body: JSON.stringify({ name }),
   });
   if (!r.ok) throw new Error(`create from template failed: ${r.status}`);
-  return normWorkflowDef(await r.json());
+  const body = await r.json() as Record<string, unknown>;
+  // Backend returns { workflow: {...}, version: {...} }
+  const wfRaw = (body["workflow"] ?? body) as Record<string, unknown>;
+  return normWorkflowDef(wfRaw);
 }
 
 export async function cancelInstance(id: string): Promise<void> {
