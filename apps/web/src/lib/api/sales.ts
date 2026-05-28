@@ -153,10 +153,15 @@ export async function getSalesOrder(id: string): Promise<SalesOrder> {
   return normSalesOrder(await r.json());
 }
 
-export async function updateSalesOrder(id: string, patch: { status?: SOStatus; requested_date?: string | null; notes?: string }): Promise<SalesOrder> {
+export async function updateSalesOrder(id: string, patch: { status?: SOStatus; requested_date?: string | null; notes?: string; version?: number }): Promise<SalesOrder> {
   const r = await apiFetch(`${SVC}/sales-orders/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateSalesOrder failed: ${r.status}`); }
   return normSalesOrder(await r.json());
+}
+
+export async function deleteSalesOrder(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/sales-orders/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteSalesOrder failed: ${r.status}`); }
 }
 
 export async function addSOLine(soId: string, line: { item_id?: string; item_desc: string; qty_ordered: number; unit_price?: number; notes?: string }): Promise<SOLine> {
@@ -229,6 +234,23 @@ export async function updateQuoteStatus(id: string, status: QuoteStatus): Promis
   if (!r.ok) throw new Error(await r.text());
 }
 
+export async function updateQuote(id: string, patch: Partial<{ title: string; status: QuoteStatus; valid_until: string; notes: string; version: number }>): Promise<Quote> {
+  const r = await apiFetch(`/api/sales/quotations/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteQuote(id: string): Promise<void> {
+  const r = await apiFetch(`/api/sales/quotations/${id}`, {
+    method: "DELETE",
+  });
+  if (!r.ok && r.status !== 204) throw new Error(await r.text());
+}
+
 export async function convertQuoteToOrder(quoteId: string): Promise<SalesOrder> {
   const r = await apiFetch(`/api/sales/quotations/${quoteId}/convert`, {
     method: "POST",
@@ -292,6 +314,21 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
   if (!r.ok) throw new Error(await r.text());
 }
 
+export async function updateInvoice(id: string, patch: Partial<{ status: InvoiceStatus; due_date: string; notes: string; version: number }>): Promise<SalesInvoice> {
+  const r = await apiFetch(`/api/sales/invoices/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function deleteSalesInvoice(id: string): Promise<void> {
+  const r = await apiFetch(`/api/sales/invoices/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) throw new Error(await r.text());
+}
+
 export async function getSalesInvoice(id: string): Promise<SalesInvoice> {
   const r = await apiFetch(`${SVC}/invoices/${id}`);
   if (!r.ok) throw new Error(`getSalesInvoice: ${r.status}`);
@@ -350,6 +387,17 @@ export async function createShipment(input: { so_id: string; notes?: string }): 
 export async function updateShipmentStatus(id: string, status: ShipmentStatus): Promise<void> {
   const r = await apiFetch(`${SVC}/shipments/${id}/status`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateShipmentStatus failed: ${r.status}`); }
+}
+
+export async function updateShipment(id: string, patch: Partial<{ status: ShipmentStatus; tracking_no: string; carrier: string; ship_date: string; notes: string }>): Promise<Shipment> {
+  const r = await apiFetch(`${SVC}/shipments/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateShipment failed: ${r.status}`); }
+  return normShipment(await r.json());
+}
+
+export async function deleteShipment(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/shipments/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteShipment failed: ${r.status}`); }
 }
 
 export async function getShipment(id: string): Promise<Shipment> {
@@ -437,6 +485,7 @@ export async function updateOpportunity(id: string, patch: Partial<{
   probability: number;
   expected_close_date: string;
   notes: string;
+  title: string;
 }>): Promise<Opportunity> {
   const r = await apiFetch(`${SVC}/opportunities/${id}`, {
     method: "PATCH",
@@ -445,4 +494,9 @@ export async function updateOpportunity(id: string, patch: Partial<{
   });
   if (!r.ok) throw new Error(`updateOpportunity failed: ${r.status}`);
   return normOpportunity(await r.json());
+}
+
+export async function deleteOpportunity(id: string): Promise<void> {
+  const r = await apiFetch(`${SVC}/opportunities/${id}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 204) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteOpportunity failed: ${r.status}`); }
 }

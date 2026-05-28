@@ -8,6 +8,8 @@ import {
   listSalesInvoices,
   createSalesInvoice,
   updateInvoiceStatus,
+  updateInvoice,
+  deleteSalesInvoice,
   listCustomers,
   type SalesInvoice,
   type InvoiceStatus,
@@ -21,6 +23,8 @@ const STATUS_OPTS = [
   { value: "paid", label: "Paid" },
   { value: "overdue", label: "Overdue" },
 ];
+
+const EDITABLE_STATUSES: InvoiceStatus[] = ["draft", "sent", "paid", "overdue", "cancelled"];
 
 function statusTone(s: string): "neutral" | "info" | "success" | "danger" | "warning" {
   if (s === "draft") return "neutral";
@@ -136,6 +140,100 @@ function NewInvoiceDialog({
   );
 }
 
+function EditInvoiceDialog({
+  invoice,
+  onClose,
+  onSaved,
+}: {
+  invoice: SalesInvoice | null;
+  onClose: () => void;
+  onSaved: (inv: SalesInvoice) => void;
+}) {
+  const [form, setForm] = useState({ status: "draft" as InvoiceStatus, due_date: "", notes: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (invoice) {
+      setForm({
+        status: invoice.status,
+        due_date: invoice.due_date ? invoice.due_date.split("T")[0] : "",
+        notes: invoice.notes ?? "",
+      });
+      setError(null);
+    }
+  }, [invoice]);
+
+  if (!invoice) return null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!invoice) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch current version
+      const cur = await fetch(`/api/sales/invoices/${invoice.id}`).then(r => r.json()) as Record<string, unknown>;
+      const version = (cur.Version ?? cur.version ?? 1) as number;
+      const updated = await updateInvoice(invoice.id, {
+        status: form.status,
+        due_date: form.due_date || undefined,
+        notes: form.notes || undefined,
+        version,
+      });
+      onSaved({ ...invoice, ...updated });
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!invoice} onClose={onClose} title="Edit Invoice">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Status</span>
+          <select
+            value={form.status}
+            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as InvoiceStatus }))}
+            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {EDITABLE_STATUSES.map((s) => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Due Date</span>
+          <Input
+            type="date"
+            value={form.due_date}
+            onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Notes</span>
+          <Input
+            value={form.notes}
+            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            placeholder="Reference, terms…"
+          />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 export default function SalesInvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
@@ -143,6 +241,7 @@ export default function SalesInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [editInvoice, setEditInvoice] = useState<SalesInvoice | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -167,6 +266,19 @@ export default function SalesInvoicesPage() {
     try {
       await updateInvoiceStatus(id, status);
       load();
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this invoice? It will be marked as cancelled.")) return;
+    setProcessing(id);
+    try {
+      await deleteSalesInvoice(id);
+      setInvoices((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      alert(`Delete failed: ${err}`);
     } finally {
       setProcessing(null);
     }
@@ -251,7 +363,7 @@ export default function SalesInvoicesPage() {
                       </Tag>
                     </td>
                     <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
                         {inv.status === "draft" && (
                           <Button
                             size="sm"
@@ -272,6 +384,22 @@ export default function SalesInvoicesPage() {
                             Mark Paid
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditInvoice(inv)}
+                          disabled={processing === inv.id}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(inv.id)}
+                          disabled={processing === inv.id}
+                        >
+                          <span className="text-danger">Del</span>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -289,6 +417,15 @@ export default function SalesInvoicesPage() {
         onCreated={(inv) => {
           setInvoices((p) => [inv, ...p]);
           setNewOpen(false);
+        }}
+      />
+
+      <EditInvoiceDialog
+        invoice={editInvoice}
+        onClose={() => setEditInvoice(null)}
+        onSaved={(updated) => {
+          setInvoices((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+          setEditInvoice(null);
         }}
       />
     </div>

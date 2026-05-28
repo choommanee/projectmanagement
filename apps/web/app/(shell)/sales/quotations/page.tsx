@@ -5,7 +5,8 @@ import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
 import {
-  listQuotes, createQuote, updateQuoteStatus, listCustomers, convertQuoteToOrder,
+  listQuotes, createQuote, updateQuoteStatus, updateQuote, deleteQuote,
+  listCustomers, convertQuoteToOrder,
   type Quote, type QuoteStatus, type Customer,
 } from "@/lib/api/sales";
 
@@ -108,6 +109,94 @@ function NewQuoteDialog({
   );
 }
 
+function EditQuoteDialog({
+  quote, onClose, onSaved,
+}: {
+  quote: Quote | null;
+  onClose: () => void;
+  onSaved: (q: Quote) => void;
+}) {
+  const [form, setForm] = useState({ title: "", valid_until: "", notes: "", status: "draft" as QuoteStatus });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (quote) {
+      setForm({
+        title: quote.title ?? "",
+        valid_until: quote.valid_until ? quote.valid_until.split("T")[0] : "",
+        notes: quote.notes ?? "",
+        status: quote.status,
+      });
+      setError(null);
+    }
+  }, [quote]);
+
+  if (!quote) return null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!quote) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch current version first
+      const cur = await fetch(`/api/sales/quotations/${quote.id}`).then(r => r.json()) as Record<string, unknown>;
+      const version = (cur.Version ?? cur.version ?? 1) as number;
+      const updated = await updateQuote(quote.id, {
+        title: form.title || undefined,
+        valid_until: form.valid_until || undefined,
+        notes: form.notes || undefined,
+        status: form.status,
+        version,
+      });
+      onSaved({ ...quote, ...updated });
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!quote} onClose={onClose} title="Edit Quotation">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Title</span>
+          <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Quote title…" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Status</span>
+          <select
+            value={form.status}
+            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as QuoteStatus }))}
+            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {STATUS_OPTIONS.filter(o => o.value).map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Valid Until</span>
+          <Input type="date" value={form.valid_until} onChange={(e) => setForm((f) => ({ ...f, valid_until: e.target.value }))} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Notes</span>
+          <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Internal notes…" />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 export default function SalesQuotationsPage() {
   const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -115,6 +204,7 @@ export default function SalesQuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [editQuote, setEditQuote] = useState<Quote | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -142,6 +232,17 @@ export default function SalesQuotationsPage() {
       router.push("/sales/orders");
     } catch (err) {
       alert(`Failed to convert: ${err}`);
+    } finally { setProcessing(null); }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this quotation? It will be marked as rejected.")) return;
+    setProcessing(id);
+    try {
+      await deleteQuote(id);
+      setQuotes((prev) => prev.filter((q) => q.id !== id));
+    } catch (err) {
+      alert(`Delete failed: ${err}`);
     } finally { setProcessing(null); }
   }
 
@@ -197,8 +298,8 @@ export default function SalesQuotationsPage() {
                   <td className="px-4 py-2">
                     <Tag tone={statusTone(q.status)} size="sm">{q.status}</Tag>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex gap-1">
+                  <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1 flex-wrap">
                       {q.status === "draft" && (
                         <Button size="sm" variant="ghost" onClick={() => updateStatus(q.id, "sent")} disabled={processing === q.id}>
                           Send
@@ -219,6 +320,22 @@ export default function SalesQuotationsPage() {
                           Convert to SO
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditQuote(q)}
+                        disabled={processing === q.id}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(q.id)}
+                        disabled={processing === q.id}
+                      >
+                        <span className="text-danger">Del</span>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -233,6 +350,15 @@ export default function SalesQuotationsPage() {
         customers={customers}
         onClose={() => setNewOpen(false)}
         onCreated={(q) => { setQuotes((prev) => [q, ...prev]); setNewOpen(false); }}
+      />
+
+      <EditQuoteDialog
+        quote={editQuote}
+        onClose={() => setEditQuote(null)}
+        onSaved={(updated) => {
+          setQuotes((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+          setEditQuote(null);
+        }}
       />
     </div>
   );

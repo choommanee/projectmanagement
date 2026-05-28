@@ -5,7 +5,7 @@ import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog } from "@pmplatform/ui-kit";
 import {
-  listSalesOrders, createSalesOrder, updateSalesOrder, getSalesOrder,
+  listSalesOrders, createSalesOrder, updateSalesOrder, deleteSalesOrder, getSalesOrder,
   listCustomers, addSOLine,
   type SalesOrder, type SOLine, type SOStatus, type Customer,
 } from "@/lib/api/sales";
@@ -119,6 +119,90 @@ function NewSODialog({
   );
 }
 
+// ─── Edit SO Dialog ───────────────────────────────────────────────────────────
+
+function EditSODialog({
+  so, onClose, onSaved,
+}: {
+  so: SalesOrder | null;
+  onClose: () => void;
+  onSaved: (updated: SalesOrder) => void;
+}) {
+  const [form, setForm] = useState({ status: "draft" as SOStatus, requested_date: "", notes: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (so) {
+      setForm({
+        status: so.status,
+        requested_date: so.requestedDate ? so.requestedDate.split("T")[0] : "",
+        notes: so.notes ?? "",
+      });
+      setError(null);
+    }
+  }, [so]);
+
+  if (!so) return null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!so) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch current version
+      const cur = await fetch(`/api/sales/sales-orders/${so.id}`).then(r => r.json()) as Record<string, unknown>;
+      const version = (cur.Version ?? cur.version ?? 1) as number;
+      const updated = await updateSalesOrder(so.id, {
+        status: form.status,
+        requested_date: form.requested_date || null,
+        notes: form.notes,
+        version,
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!so} onClose={onClose} title="Edit Sales Order">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Status</label>
+          <select
+            value={form.status}
+            onChange={(e) => setForm(f => ({ ...f, status: e.target.value as SOStatus }))}
+            className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            {SO_STATUSES.filter(s => s.value).map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Requested Date</label>
+          <Input type="date" value={form.requested_date} onChange={(e) => setForm(f => ({ ...f, requested_date: e.target.value }))} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Notes</label>
+          <Input value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 // ─── Add Line Row ─────────────────────────────────────────────────────────────
 
 function AddSOLineRow({ soId, onAdded }: { soId: string; onAdded: (line: SOLine) => void }) {
@@ -209,11 +293,13 @@ function AddSOLineRow({ soId, onAdded }: { soId: string; onAdded: (line: SOLine)
 // ─── SO Detail ─────────────────────────────────────────────────────────────────
 
 function SODetail({
-  so: initialSo, customerMap, onStatusChanged,
+  so: initialSo, customerMap, onStatusChanged, onEditRequest, onDeleteRequest,
 }: {
   so: SalesOrder;
   customerMap: Map<string, Customer>;
   onStatusChanged: (so: SalesOrder) => void;
+  onEditRequest: (so: SalesOrder) => void;
+  onDeleteRequest: (so: SalesOrder) => void;
 }) {
   const [so, setSo] = useState(initialSo);
   const [addingLine, setAddingLine] = useState(false);
@@ -236,7 +322,10 @@ function SODetail({
     setStatusLoading(true);
     setError(null);
     try {
-      const updated = await updateSalesOrder(so.id, { status: t.next });
+      // Fetch current version
+      const cur = await fetch(`/api/sales/sales-orders/${so.id}`).then(r => r.json()) as Record<string, unknown>;
+      const version = (cur.Version ?? cur.version ?? 1) as number;
+      const updated = await updateSalesOrder(so.id, { status: t.next, version });
       setSo(updated);
       onStatusChanged(updated);
     } catch (e) {
@@ -263,15 +352,29 @@ function SODetail({
               {customer ? `${customer.code} — ${customer.name}` : so.customerId}
             </div>
           </div>
-          {transition && (
+          <div className="flex items-center gap-2">
+            {transition && (
+              <button
+                onClick={() => void advance()}
+                disabled={statusLoading}
+                className="rounded-xs border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-50"
+              >
+                {transition.label}
+              </button>
+            )}
             <button
-              onClick={() => void advance()}
-              disabled={statusLoading}
-              className="rounded-xs border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-50"
+              onClick={() => onEditRequest(so)}
+              className="rounded-xs border border-line px-3 py-1 text-xs font-medium text-ink-2 hover:bg-surface-2"
             >
-              {transition.label}
+              Edit
             </button>
-          )}
+            <button
+              onClick={() => onDeleteRequest(so)}
+              className="rounded-xs border border-danger/40 px-3 py-1 text-xs font-medium text-danger hover:bg-danger/10"
+            >
+              Delete
+            </button>
+          </div>
         </div>
         <div className="mt-2 grid grid-cols-3 gap-4 text-xs">
           <div>
@@ -364,6 +467,7 @@ export default function SalesOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newSOOpen, setNewSOOpen] = useState(false);
+  const [editSO, setEditSO] = useState<SalesOrder | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -401,6 +505,17 @@ export default function SalesOrdersPage() {
     setNewSOOpen(false);
     setOrders(prev => [so, ...prev]);
     void handleSelectSO(so);
+  }
+
+  async function handleDelete(so: SalesOrder) {
+    if (!confirm(`Delete sales order ${so.soNumber || so.id.slice(0, 8)}? It will be marked as cancelled.`)) return;
+    try {
+      await deleteSalesOrder(so.id);
+      setOrders(prev => prev.filter(o => o.id !== so.id));
+      if (selected?.id === so.id) setSelected(null);
+    } catch (err) {
+      alert(`Delete failed: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   return (
@@ -481,6 +596,8 @@ export default function SalesOrdersPage() {
                   return prev;
                 });
               }}
+              onEditRequest={(so) => setEditSO(so)}
+              onDeleteRequest={handleDelete}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-ink-3">
@@ -495,6 +612,20 @@ export default function SalesOrdersPage() {
         customers={customers}
         onClose={() => setNewSOOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <EditSODialog
+        so={editSO}
+        onClose={() => setEditSO(null)}
+        onSaved={(updated) => {
+          setSelected(updated);
+          setOrders(prev => {
+            const idx = prev.findIndex(o => o.id === updated.id);
+            if (idx >= 0) { const n = [...prev]; n[idx] = updated; return n; }
+            return prev;
+          });
+          setEditSO(null);
+        }}
       />
     </div>
   );

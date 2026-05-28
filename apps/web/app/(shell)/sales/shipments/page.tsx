@@ -2,9 +2,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { Button, Tag, Dialog, Input } from "@pmplatform/ui-kit";
 import {
   listShipments,
   createShipment,
+  updateShipment,
+  deleteShipment,
   updateShipmentStatus,
   listSalesOrders,
   type Shipment,
@@ -23,13 +26,14 @@ const STATUS_TABS: { value: ShipmentStatus | ""; label: string }[] = [
   { value: "returned", label: "Returned" },
 ];
 
-const STATUS_BADGE: Record<ShipmentStatus, { bg: string; text: string; border: string }> = {
-  pending:   { bg: "bg-zinc-800",   text: "text-zinc-300",   border: "border-zinc-600" },
-  packed:    { bg: "bg-blue-950",   text: "text-blue-300",   border: "border-blue-700" },
-  shipped:   { bg: "bg-amber-950",  text: "text-amber-300",  border: "border-amber-700" },
-  delivered: { bg: "bg-emerald-950",text: "text-emerald-300",border: "border-emerald-800" },
-  returned:  { bg: "bg-red-950",    text: "text-red-300",    border: "border-red-700" },
-};
+function statusTone(s: ShipmentStatus): "neutral" | "info" | "accent" | "success" | "warning" | "danger" {
+  if (s === "pending") return "neutral";
+  if (s === "packed") return "info";
+  if (s === "shipped") return "accent";
+  if (s === "delivered") return "success";
+  if (s === "returned") return "warning";
+  return "neutral";
+}
 
 const NEXT_STATUS: Partial<Record<ShipmentStatus, ShipmentStatus>> = {
   pending:  "packed",
@@ -80,60 +84,135 @@ function NewShipmentDialog({
     }
   }
 
-  if (!open) return null;
+  return (
+    <Dialog open={open} onClose={onClose} title="New Shipment">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Sales Order *</span>
+          <select
+            value={soId}
+            onChange={(e) => setSoId(e.target.value)}
+            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">— select SO —</option>
+            {salesOrders.map((so) => (
+              <option key={so.id} value={so.id}>
+                {so.soNumber} {so.customerId ? `· ${so.customerId}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Notes</span>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional notes…"
+          />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Creating…" : "Create Shipment"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ── edit shipment dialog ────────────────────────────────────────────────────
+
+function EditShipmentDialog({
+  shipment,
+  onClose,
+  onSaved,
+}: {
+  shipment: Shipment | null;
+  onClose: () => void;
+  onSaved: (s: Shipment) => void;
+}) {
+  const [form, setForm] = useState({ status: "pending" as ShipmentStatus, tracking_no: "", carrier: "", ship_date: "", notes: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (shipment) {
+      setForm({
+        status: shipment.status,
+        tracking_no: "",
+        carrier: "",
+        ship_date: "",
+        notes: shipment.notes ?? "",
+      });
+      setError(null);
+    }
+  }, [shipment]);
+
+  if (!shipment) return null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shipment) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await updateShipment(shipment.id, {
+        status: form.status,
+        tracking_no: form.tracking_no || undefined,
+        carrier: form.carrier || undefined,
+        ship_date: form.ship_date || undefined,
+        notes: form.notes || undefined,
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-base font-semibold text-zinc-100 mb-4">New Shipment</h2>
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1 uppercase tracking-wide">Sales Order</label>
-            <select
-              value={soId}
-              onChange={(e) => setSoId(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400"
-            >
-              <option value="">-- Select SO --</option>
-              {salesOrders.map((so) => (
-                <option key={so.id} value={so.id}>
-                  {so.soNumber} {so.customerId ? `· ${so.customerId}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-400 mb-1 uppercase tracking-wide">Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-zinc-400 resize-none"
-              placeholder="Optional notes..."
-            />
-          </div>
-          {error && (
-            <p className="text-xs text-red-400 border border-red-800 bg-red-950 rounded px-3 py-2">{error}</p>
-          )}
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-1.5 text-sm rounded border border-zinc-600 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-1.5 text-sm rounded bg-zinc-700 text-zinc-100 hover:bg-zinc-600 disabled:opacity-50 transition-colors"
-            >
-              {loading ? "Creating..." : "Create Shipment"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Dialog open={!!shipment} onClose={onClose} title="Edit Shipment">
+      <form onSubmit={submit} className="flex flex-col gap-3 p-4 min-w-[360px]">
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Status</span>
+          <select
+            value={form.status}
+            onChange={(e) => setForm(f => ({ ...f, status: e.target.value as ShipmentStatus }))}
+            className="rounded border border-line bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {STATUS_TABS.filter(t => t.value).map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Tracking Number</span>
+          <Input value={form.tracking_no} onChange={(e) => setForm(f => ({ ...f, tracking_no: e.target.value }))} placeholder="e.g. TH123456789" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Carrier</span>
+          <Input value={form.carrier} onChange={(e) => setForm(f => ({ ...f, carrier: e.target.value }))} placeholder="e.g. DHL, FedEx" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Ship Date</span>
+          <Input type="date" value={form.ship_date} onChange={(e) => setForm(f => ({ ...f, ship_date: e.target.value }))} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Notes</span>
+          <Input value={form.notes} onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes…" />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" size="sm" type="submit" disabled={loading}>
+            {loading ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
@@ -147,6 +226,7 @@ export default function ShipmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editShipment, setEditShipment] = useState<Shipment | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   function fetchShipments() {
@@ -160,7 +240,6 @@ export default function ShipmentsPage() {
 
   useEffect(() => {
     fetchShipments();
-    // Also load sales orders for the dialog
     listSalesOrders({ limit: 100 })
       .then((r) => setSalesOrders(r.items))
       .catch(() => {/* non-critical */});
@@ -181,36 +260,46 @@ export default function ShipmentsPage() {
     }
   }
 
+  async function handleDelete(shipment: Shipment) {
+    if (!confirm(`Delete shipment ${shipment.shipmentNumber || shipment.id.slice(0, 8)}? It will be marked as returned.`)) return;
+    setActionLoading(shipment.id);
+    try {
+      await deleteShipment(shipment.id);
+      setShipments((prev) => prev.filter((s) => s.id !== shipment.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   function handleCreated(s: Shipment) {
     setDialogOpen(false);
     setShipments((prev) => [s, ...prev]);
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <Breadcrumb items={[{ label: "Sales" }, { label: "Shipments" }]} />
+    <div className="flex flex-col gap-4 p-6">
+      <Breadcrumb items={[{ label: "Sales", href: "/sales/home" }, { label: "Shipments" }]} />
 
       {/* header row */}
       <div className="flex items-center justify-between">
-        <h1 className="text-base font-semibold text-zinc-100">Shipments</h1>
-        <button
-          onClick={() => setDialogOpen(true)}
-          className="px-3 py-1.5 text-sm rounded bg-zinc-700 text-zinc-100 hover:bg-zinc-600 transition-colors border border-zinc-600"
-        >
+        <h1 className="text-base font-semibold text-ink">Shipments</h1>
+        <Button variant="primary" size="sm" onClick={() => setDialogOpen(true)}>
           + New Shipment
-        </button>
+        </Button>
       </div>
 
       {/* status filter tabs */}
-      <div className="flex gap-1 border-b border-zinc-700">
+      <div className="flex gap-1 border-b border-line">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
             className={`px-4 py-2 text-xs font-medium uppercase tracking-wide transition-colors border-b-2 -mb-px ${
               activeTab === tab.value
-                ? "border-zinc-300 text-zinc-100"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
+                ? "border-accent text-accent"
+                : "border-transparent text-ink-3 hover:text-ink"
             }`}
           >
             {tab.label}
@@ -219,33 +308,32 @@ export default function ShipmentsPage() {
       </div>
 
       {error && (
-        <div className="border border-red-700 bg-red-950 text-red-300 rounded px-4 py-3 text-sm">
+        <div className="rounded border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-zinc-400 text-sm py-12 text-center">Loading shipments...</div>
+        <p className="py-12 text-center text-sm text-ink-3">Loading shipments…</p>
       ) : shipments.length === 0 ? (
-        <div className="text-zinc-500 text-sm py-12 text-center">
+        <p className="py-12 text-center text-sm text-ink-3">
           No shipments found{activeTab ? ` with status "${activeTab}"` : ""}.
-        </div>
+        </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse border border-zinc-700">
-            <thead>
-              <tr className="bg-zinc-800 text-zinc-300 uppercase text-xs tracking-wider">
-                <th className="border border-zinc-700 px-4 py-2 text-left">Shipment #</th>
-                <th className="border border-zinc-700 px-4 py-2 text-left">SO #</th>
-                <th className="border border-zinc-700 px-4 py-2 text-left">Customer</th>
-                <th className="border border-zinc-700 px-4 py-2 text-center">Status</th>
-                <th className="border border-zinc-700 px-4 py-2 text-left">Created</th>
-                <th className="border border-zinc-700 px-4 py-2 text-center w-28">Action</th>
+        <div className="overflow-x-auto rounded-lg border border-line">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2 text-ink-3">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Shipment #</th>
+                <th className="px-4 py-2 text-left font-medium">SO #</th>
+                <th className="px-4 py-2 text-left font-medium">Customer</th>
+                <th className="px-4 py-2 text-center font-medium">Status</th>
+                <th className="px-4 py-2 text-left font-medium">Created</th>
+                <th className="px-4 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line">
               {shipments.map((s) => {
-                const badge = STATUS_BADGE[s.status];
                 const nextStatus = NEXT_STATUS[s.status];
                 const actionLabel = ACTION_LABEL[s.status];
                 const isActing = actionLoading === s.id;
@@ -254,38 +342,55 @@ export default function ShipmentsPage() {
                   : "—";
 
                 return (
-                  <tr key={s.id} className="hover:bg-zinc-800/40 transition-colors cursor-pointer" onClick={() => router.push('/sales/shipments/' + s.id)}>
-                    <td className="border border-zinc-700 px-4 py-2 font-mono text-zinc-100">
+                  <tr
+                    key={s.id}
+                    className="hover:bg-surface-2/50 cursor-pointer transition-colors"
+                    onClick={() => router.push('/sales/shipments/' + s.id)}
+                  >
+                    <td className="px-4 py-2 font-mono text-xs font-semibold text-ink">
                       {s.shipmentNumber || s.id.slice(0, 8)}
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 font-mono text-zinc-300">
+                    <td className="px-4 py-2 font-mono text-xs text-ink-2">
                       {s.soNumber || s.soId.slice(0, 8)}
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-zinc-300">
+                    <td className="px-4 py-2 text-ink-2">
                       {s.customerName || s.customerId || "—"}
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-center">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded border text-xs font-medium uppercase tracking-wide ${badge.bg} ${badge.text} ${badge.border}`}
-                      >
-                        {s.status}
-                      </span>
+                    <td className="px-4 py-2 text-center">
+                      <Tag tone={statusTone(s.status)} size="sm">{s.status}</Tag>
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-zinc-400 font-mono text-xs">
+                    <td className="px-4 py-2 font-mono text-xs text-ink-3">
                       {createdDate}
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                      {nextStatus && actionLabel ? (
-                        <button
-                          onClick={() => handleAction(s)}
+                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1">
+                        {nextStatus && actionLabel && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleAction(s)}
+                            disabled={isActing}
+                          >
+                            {isActing ? "…" : actionLabel}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditShipment(s)}
                           disabled={isActing}
-                          className="px-3 py-1 text-xs rounded border border-zinc-600 text-zinc-300 hover:text-zinc-100 hover:border-zinc-400 disabled:opacity-50 transition-colors"
                         >
-                          {isActing ? "..." : actionLabel}
-                        </button>
-                      ) : (
-                        <span className="text-zinc-600 text-xs">—</span>
-                      )}
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(s)}
+                          disabled={isActing}
+                        >
+                          <span className="text-danger">Del</span>
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -300,6 +405,15 @@ export default function ShipmentsPage() {
         salesOrders={salesOrders}
         onClose={() => setDialogOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <EditShipmentDialog
+        shipment={editShipment}
+        onClose={() => setEditShipment(null)}
+        onSaved={(updated) => {
+          setShipments((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+          setEditShipment(null);
+        }}
       />
     </div>
   );

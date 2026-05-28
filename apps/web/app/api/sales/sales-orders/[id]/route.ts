@@ -26,3 +26,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const r = await fetch(`${SALES_URL}/v1/sales-orders/${id}`, { method: "PATCH", headers: h, body });
   return new NextResponse(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
 }
+
+export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
+  // Backend has no hard-delete for sales orders; cancel by setting status=cancelled
+  const gr = await fetch(`${SALES_URL}/v1/sales-orders/${id}`, { headers: h });
+  if (!gr.ok) return new NextResponse(await gr.text(), { status: gr.status });
+  const so = await gr.json() as Record<string, unknown>;
+  const version = so.Version ?? so.version ?? 1;
+  h.set("content-type", "application/json");
+  const r = await fetch(`${SALES_URL}/v1/sales-orders/${id}`, {
+    method: "PATCH", headers: h,
+    body: JSON.stringify({ status: "cancelled", version }),
+  });
+  return new NextResponse(r.status === 204 ? null : await r.text(), { status: r.status === 200 ? 204 : r.status });
+}
