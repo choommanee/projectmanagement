@@ -17,6 +17,7 @@ import { CommandBar } from "@/shell/CommandBar";
 import {
   listProjects,
   createProject,
+  updateProject,
   deleteProject,
   type Project,
 } from "@/lib/api/projects";
@@ -84,6 +85,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editTarget, setEditTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
 
   const load = useCallback(async () => {
@@ -388,7 +390,7 @@ export default function ProjectsPage() {
                         variant="ghost"
                         size="sm"
                         aria-label="Edit"
-                        onClick={() => router.push(`/pm/projects/${p.id}`)}
+                        onClick={() => setEditTarget(p)}
                       >
                         <Pencil size={13} />
                       </Button>
@@ -441,6 +443,14 @@ export default function ProjectsPage() {
         onCreated={() => {
           setShowCreate(false);
           void load();
+        }}
+      />
+      <EditDialog
+        project={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={(updated) => {
+          setEditTarget(null);
+          setItems(prev => prev.map(p => p.id === updated.id ? updated : p));
         }}
       />
       <DeleteDialog
@@ -543,6 +553,103 @@ function CreateDialog({
             options={["planning", "active", "on_hold", "completed", "cancelled"]}
           />
         </Field>
+        {err && (
+          <div role="alert" className="rounded-sm border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
+            {err}
+          </div>
+        )}
+      </form>
+    </Dialog>
+  );
+}
+
+// ─── Edit Dialog ────────────────────────────────────────────────────────────
+
+function EditDialog({
+  project,
+  onClose,
+  onSaved,
+}: {
+  project: Project | null;
+  onClose: () => void;
+  onSaved: (updated: Project) => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<Project["status"]>("planning");
+  const [dueDate, setDueDate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (project) {
+      setName(project.name);
+      setDescription(project.description ?? "");
+      setStatus(project.status);
+      setDueDate(project.dueDate ? project.dueDate.slice(0, 10) : "");
+      setErr(null);
+    }
+  }, [project]);
+
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!project || !name.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const updated = await updateProject(project.id, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        status,
+        due_date: dueDate || null,
+        version: project.version,
+      });
+      onSaved(updated);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={!!project}
+      onClose={onClose}
+      title="Edit project"
+      description="Update name, description, status or due date."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!name.trim() || busy} loading={busy} onClick={() => void submit()}>Save</Button>
+        </>
+      }
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Name" required>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" data-autofocus />
+        </Field>
+        <Field label="Description">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description…" />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Status">
+            <SelectNative
+              label="Status"
+              value={status}
+              onChange={(v) => setStatus(v as Project["status"])}
+              options={["planning", "active", "on_hold", "completed", "cancelled"]}
+            />
+          </Field>
+          <Field label="Due Date">
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+            />
+          </Field>
+        </div>
         {err && (
           <div role="alert" className="rounded-sm border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
             {err}

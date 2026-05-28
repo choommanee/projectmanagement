@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Pencil, Trash2, X, Check } from "lucide-react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
+import { Button, Input, Dialog } from "@pmplatform/ui-kit";
 import {
-  getSupplier, listPurchaseOrders,
+  getSupplier, listPurchaseOrders, updateSupplier, deleteSupplier,
   type Supplier, type PurchaseOrder, type POStatus,
 } from "@/lib/api/mfg";
 
@@ -15,12 +17,25 @@ const PO_STATUS_COLORS: Record<POStatus, string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
+const fieldCls = "h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", contact: "", email: "", phone: "", lead_time_days: 0, active: true });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete state
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -31,6 +46,55 @@ export default function SupplierDetailPage() {
       ),
     ]).finally(() => setLoading(false));
   }, [id]);
+
+  function startEdit() {
+    if (!supplier) return;
+    setEditForm({
+      name: supplier.name,
+      contact: supplier.contact,
+      email: supplier.email,
+      phone: supplier.phone,
+      lead_time_days: supplier.leadTimeDays,
+      active: supplier.active,
+    });
+    setEditError(null);
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!supplier) return;
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const updated = await updateSupplier(supplier.id, {
+        name: editForm.name,
+        contact: editForm.contact,
+        email: editForm.email,
+        phone: editForm.phone,
+        lead_time_days: editForm.lead_time_days,
+        active: editForm.active,
+      });
+      setSupplier(updated);
+      setEditing(false);
+    } catch (e) {
+      setEditError((e as Error).message);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!supplier) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await deleteSupplier(supplier.id);
+      router.push("/mfg/suppliers");
+    } catch (e) {
+      setDeleteError((e as Error).message);
+      setDeleteLoading(false);
+    }
+  }
 
   const fmt = (n: number) => n.toLocaleString("en", { maximumFractionDigits: 0 });
   const totalPOValue = orders.reduce((s, po) =>
@@ -50,28 +114,85 @@ export default function SupplierDetailPage() {
       ]} />
 
       {/* Header */}
-      <div className="rounded-md border border-line bg-paper p-5 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-xl font-semibold text-ink">{supplier.name}</h1>
-            <span className="font-mono text-xs text-ink-3">{supplier.code}</span>
-            {!supplier.active && (
-              <span className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink-3">Inactive</span>
-            )}
+      <div className="rounded-md border border-line bg-paper p-5">
+        {!editing ? (
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-xl font-semibold text-ink">{supplier.name}</h1>
+                <span className="font-mono text-xs text-ink-3">{supplier.code}</span>
+                {!supplier.active && (
+                  <span className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink-3">Inactive</span>
+                )}
+              </div>
+              <div className="space-y-0.5 text-sm text-ink-2">
+                {supplier.contact && <div>{supplier.contact}</div>}
+                {supplier.email && <div>{supplier.email}</div>}
+                {supplier.phone && <div>{supplier.phone}</div>}
+                <div className="text-xs text-ink-3">Lead time: {supplier.leadTimeDays} days</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={startEdit} aria-label="Edit supplier">
+                <Pencil size={14} className="mr-1" /> Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowDelete(true)} aria-label="Delete supplier">
+                <Trash2 size={14} className="mr-1 text-danger" />
+                <span className="text-danger">Delete</span>
+              </Button>
+              <button
+                onClick={() => router.back()}
+                className="rounded border border-line px-3 py-1.5 text-xs text-ink-3 hover:text-ink"
+              >
+                Back
+              </button>
+            </div>
           </div>
-          <div className="space-y-0.5 text-sm text-ink-2">
-            {supplier.contact && <div>{supplier.contact}</div>}
-            {supplier.email && <div>{supplier.email}</div>}
-            {supplier.phone && <div>{supplier.phone}</div>}
-            <div className="text-xs text-ink-3">Lead time: {supplier.leadTimeDays} days</div>
+        ) : (
+          /* Inline edit form */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-ink-3">Edit Supplier</h2>
+              <button onClick={() => setEditing(false)} className="text-ink-3 hover:text-ink"><X size={16} /></button>
+            </div>
+            {editError && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{editError}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Name</label>
+                <Input value={editForm.name} onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Contact</label>
+                <Input value={editForm.contact} onChange={(e) => setEditForm(f => ({ ...f, contact: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Email</label>
+                <Input type="email" value={editForm.email} onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Phone</label>
+                <Input value={editForm.phone} onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Lead Time (days)</label>
+                <Input type="number" min="0" value={String(editForm.lead_time_days)} onChange={(e) => setEditForm(f => ({ ...f, lead_time_days: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-2">Status</label>
+                <select aria-label="Active status" value={editForm.active ? "active" : "inactive"} onChange={(e) => setEditForm(f => ({ ...f, active: e.target.value === "active" }))} className={fieldCls}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button variant="primary" loading={editLoading} onClick={() => void saveEdit()}>
+                <Check size={13} className="mr-1" /> Save
+              </Button>
+            </div>
           </div>
-        </div>
-        <button
-          onClick={() => router.back()}
-          className="rounded border border-line px-3 py-1.5 text-xs text-ink-3 hover:text-ink"
-        >
-          ← Back
-        </button>
+        )}
       </div>
 
       {/* KPIs */}
@@ -132,6 +253,28 @@ export default function SupplierDetailPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        title="Delete supplier"
+        description="This action cannot be undone."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowDelete(false)}>Cancel</Button>
+            <Button variant="danger" loading={deleteLoading} onClick={() => void confirmDelete()}>Delete</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-ink-2">
+            Delete <span className="font-mono font-semibold text-ink">{supplier.name}</span> ({supplier.code})?
+            This will permanently remove the supplier record.
+          </p>
+          {deleteError && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{deleteError}</p>}
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
-import { listWorkOrders, createWorkOrder, listItems, listWorkCenters, listUoms, type WorkOrder, type WOStatus, type WOPriority, type Item, type WorkCenter } from "@/lib/api/mfg";
+import { listWorkOrders, createWorkOrder, updateWorkOrder, deleteWorkOrder, listItems, listWorkCenters, listUoms, type WorkOrder, type WOStatus, type WOPriority, type Item, type WorkCenter } from "@/lib/api/mfg";
 
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: "", label: "All" },
@@ -143,6 +144,162 @@ function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
   );
 }
 
+// ── Edit WO Dialog ────────────────────────────────────────────────────────────
+
+const EDITABLE_STATUSES: WOStatus[] = ["planned", "released", "in_progress", "completed", "closed", "cancelled"];
+
+function EditWODialog({ wo, workCenters, open, onClose, onSaved }: {
+  wo: WorkOrder | null; workCenters: WorkCenter[]; open: boolean; onClose: () => void; onSaved: (updated: WorkOrder) => void;
+}) {
+  const [status, setStatus] = useState<WOStatus>("planned");
+  const [priority, setPriority] = useState<WOPriority>("med");
+  const [dueDate, setDueDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [wcId, setWcId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (wo) {
+      setStatus(wo.status);
+      setPriority(wo.priority);
+      setDueDate(wo.dueDate ? wo.dueDate.slice(0, 10) : "");
+      setNotes(wo.notes);
+      setWcId(wo.workCenterId ?? "");
+      setError(null);
+    }
+  }, [wo]);
+
+  async function submit() {
+    if (!wo) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await updateWorkOrder(wo.id, {
+        status,
+        priority,
+        due_date: dueDate || null,
+        notes,
+        work_center_id: wcId || null,
+        version: wo.version,
+      });
+      onSaved(updated);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const fieldCls = "h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Edit work order"
+      description={wo ? `WO ${wo.code} — update status, priority, dates, notes` : ""}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={() => void submit()}>Save changes</Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Status</label>
+            <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as WOStatus)} className={fieldCls}>
+              {EDITABLE_STATUSES.map(s => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Priority</label>
+            <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as WOPriority)} className={fieldCls}>
+              {(["low","med","high","critical"] as WOPriority[]).map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Due Date</label>
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+        {workCenters.length > 0 && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Work Center</label>
+            <select aria-label="Work center" value={wcId} onChange={(e) => setWcId(e.target.value)} className={fieldCls}>
+              <option value="">— none —</option>
+              {workCenters.map(w => <option key={w.id} value={w.id}>{w.code} — {w.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="w-full rounded-sm border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15 resize-none"
+          />
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+// ── Delete WO Dialog ──────────────────────────────────────────────────────────
+
+function DeleteWODialog({ wo, open, onClose, onDeleted }: {
+  wo: WorkOrder | null; open: boolean; onClose: () => void; onDeleted: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { if (wo) setError(null); }, [wo]);
+
+  async function submit() {
+    if (!wo) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteWorkOrder(wo.id, wo.version);
+      onDeleted();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Cancel work order"
+      description="This marks the WO as cancelled. It cannot be undone."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Back</Button>
+          <Button variant="danger" loading={loading} onClick={() => void submit()}>Cancel WO</Button>
+        </>
+      }
+    >
+      {wo && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-2">
+            Work order <span className="font-mono font-semibold text-ink">{wo.code}</span> will be cancelled.
+          </p>
+          {error && <p role="alert" className="rounded-xs bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+        </div>
+      )}
+    </Dialog>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function WorkOrdersPage() {
   const router = useRouter();
   const [wos, setWos] = useState<WorkOrder[]>([]);
@@ -152,6 +309,8 @@ export default function WorkOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [editTarget, setEditTarget] = useState<WorkOrder | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkOrder | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
   const [itemMap, setItemMap] = useState<Map<string, Item>>(new Map());
@@ -314,6 +473,7 @@ export default function WorkOrdersPage() {
                     <th className="px-4 py-2.5">Work Center</th>
                     <th className="px-4 py-2.5">Due</th>
                     <th className="px-4 py-2.5">v</th>
+                    <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -341,6 +501,16 @@ export default function WorkOrdersPage() {
                         <td className="px-4 py-2 font-mono text-xs text-ink-2">{wc?.code ?? "—"}</td>
                         <td className="px-4 py-2 font-mono text-xs tabular-nums text-ink-3">{wo.dueDate ? new Date(wo.dueDate).toLocaleDateString() : "—"}</td>
                         <td className="px-4 py-2 font-mono text-xs tabular-nums text-ink-3">v{wo.version}</td>
+                        <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="inline-flex gap-1">
+                            <Button variant="ghost" size="sm" aria-label="Edit" onClick={() => setEditTarget(wo)}>
+                              <Pencil size={13} />
+                            </Button>
+                            <Button variant="ghost" size="sm" aria-label="Cancel WO" onClick={() => setDeleteTarget(wo)}>
+                              <Trash2 size={13} className="text-danger" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -352,6 +522,25 @@ export default function WorkOrdersPage() {
       </div>
 
       <NewWODialog open={showNew} items={items} workCenters={workCenters} onClose={() => setShowNew(false)} onCreated={(wo) => { setShowNew(false); router.push(`/mfg/work-orders/${wo.id}`); }} />
+      <EditWODialog
+        wo={editTarget}
+        workCenters={workCenters}
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={(updated) => {
+          setEditTarget(null);
+          setWos(prev => prev.map(w => w.id === updated.id ? updated : w));
+        }}
+      />
+      <DeleteWODialog
+        wo={deleteTarget}
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => {
+          setDeleteTarget(null);
+          void load();
+        }}
+      />
     </div>
   );
 }

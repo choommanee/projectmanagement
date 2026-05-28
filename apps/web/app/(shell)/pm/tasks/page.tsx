@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Plus, Download, List, LayoutGrid } from "lucide-react";
+import { RefreshCw, Plus, Download, List, LayoutGrid, Pencil, Trash2 } from "lucide-react";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
-import { listAllTasks, createTask, listTasksForProject, type Task, type TaskStatus, type TaskType, type TaskPriority } from "@/lib/api/tasks";
+import { listAllTasks, createTask, updateTask, deleteTask, listTasksForProject, type Task, type TaskStatus, type TaskType, type TaskPriority } from "@/lib/api/tasks";
 import { listProjects, type Project } from "@/lib/api/projects";
 import { statusTone, priorityTone, statusLabel, priorityLabel } from "@/lib/api/taskTones";
 import { TaskSheet } from "@/components/TaskSheet";
@@ -140,6 +140,8 @@ export default function TasksPage() {
   const [view, setView] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editTarget, setEditTarget] = useState<Task | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
   // Load projects for display lookup
   useEffect(() => {
@@ -372,6 +374,7 @@ export default function TasksPage() {
                     <th className="px-3 py-2.5">Act md</th>
                     <th className="px-3 py-2.5">Due</th>
                     <th className="px-3 py-2.5">Progress</th>
+                    <th className="px-3 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -424,6 +427,16 @@ export default function TasksPage() {
                           <span className="font-mono text-[11px] tabular-nums text-ink-3">{task.progressPct}%</span>
                         </div>
                       </td>
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex gap-1">
+                          <Button variant="ghost" size="sm" aria-label="Edit task" onClick={() => setEditTarget(task)}>
+                            <Pencil size={13} />
+                          </Button>
+                          <Button variant="ghost" size="sm" aria-label="Delete task" onClick={() => setDeleteTarget(task)}>
+                            <Trash2 size={13} className="text-danger" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -462,7 +475,184 @@ export default function TasksPage() {
         onClose={() => setShowCreate(false)}
         onCreated={() => { setShowCreate(false); void fetchTasks(); }}
       />
+
+      {/* Edit task dialog */}
+      <EditTaskDialog
+        task={editTarget}
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={(updated) => {
+          setEditTarget(null);
+          setTasks(prev => prev.map(t => t.id === updated.id ? updated : t));
+        }}
+      />
+
+      {/* Delete task dialog */}
+      <DeleteTaskDialog
+        task={deleteTarget}
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={() => {
+          setDeleteTarget(null);
+          void fetchTasks();
+        }}
+      />
     </div>
+  );
+}
+
+// ─── Edit task dialog ─────────────────────────────────────────────────────────
+
+function EditTaskDialog({ task, open, onClose, onSaved }: {
+  task: Task | null; open: boolean; onClose: () => void; onSaved: (updated: Task) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("todo");
+  const [priority, setPriority] = useState<TaskPriority>("med");
+  const [dueDate, setDueDate] = useState("");
+  const [estimateMd, setEstimateMd] = useState("0");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const fieldLabel = "mb-1 block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-3";
+  const fieldSelect = "h-9 w-full appearance-none rounded-sm border border-line bg-surface px-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+
+  useEffect(() => {
+    if (task) {
+      setTitle(task.title);
+      setDescription(task.description ?? "");
+      setStatus(task.status);
+      setPriority(task.priority);
+      setDueDate(task.dueDate ? String(task.dueDate).slice(0, 10) : "");
+      setEstimateMd(String(task.estimateMd ?? 0));
+      setErr(null);
+    }
+  }, [task]);
+
+  async function submit() {
+    if (!task || !title.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const updated = await updateTask(task.id, {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        status,
+        priority,
+        due_date: dueDate || null,
+        estimate_md: parseFloat(estimateMd) || 0,
+        version: task.version,
+      });
+      onSaved(updated);
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Edit task"
+      description={task ? `Task ${task.code} — update title, status, priority, dates` : ""}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!title.trim() || busy} loading={busy} onClick={() => void submit()}>Save</Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <label className="block">
+          <span className={fieldLabel}>Title <span className="text-signal">*</span></span>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" data-autofocus />
+        </label>
+        <label className="block">
+          <span className={fieldLabel}>Description</span>
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className={fieldLabel}>Status</span>
+            <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)} className={fieldSelect}>
+              {(["todo","in_progress","blocked","review","done","cancelled"] as TaskStatus[]).map(v => (
+                <option key={v} value={v}>{v.replace("_", " ")}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Priority</span>
+            <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className={fieldSelect}>
+              {(["low","med","high","critical"] as TaskPriority[]).map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className={fieldLabel}>Due Date</span>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+              className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15" />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Estimate (md)</span>
+            <Input type="number" step="0.5" min="0" value={estimateMd} onChange={(e) => setEstimateMd(e.target.value)} className="font-mono" />
+          </label>
+        </div>
+        {err && <div role="alert" className="rounded-sm border border-danger/40 bg-danger/10 p-2 text-xs text-danger">{err}</div>}
+      </div>
+    </Dialog>
+  );
+}
+
+// ─── Delete task dialog ───────────────────────────────────────────────────────
+
+function DeleteTaskDialog({ task, open, onClose, onDeleted }: {
+  task: Task | null; open: boolean; onClose: () => void; onDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => { if (task) setErr(null); }, [task]);
+
+  async function submit() {
+    if (!task) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await deleteTask(task.id, task.version);
+      onDeleted();
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Delete task"
+      description="Permanently removes the task. This cannot be undone."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={busy} disabled={busy} onClick={() => void submit()}>Delete task</Button>
+        </>
+      }
+    >
+      {task && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-2">
+            Delete <span className="font-mono font-semibold text-ink">{task.code}</span> — {task.title}?
+          </p>
+          {err && <div role="alert" className="rounded-sm border border-danger/40 bg-danger/10 p-2 text-xs text-danger">{err}</div>}
+        </div>
+      )}
+    </Dialog>
   );
 }
 
