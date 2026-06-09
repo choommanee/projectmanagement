@@ -1,0 +1,15 @@
+# Keep railway up uploads small + reliable. Build context only needs source.
+.git
+.claude
+node_modules
+**/node_modules
+.next
+**/.next
+target
+**/target
+.turbo
+**/.turbo
+infra/local-data
+docs/*.png
+*.tsbuildinfo
+**/*.tsbuildinfo
