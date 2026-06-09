@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+# Parameterized build for any Rust engine in the Cargo workspace.
+# Build context = repo root. Set on Railway:
+#   RAILWAY_DOCKERFILE_PATH=infra/docker/Dockerfile.engine
+#   ENGINE=<crate name, e.g. mrp-engine>
+FROM rust:1.86-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY engines ./engines
+COPY libs ./libs
+ARG ENGINE
+RUN test -n "$ENGINE" || (echo "ENGINE build-arg is required" && exit 1)
+RUN cargo build --release -p ${ENGINE}
+RUN cp /src/target/release/${ENGINE} /out
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /out /engine
+# Railway injects PORT; engines read std::env::var("PORT").
+CMD ["/engine"]

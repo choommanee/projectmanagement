@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# Parameterized build for any Go service in the go.work workspace.
+# Build context = repo root. Pass --build-arg SERVICE=<svc-dir-name>.
+# On Railway set: RAILWAY_DOCKERFILE_PATH=infra/docker/Dockerfile.gosvc
+#                 SERVICE=<service dir under services/>
+FROM golang:1.25-alpine AS build
+RUN apk add --no-cache git ca-certificates
+WORKDIR /src
+# Workspace + shared libs + all service modules (go.work needs every `use` path present).
+COPY go.work go.work.sum ./
+COPY libs ./libs
+COPY services ./services
+ARG SERVICE
+RUN test -n "$SERVICE" || (echo "SERVICE build-arg is required" && exit 1)
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /out/server ./services/${SERVICE}/cmd/server
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /
+COPY --from=build /out/server /server
+# Railway injects PORT; each service reads it via envOr("PORT", ...).
+CMD ["/server"]
