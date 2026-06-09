@@ -1,348 +1,409 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SWK Platform — ระบบบริหารโครงการ × การผลิต (PM × Manufacturing) | SWK Solution</title>
-  <meta name="description" content="SWK Platform แพลตฟอร์ม SaaS ครบวงจรสำหรับบริหารโครงการ (PM), การผลิต (MRP/Manufacturing), คุณภาพ (APQP/PPAP/FMEA), Workflow อัตโนมัติ, รายงาน BI และการแจ้งเตือน — รองรับหลายองค์กร (multi-tenant) ความปลอดภัยระดับองค์กร โดย SWK Solution">
-  <meta property="og:title" content="SWK Platform — PM × Manufacturing SaaS">
-  <meta property="og:description" content="บริหารโครงการ การผลิต คุณภาพ และเวิร์กโฟลว์ ครบในแพลตฟอร์มเดียว">
-  <meta property="og:image" content="assets/img_hero.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root{
-      --bg:#090d16; --bg-panel:rgba(15,23,42,.65); --bg-panel-border:rgba(255,255,255,.08);
-      --primary:#2563eb; --primary-l:#3b82f6; --primary-glow:rgba(37,99,235,.15);
-      --cyan:#06b6d4; --cyan-l:#22d3ee; --cyan-glow:rgba(6,182,212,.15);
-      --purple:#8b5cf6; --purple-l:#a78bfa; --purple-glow:rgba(139,92,246,.15);
-      --slate-50:#f8fafc; --slate-200:#e2e8f0; --slate-300:#cbd5e1; --slate-400:#94a3b8;
-      --slate-500:#64748b; --slate-800:#1e293b; --slate-900:#0f172a; --white:#fff;
-      --font-sans:'Inter','IBM Plex Sans Thai',-apple-system,BlinkMacSystemFont,sans-serif;
-      --font-mono:'Fira Code',monospace;
-      --shadow-glow:0 0 30px rgba(37,99,235,.25),0 0 60px rgba(6,182,212,.1);
-      --shadow-panel:0 20px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.1);
-    }
-    *{margin:0;padding:0;box-sizing:border-box}
-    html{scroll-behavior:smooth}
-    body{font-family:var(--font-sans);background:var(--bg);color:var(--slate-200);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-    body::before{content:"";position:fixed;inset:0;z-index:-2;background:
-      radial-gradient(800px circle at 12% 8%,var(--primary-glow),transparent 45%),
-      radial-gradient(700px circle at 88% 18%,var(--cyan-glow),transparent 45%),
-      radial-gradient(700px circle at 50% 110%,var(--purple-glow),transparent 45%);}
-    body::after{content:"";position:fixed;inset:0;z-index:-1;opacity:.4;
-      background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
-      background-size:48px 48px;mask-image:radial-gradient(ellipse 100% 80% at 50% 0%,#000 40%,transparent 80%)}
-    a{text-decoration:none;color:inherit}
-    .container{max-width:1200px;margin:0 auto;padding:0 1.5rem}
-    .mono{font-family:var(--font-mono)}
-    /* header */
-    .header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(9,13,22,.72);border-bottom:1px solid var(--bg-panel-border)}
-    .header-inner{display:flex;align-items:center;justify-content:space-between;height:68px}
-    .logo{display:flex;align-items:center;gap:.7rem}
-    .logo-container{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.03);border:1.5px solid rgba(255,255,255,.08)}
-    .logo-name{display:block;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;color:#fff}
-    .logo-sub{display:block;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--slate-400)}
-    .nav{display:flex;gap:1.6rem}
-    .nav-link{font-size:.86rem;color:var(--slate-300);transition:.2s;font-weight:500}
-    .nav-link:hover{color:#fff}
-    .btn{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--font-sans);font-weight:600;font-size:.9rem;padding:.8rem 1.5rem;border-radius:10px;cursor:pointer;transition:.25s;border:1px solid transparent}
-    .btn-primary{background:linear-gradient(135deg,var(--primary),var(--cyan));color:#fff;box-shadow:0 8px 24px rgba(37,99,235,.35)}
-    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(37,99,235,.5)}
-    .btn-secondary{background:rgba(255,255,255,.04);border-color:var(--bg-panel-border);color:var(--slate-200)}
-    .btn-secondary:hover{background:rgba(255,255,255,.08);border-color:var(--primary-l)}
-    .header-cta{padding:.6rem 1.3rem;font-size:.82rem}
-    /* hero */
-    .hero{padding:5rem 0 3rem}
-    .hero-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:3.5rem;align-items:center}
-    .badge-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.4rem}
-    .badge{font-size:.72rem;font-weight:600;padding:.4rem .9rem;border-radius:999px;background:rgba(37,99,235,.1);border:1px solid rgba(59,130,246,.3);color:var(--primary-l)}
-    .badge.cyan{background:rgba(6,182,212,.1);border-color:rgba(34,211,238,.3);color:var(--cyan-l)}
-    .badge.purple{background:rgba(139,92,246,.1);border-color:rgba(167,139,250,.3);color:var(--purple-l)}
-    h1.hero-title{font-size:3.1rem;line-height:1.1;font-weight:800;letter-spacing:-.03em;color:#fff;margin-bottom:1.2rem}
-    h1.hero-title .grad{background:linear-gradient(120deg,var(--primary-l),var(--cyan-l));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-    .hero-p{font-size:1.08rem;color:var(--slate-300);max-width:34rem;margin-bottom:2rem}
-    .hero-actions{display:flex;gap:1rem;flex-wrap:wrap}
-    .hero-stats{display:flex;gap:2.2rem;margin-top:2.6rem;flex-wrap:wrap}
-    .stat-num{font-family:var(--font-mono);font-size:1.8rem;font-weight:600;color:#fff}
-    .stat-num span{color:var(--cyan-l)}
-    .stat-label{font-size:.78rem;color:var(--slate-400)}
-    .hero-visual{position:relative}
-    .hero-visual img{width:100%;border-radius:16px;border:1px solid var(--bg-panel-border);box-shadow:var(--shadow-panel),var(--shadow-glow)}
-    .hero-visual::before{content:"";position:absolute;inset:-1px;border-radius:18px;background:linear-gradient(135deg,var(--primary),var(--cyan),var(--purple));opacity:.25;filter:blur(28px);z-index:-1}
-    .browser-bar{position:absolute;top:.7rem;left:.9rem;display:flex;gap:6px;z-index:2}
-    .browser-bar i{width:10px;height:10px;border-radius:50%;display:inline-block}
-    /* sections */
-    .section{padding:4.5rem 0;border-top:1px solid rgba(255,255,255,.05)}
-    .section-head{text-align:center;max-width:42rem;margin:0 auto 3rem}
-    .eyebrow{font-family:var(--font-mono);font-size:.78rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan-l);margin-bottom:.8rem}
-    .section-head h2{font-size:2.1rem;font-weight:800;letter-spacing:-.02em;color:#fff;margin-bottom:.8rem}
-    .section-head p{color:var(--slate-400);font-size:1rem}
-    /* feature alternating rows */
-    .feature-row{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center;margin-bottom:4.5rem}
-    .feature-row:nth-child(even) .feature-media{order:2}
-    .feature-row .feature-tag{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--primary-l);margin-bottom:.7rem}
-    .feature-row h3{font-size:1.7rem;font-weight:700;color:#fff;margin-bottom:1rem;letter-spacing:-.01em}
-    .feature-row p{color:var(--slate-300);margin-bottom:1.2rem}
-    .feature-list{list-style:none;display:flex;flex-direction:column;gap:.6rem}
-    .feature-list li{display:flex;gap:.7rem;align-items:flex-start;font-size:.92rem;color:var(--slate-300)}
-    .feature-list li::before{content:"";flex:none;width:18px;height:18px;margin-top:3px;border-radius:5px;background:linear-gradient(135deg,var(--primary),var(--cyan));box-shadow:0 0 12px var(--primary-glow)}
-    .feature-media img{width:100%;border-radius:14px;border:1px solid var(--bg-panel-border);box-shadow:var(--shadow-panel)}
-    /* modules grid */
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem}
-    .card{background:var(--bg-panel);border:1px solid var(--bg-panel-border);border-radius:14px;padding:1.6rem;transition:.25s;backdrop-filter:blur(8px)}
-    .card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,.4);box-shadow:var(--shadow-glow)}
-    .card .ico{width:46px;height:46px;border-radius:11px;display:grid;place-items:center;font-size:1.4rem;margin-bottom:1rem;background:rgba(37,99,235,.1);border:1px solid rgba(59,130,246,.25)}
-    .card h4{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:.5rem}
-    .card p{font-size:.88rem;color:var(--slate-400)}
-    /* demo CTA */
-    .cta-box{position:relative;border-radius:20px;padding:3.5rem;text-align:center;background:linear-gradient(135deg,rgba(37,99,235,.12),rgba(6,182,212,.08));border:1px solid rgba(59,130,246,.25);overflow:hidden}
-    .cta-box h2{font-size:2.2rem;font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-.02em}
-    .cta-box p{color:var(--slate-300);margin-bottom:2rem;max-width:36rem;margin-inline:auto}
-    .cred{display:inline-flex;flex-wrap:wrap;gap:1.4rem;justify-content:center;font-family:var(--font-mono);font-size:.85rem;background:rgba(0,0,0,.3);border:1px solid var(--bg-panel-border);border-radius:12px;padding:1rem 1.6rem;margin-bottom:2rem}
-    .cred b{color:var(--cyan-l)}
-    .cred .k{color:var(--slate-500);margin-right:.4rem}
-    /* footer */
-    .footer{border-top:1px solid var(--bg-panel-border);padding:3rem 0 2rem;margin-top:2rem}
-    .footer-top{display:flex;justify-content:space-between;align-items:center;gap:2rem;flex-wrap:wrap;margin-bottom:2rem}
-    .footer-top h4{font-size:.86rem;font-weight:600;opacity:.7;max-width:480px;line-height:1.6;text-align:right;color:var(--slate-300)}
-    .footer-copyright{display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,.05);padding-top:1.4rem;font-size:.8rem;color:var(--slate-500);gap:1rem;flex-wrap:wrap}
-    .scroll-top-btn{background:rgba(255,255,255,.04);border:1px solid var(--bg-panel-border);color:var(--slate-300);width:38px;height:38px;border-radius:10px;cursor:pointer;transition:.2s}
-    .scroll-top-btn:hover{background:var(--primary);color:#fff}
-    @media(max-width:880px){
-      .nav{display:none}
-      .hero-grid,.feature-row,.feature-row:nth-child(even) .feature-media{grid-template-columns:1fr;order:0}
-      h1.hero-title{font-size:2.2rem}
-      .cta-box{padding:2.2rem 1.4rem}
-      .footer-top h4{text-align:left}
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWK Platform — ระบบบริหารโครงการ × การผลิต | SWK Solution</title>
+<meta name="description" content="SWK Platform แพลตฟอร์ม SaaS ระดับองค์กรสำหรับบริหารโครงการ การผลิต (MRP) คุณภาพ เวิร์กโฟลว์ รายงาน และการแจ้งเตือน รองรับหลายองค์กรด้วยสถาปัตยกรรมไมโครเซอร์วิส โดย SWK Solution">
+<meta property="og:title" content="SWK Platform — PM × Manufacturing">
+<meta property="og:description" content="บริหารโครงการ การผลิต และคุณภาพ ครบในแพลตฟอร์มเดียว">
+<meta property="og:image" content="assets/img_hero.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0c0d10; --ink-2:#121419; --panel:#15171d; --panel-2:#1b1e26;
+  --line:rgba(233,228,217,.12); --line-2:rgba(233,228,217,.07);
+  --fg:#ece7dd; --fg-dim:#a7a59d; --fg-mut:#74726b;
+  --accent:#ff5a1f; --accent-2:#ff8a3d; --accent-soft:rgba(255,90,31,.10);
+  --steel:#5b7c99;
+  --d:'Archivo',sans-serif; --t:'IBM Plex Sans Thai','Archivo',sans-serif; --m:'IBM Plex Mono',monospace;
+  --gut:clamp(1.2rem,4vw,4rem);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--ink);color:var(--fg);font-family:var(--t);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;font-weight:400}
+/* blueprint grid + paper grain atmosphere */
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+  linear-gradient(var(--line-2) 1px,transparent 1px),
+  linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+  background-size:clamp(40px,7vw,86px) clamp(40px,7vw,86px);
+  -webkit-mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 78%);
+          mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 78%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+  background:radial-gradient(70% 50% at 78% 0%,rgba(255,90,31,.06),transparent 60%)}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+::selection{background:var(--accent);color:#fff}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:var(--gut)}
+.mono{font-family:var(--m)}
+/* label / eyebrow with tick */
+.kicker{font-family:var(--m);font-size:.72rem;font-weight:500;letter-spacing:.28em;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:.6rem}
+.kicker::before{content:"";width:26px;height:1px;background:var(--accent)}
+.kicker.dim{color:var(--fg-mut)}.kicker.dim::before{background:var(--fg-mut)}
+
+/* ============ HEADER ============ */
+header{position:sticky;top:0;z-index:60;background:rgba(12,13,16,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.hbar{display:flex;align-items:center;justify-content:space-between;height:64px;gap:1rem}
+.brand{display:flex;align-items:center;gap:.7rem}
+.brand .mark{width:34px;height:34px;border:1px solid var(--line);display:grid;place-items:center;background:var(--ink-2)}
+.brand b{font-family:var(--d);font-weight:800;font-size:1.02rem;letter-spacing:-.01em;line-height:1}
+.brand small{display:block;font-family:var(--m);font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;color:var(--fg-mut);margin-top:3px}
+nav.links{display:flex;gap:2rem}
+nav.links a{font-family:var(--m);font-size:.78rem;letter-spacing:.04em;color:var(--fg-dim);text-transform:uppercase;transition:color .2s;position:relative}
+nav.links a:hover{color:var(--fg)}
+nav.links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:1px;background:var(--accent);transition:width .25s}
+nav.links a:hover::after{width:100%}
+.cta{font-family:var(--m);font-size:.76rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:.62rem 1.1rem;border:1px solid var(--accent);color:var(--accent);transition:.2s;white-space:nowrap}
+.cta:hover{background:var(--accent);color:#fff}
+.cta.solid{background:var(--accent);color:#fff}.cta.solid:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.burger{display:none;background:none;border:1px solid var(--line);color:var(--fg);width:40px;height:36px;font-size:1rem;cursor:pointer}
+
+/* ============ HERO ============ */
+.hero{position:relative;padding:clamp(3rem,8vw,6.5rem) 0 clamp(2.5rem,5vw,4rem);border-bottom:1px solid var(--line)}
+.hero-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.8rem;font-family:var(--m);font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:clamp(1.6rem,4vw,3rem)}
+.hero h1{font-family:var(--t);font-weight:700;font-size:clamp(2.3rem,6.4vw,5rem);line-height:1.02;letter-spacing:-.02em;color:var(--fg);max-width:16ch}
+.hero h1 .o{color:var(--accent)}
+.hero h1 .line{display:block;overflow:hidden}
+.hero h1 .line>span{display:block;transform:translateY(110%);animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+.hero h1 .line:nth-child(2)>span{animation-delay:.08s}
+.hero h1 .line:nth-child(3)>span{animation-delay:.16s}
+@keyframes rise{to{transform:translateY(0)}}
+.hero-grid{display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(2rem,5vw,4.5rem);align-items:end;margin-top:clamp(1.8rem,4vw,3rem)}
+.lead{font-size:clamp(1rem,1.3vw,1.18rem);color:var(--fg-dim);max-width:42ch;border-left:2px solid var(--accent);padding-left:1.1rem}
+.hero-actions{display:flex;gap:.9rem;flex-wrap:wrap;margin-top:1.8rem}
+.btn{font-family:var(--m);font-size:.8rem;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:.95rem 1.6rem;border:1px solid var(--line);color:var(--fg);transition:.22s;display:inline-flex;align-items:center;gap:.6rem}
+.btn:hover{border-color:var(--fg);transform:translateY(-2px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+/* plate = framed screenshot with technical ticks */
+.plate{position:relative;border:1px solid var(--line);background:var(--ink-2);padding:10px}
+.plate::before,.plate::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--accent)}
+.plate::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.plate::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.plate img{width:100%;border:1px solid var(--line-2)}
+.plate .tag{position:absolute;top:-1px;right:-1px;background:var(--accent);color:#fff;font-family:var(--m);font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;padding:.3rem .6rem}
+/* spec strip */
+.specs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);margin-top:clamp(2rem,5vw,3.4rem)}
+.specs div{padding:1.3rem 0;border-right:1px solid var(--line)}
+.specs div:last-child{border-right:0}
+.specs .n{font-family:var(--d);font-weight:800;font-size:clamp(1.8rem,4vw,2.7rem);line-height:1;letter-spacing:-.02em}
+.specs .n em{color:var(--accent);font-style:normal}
+.specs .l{font-family:var(--m);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mut);margin-top:.5rem}
+
+/* ============ SECTION ============ */
+section{padding:clamp(3.4rem,8vw,6.5rem) 0;border-bottom:1px solid var(--line)}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:clamp(2rem,5vw,3.6rem)}
+.sec-head h2{font-family:var(--t);font-weight:700;font-size:clamp(1.7rem,3.6vw,2.7rem);letter-spacing:-.015em;max-width:18ch;line-height:1.08}
+.sec-head .idx{font-family:var(--m);font-size:.78rem;color:var(--fg-mut);letter-spacing:.2em}
+
+/* feature blocks — numbered, hairline, alternating */
+.feat{display:grid;grid-template-columns:5.5rem 1fr 1fr;gap:clamp(1.4rem,3vw,3rem);align-items:center;padding:clamp(1.8rem,4vw,3rem) 0;border-top:1px solid var(--line)}
+.feat:last-child{border-bottom:1px solid var(--line)}
+.feat .num{font-family:var(--d);font-weight:800;font-size:clamp(1.6rem,3vw,2.2rem);color:var(--fg-mut);line-height:1}
+.feat:hover .num{color:var(--accent)}
+.feat .icon{width:34px;height:34px;margin-bottom:1rem;color:var(--accent)}
+.feat .icon svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
+.feat .ftag{font-family:var(--m);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.7rem}
+.feat h3{font-family:var(--t);font-weight:700;font-size:clamp(1.25rem,2.4vw,1.65rem);letter-spacing:-.01em;margin-bottom:.7rem;line-height:1.18}
+.feat p{color:var(--fg-dim);max-width:46ch;font-size:.96rem}
+.feat .pts{list-style:none;display:flex;flex-direction:column;gap:.55rem}
+.feat .pts li{font-family:var(--m);font-size:.82rem;color:var(--fg-dim);display:flex;gap:.7rem;align-items:baseline;letter-spacing:.01em}
+.feat .pts li::before{content:"›";color:var(--accent);font-weight:600}
+.feat .media{order:0}
+.feat:nth-child(even) .media{order:-1}
+.feat .shot{border:1px solid var(--line);background:var(--ink-2);padding:8px}
+.feat .shot img{width:100%;border:1px solid var(--line-2);filter:saturate(.92)}
+
+/* ============ MODULE SPEC TABLE ============ */
+.modtable{border:1px solid var(--line)}
+.modrow{display:grid;grid-template-columns:auto 1fr 2.2fr;gap:clamp(1rem,2.5vw,2.4rem);align-items:center;padding:clamp(1rem,2.2vw,1.5rem) clamp(1.1rem,2.5vw,1.8rem);border-bottom:1px solid var(--line);transition:background .2s}
+.modrow:last-child{border-bottom:0}
+.modrow:hover{background:var(--accent-soft)}
+.modrow .code{font-family:var(--m);font-size:.74rem;color:var(--accent);letter-spacing:.12em;min-width:3.4rem}
+.modrow .mh{display:flex;align-items:center;gap:.85rem}
+.modrow .mh svg{width:20px;height:20px;stroke:var(--fg);stroke-width:1.4;fill:none;flex:none}
+.modrow .mh b{font-family:var(--t);font-weight:600;font-size:1.02rem}
+.modrow .md{color:var(--fg-dim);font-size:.9rem}
+
+/* ============ DEMO CREDENTIAL PLATE ============ */
+.demo{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(1.6rem,4vw,3.5rem);align-items:center}
+.demo h2{font-family:var(--t);font-weight:700;font-size:clamp(1.8rem,4vw,3rem);letter-spacing:-.02em;line-height:1.05;margin-bottom:1rem}
+.demo p{color:var(--fg-dim);max-width:42ch;margin-bottom:1.8rem}
+.term{border:1px solid var(--line);background:#0a0b0e;font-family:var(--m);font-size:.86rem}
+.term .top{display:flex;align-items:center;gap:.5rem;padding:.7rem 1rem;border-bottom:1px solid var(--line);color:var(--fg-mut);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase}
+.term .top i{width:9px;height:9px;border-radius:50%;background:var(--fg-mut);display:inline-block}
+.term .top i:first-child{background:var(--accent)}
+.term .body{padding:1.2rem 1.2rem 1.4rem}
+.term .row{display:flex;justify-content:space-between;gap:1rem;padding:.5rem 0;border-bottom:1px dashed var(--line-2)}
+.term .row:last-child{border-bottom:0}
+.term .k{color:var(--fg-mut)}.term .v{color:var(--accent-2);font-weight:500}
+
+/* ============ FOOTER ============ */
+footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
+.foot-top{display:flex;justify-content:space-between;gap:2rem;flex-wrap:wrap;align-items:flex-start;padding-bottom:1.8rem;border-bottom:1px solid var(--line)}
+.foot-top p{font-family:var(--m);font-size:.78rem;color:var(--fg-dim);max-width:44ch;line-height:1.7}
+.foot-bot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1.4rem;font-family:var(--m);font-size:.72rem;color:var(--fg-mut);letter-spacing:.04em}
+.totop{border:1px solid var(--line);background:none;color:var(--fg-dim);font-family:var(--m);font-size:.7rem;letter-spacing:.1em;padding:.5rem .9rem;cursor:pointer;transition:.2s;text-transform:uppercase}
+.totop:hover{border-color:var(--accent);color:var(--accent)}
+
+/* reveal on load */
+[data-rise]{opacity:0;transform:translateY(18px);animation:reveal .7s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes reveal{to{opacity:1;transform:none}}
+
+/* ============ RESPONSIVE ============ */
+@media(max-width:900px){
+  nav.links,.hbar .cta{display:none}
+  .burger{display:grid;place-items:center}
+  .hero-grid,.demo{grid-template-columns:1fr}
+  .feat{grid-template-columns:1fr;gap:1.2rem}
+  .feat .num{font-size:1.4rem}
+  .feat .media,.feat:nth-child(even) .media{order:-1}
+  .feat .shot{margin-bottom:.4rem}
+}
+@media(max-width:540px){
+  .specs{grid-template-columns:1fr;}
+  .specs div{border-right:0;border-bottom:1px solid var(--line);padding:1rem 0}
+  .modrow{grid-template-columns:1fr;gap:.5rem}
+  .modrow .code{min-width:0}
+  .hero-meta{font-size:.62rem}
+}
+/* mobile menu */
+#mnav{display:none;border-bottom:1px solid var(--line);background:var(--ink-2)}
+#mnav a{display:block;padding:1rem var(--gut);border-top:1px solid var(--line-2);font-family:var(--m);font-size:.84rem;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-dim)}
+#mnav a:active{color:var(--accent)}
+#mtoggle:checked~#mnav{display:block}
+#mtoggle{display:none}
+</style>
 </head>
 <body>
-  <!-- HEADER -->
-  <header class="header">
-    <div class="container">
-      <div class="header-inner">
-        <a href="index.html" class="logo">
-          <div class="logo-container">
-            <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#06b6d4"/>
-                </linearGradient>
-              </defs>
-              <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="url(#logoGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="30" cy="30" r="4.5" fill="#fff"/><circle cx="72" cy="30" r="4.5" fill="#fff"/>
-              <circle cx="45" cy="45" r="4.5" fill="#fff"/><circle cx="72" cy="60" r="4.5" fill="#fff"/><circle cx="30" cy="60" r="4.5" fill="#fff"/>
-            </svg>
-          </div>
-          <div class="logo-text">
-            <span class="logo-name">SWK Solution</span>
-            <span class="logo-sub">Technology Solutions Agency</span>
-          </div>
-        </a>
-        <nav class="nav">
-          <a href="index.html" class="nav-link">หน้าแรก</a>
-          <a href="index.html#services" class="nav-link">บริการของเรา</a>
-          <a href="#features" class="nav-link">ฟีเจอร์</a>
-          <a href="#modules" class="nav-link">โมดูล</a>
-          <a href="index.html#contact" class="nav-link">ติดต่อ</a>
-        </nav>
-        <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="btn btn-primary header-cta">เข้าสู่ระบบ →</a>
+
+<!-- HEADER -->
+<header>
+  <div class="wrap">
+    <div class="hbar">
+      <a href="index.html" class="brand">
+        <span class="mark">
+          <svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span>
+      </a>
+      <nav class="links">
+        <a href="index.html">หน้าแรก</a>
+        <a href="#features">ฟีเจอร์</a>
+        <a href="#modules">โมดูล</a>
+        <a href="#demo">เดโม</a>
+        <a href="index.html#contact">ติดต่อ</a>
+      </nav>
+      <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="cta solid">เข้าสู่ระบบ ↗</a>
+      <label for="mtoggle" class="burger">☰</label>
+    </div>
+  </div>
+  <input type="checkbox" id="mtoggle">
+  <div id="mnav">
+    <a href="index.html">หน้าแรก</a>
+    <a href="#features">ฟีเจอร์</a>
+    <a href="#modules">โมดูล</a>
+    <a href="#demo">เดโม</a>
+    <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener">เข้าสู่ระบบ ↗</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-meta">
+      <span>SWK&nbsp;PLATFORM / v1.0</span>
+      <span>PM × MANUFACTURING SUITE</span>
+      <span>EST. 2026 — BANGKOK</span>
+    </div>
+    <h1>
+      <span class="line"><span>แพลตฟอร์มเดียว</span></span>
+      <span class="line"><span>บริหาร<span class="o">โครงการ × การผลิต</span></span></span>
+      <span class="line"><span>ครบทั้งองค์กร</span></span>
+    </h1>
+    <div class="hero-grid">
+      <div data-rise style="animation-delay:.3s">
+        <p class="lead">ระบบ ERP/SaaS ระดับองค์กรที่รวมการบริหารโครงการ การวางแผนการผลิต (MRP) การควบคุมคุณภาพ เวิร์กโฟลว์อัตโนมัติ และรายงานเชิงวิเคราะห์ ไว้บนฐานข้อมูลเดียว — รองรับหลายองค์กรด้วยสถาปัตยกรรมไมโครเซอร์วิส</p>
+        <div class="hero-actions">
+          <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="btn primary">ทดลองใช้งานจริง ↗</a>
+          <a href="#features" class="btn">ดูฟีเจอร์</a>
+        </div>
+      </div>
+      <div class="plate" data-rise style="animation-delay:.42s">
+        <span class="tag">Live&nbsp;Dashboard</span>
+        <img src="assets/img_hero.png" alt="SWK Platform dashboard">
       </div>
     </div>
-  </header>
+    <div class="specs">
+      <div data-rise style="animation-delay:.5s"><div class="n">17<em>+</em></div><div class="l">Microservices</div></div>
+      <div data-rise style="animation-delay:.58s"><div class="n">12</div><div class="l">Business Modules</div></div>
+      <div data-rise style="animation-delay:.66s"><div class="n">100<em>%</em></div><div class="l">Multi-tenant RLS</div></div>
+    </div>
+  </div>
+</div>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-grid">
-        <div>
-          <div class="badge-row">
-            <span class="badge">PM Core</span>
-            <span class="badge cyan">Manufacturing / MRP</span>
-            <span class="badge purple">Workflow อัตโนมัติ</span>
-          </div>
-          <h1 class="hero-title">แพลตฟอร์มเดียว<br>บริหาร <span class="grad">โครงการ × การผลิต</span><br>ครบทั้งองค์กร</h1>
-          <p class="hero-p">SWK Platform คือระบบ SaaS ระดับองค์กรที่รวมการบริหารโครงการ, การวางแผนการผลิต (MRP), การควบคุมคุณภาพ, เวิร์กโฟลว์อัตโนมัติ, รายงาน BI และการแจ้งเตือน ไว้ในที่เดียว — สไตล์ MS Dynamics 365 รองรับหลายองค์กร (multi-tenant) ปลอดภัยด้วย Row-Level Security</p>
-          <div class="hero-actions">
-            <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="btn btn-primary">ทดลองใช้งานจริง (Live Demo) →</a>
-            <a href="#features" class="btn btn-secondary">ดูฟีเจอร์ทั้งหมด</a>
-          </div>
-          <div class="hero-stats">
-            <div><div class="stat-num">17<span>+</span></div><div class="stat-label">ไมโครเซอร์วิส</div></div>
-            <div><div class="stat-num">10<span>+</span></div><div class="stat-label">โมดูลธุรกิจ</div></div>
-            <div><div class="stat-num">100<span>%</span></div><div class="stat-label">Multi-tenant RLS</div></div>
-          </div>
-        </div>
-        <div class="hero-visual">
-          <span class="browser-bar"><i style="background:#ef4444"></i><i style="background:#f59e0b"></i><i style="background:#22c55e"></i></span>
-          <img src="assets/img_hero.png" alt="SWK Platform dashboard">
-        </div>
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="kicker" style="margin-bottom:1rem">Core Capabilities</div>
+        <h2>ความสามารถที่ออกแบบมาเพื่อการทำงานจริง</h2>
+      </div>
+      <span class="idx">[ 06 ระบบหลัก ]</span>
+    </div>
+
+    <article class="feat">
+      <div class="num">01</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4"/><rect x="3" y="11" width="12" height="4"/><rect x="3" y="18" width="16" height="3"/></svg></div>
+        <div class="ftag">Project Management</div>
+        <h3>บริหารโครงการแบบ Agile &amp; Waterfall</h3>
+        <p>วางแผน ติดตาม และส่งมอบงานด้วยเครื่องมือที่ทีมใช้จริง พร้อม Workspace เฉพาะบทบาท PM / BA / SA / Expert</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_project.jpg" alt="Project"></div>
+        <ul class="pts"><li>Backlog · Sprint · Board · Timesheet</li><li>Task hierarchy &amp; worklog</li><li>Role workspace จากงานจริง</li></ul>
+      </div>
+    </article>
+
+    <article class="feat">
+      <div class="num">02</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 21V8l6-3v4l6-3v4l6-3v14z"/><path d="M3 21h18"/></svg></div>
+        <div class="ftag">Manufacturing · MRP</div>
+        <h3>วางแผนการผลิตด้วย MRP Engine</h3>
+        <p>คำนวณความต้องการวัตถุดิบ จัดตารางการผลิต และติดตามใบสั่งผลิตแบบเรียลไทม์ ขับเคลื่อนด้วย compute engine ที่เขียนด้วย Rust</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_manufacturing.jpg" alt="Manufacturing"></div>
+        <ul class="pts"><li>BOM · Routing · Work Order · Lot</li><li>MRP · Inventory · Procurement</li><li>OEE · Work Center · Capacity</li></ul>
+      </div>
+    </article>
+
+    <article class="feat">
+      <div class="num">03</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 3h6v5l4 9a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3l4-9z"/><path d="M8 14h8"/></svg></div>
+        <div class="ftag">Quality Management</div>
+        <h3>ควบคุมคุณภาพระดับมาตรฐานอุตสาหกรรม</h3>
+        <p>ครบทั้ง APQP / PPAP, FMEA, Control Plan และวงจร NCR / CAPA เชื่อมโยงตรงกับสายการผลิตและการสอบกลับ lot</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_quality.jpg" alt="Quality"></div>
+        <ul class="pts"><li>APQP / PPAP · Control Plan</li><li>FMEA · Inspection</li><li>NCR / CAPA · Lot traceability</li></ul>
+      </div>
+    </article>
+
+    <article class="feat">
+      <div class="num">04</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.4 6H15a3 3 0 0 1 3 3v6.6"/></svg></div>
+        <div class="ftag">Workflow Automation</div>
+        <h3>เวิร์กโฟลว์อัตโนมัติแบบ no-code</h3>
+        <p>ออกแบบกระบวนการอนุมัติและงานอัตโนมัติด้วย visual editor รันบน runtime ที่รองรับ expression, switch, HTTP และ human task</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_workflow.jpg" alt="Workflow"></div>
+        <ul class="pts"><li>Visual designer · Template</li><li>Approval · Human task · HTTP</li><li>ติดตามทุก run instance</li></ul>
+      </div>
+    </article>
+
+    <article class="feat">
+      <div class="num">05</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/><rect x="19" y="13" width="0.1" height="4"/></svg></div>
+        <div class="ftag">Reports · BI</div>
+        <h3>แดชบอร์ดและรายงานเชิงวิเคราะห์</h3>
+        <p>สร้างแดชบอร์ดแบบ schema-driven ดึงตัวชี้วัดข้ามโมดูลมาแสดงในมุมมองเดียว ช่วยตัดสินใจบนข้อมูลจริง</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_reports.jpg" alt="Reports"></div>
+        <ul class="pts"><li>Dashboard builder</li><li>ตัวชี้วัดข้ามโมดูล</li><li>ปรับแต่งจาก JSON config</li></ul>
+      </div>
+    </article>
+
+    <article class="feat">
+      <div class="num">06</div>
+      <div>
+        <div class="icon"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div>
+        <div class="ftag">Notifications</div>
+        <h3>แจ้งเตือนหลายช่องทางอัตโนมัติ</h3>
+        <p>ส่งการแจ้งเตือนเข้าระบบ อีเมล และแชต (Teams / Slack / LINE) ตามเหตุการณ์ พร้อมตั้งค่าช่องทางรายบุคคล</p>
+      </div>
+      <div class="media"><div class="shot"><img src="assets/img_notification.jpg" alt="Notifications"></div>
+        <ul class="pts"><li>In-app · Email · Chat webhook</li><li>ตั้งค่าช่องทางต่อผู้ใช้</li><li>Event stream near real-time</li></ul>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section id="modules">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="kicker dim" style="margin-bottom:1rem">Full Module Index</div>
+        <h2>ทุกหน่วยงาน บนข้อมูลชุดเดียวกัน</h2>
+      </div>
+      <span class="idx">[ 12 โมดูล ]</span>
+    </div>
+    <div class="modtable">
+      <div class="modrow"><span class="code">PM-01</span><span class="mh"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16"/><path d="M3 9h18"/></svg><b>Project Management</b></span><span class="md">Backlog, Sprint, Task, Board, Timesheet, Role Workspace</span></div>
+      <div class="modrow"><span class="code">MFG-02</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M3 21V8l6-3v4l6-3v4l6-3v14z"/></svg><b>Manufacturing</b></span><span class="md">MRP, Work Order, Inventory, Scheduling, OEE, Costing</span></div>
+      <div class="modrow"><span class="code">QA-03</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M9 3h6v5l4 9a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3l4-9z"/></svg><b>Quality</b></span><span class="md">APQP/PPAP, FMEA, Control Plan, Inspection, NCR/CAPA</span></div>
+      <div class="modrow"><span class="code">TRC-04</span><span class="mh"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M6 8v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V8M12 14v2"/></svg><b>Traceability</b></span><span class="md">Lot genealogy สอบกลับวัตถุดิบถึงสินค้าสำเร็จรูป</span></div>
+      <div class="modrow"><span class="code">WFL-05</span><span class="mh"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 6h7a3 3 0 0 1 3 3v7"/></svg><b>Workflow Automation</b></span><span class="md">Visual designer + runtime สำหรับงานอนุมัติอัตโนมัติ</span></div>
+      <div class="modrow"><span class="code">BI-06</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg><b>Reports &amp; BI</b></span><span class="md">Dashboard เชิงวิเคราะห์ ปรับแต่งจาก schema</span></div>
+      <div class="modrow"><span class="code">NTF-07</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/></svg><b>Notifications</b></span><span class="md">In-app, Email, Teams/Slack/LINE ตามเหตุการณ์</span></div>
+      <div class="modrow"><span class="code">HR-08</span><span class="mh"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/></svg><b>HR</b></span><span class="md">พนักงาน, แผนก, ตำแหน่ง, Payroll, Leave, Training</span></div>
+      <div class="modrow"><span class="code">FIN-09</span><span class="mh"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13"/><path d="M3 10h18"/></svg><b>Accounting</b></span><span class="md">ผังบัญชี, Journal, Invoice, Aging, งบประมาณ</span></div>
+      <div class="modrow"><span class="code">CRM-10</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-7-10a7 7 0 0 1 14 0c0 5.5-7 10-7 10z"/></svg><b>Sales / CRM</b></span><span class="md">ลูกค้า, ใบเสนอราคา, ใบสั่งขาย เชื่อมตรงสู่การผลิต</span></div>
+      <div class="modrow"><span class="code">DOC-11</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><b>Documents</b></span><span class="md">เอกสาร, เทมเพลต และลายเซ็นดิจิทัล (e-signature)</span></div>
+      <div class="modrow"><span class="code">SEC-12</span><span class="mh"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/></svg><b>Security</b></span><span class="md">Multi-tenant RLS, JWT, Cedar authorization, Audit trail</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO -->
+<section id="demo">
+  <div class="wrap demo">
+    <div>
+      <div class="kicker" style="margin-bottom:1rem">Live Sandbox</div>
+      <h2>ทดลองใช้งานจริงได้เลย</h2>
+      <p>เข้าสู่ระบบเดโมด้วยบัญชีตัวอย่าง สำรวจทุกโมดูลบนข้อมูลจำลองที่พร้อมใช้งาน ไม่ต้องติดตั้งอะไรเพิ่ม</p>
+      <div class="hero-actions">
+        <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="btn primary">เปิดระบบเดโม ↗</a>
+        <a href="index.html#contact" class="btn">ปรึกษาทีม SWK</a>
       </div>
     </div>
-  </section>
-
-  <!-- FEATURES (alternating) -->
-  <section class="section" id="features">
-    <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">Core Capabilities</div>
-        <h2>ฟีเจอร์ที่ออกแบบมาเพื่อการทำงานจริง</h2>
-        <p>ทุกโมดูลเชื่อมต่อกันบนฐานข้อมูลเดียว ข้อมูลไหลตั้งแต่ใบสั่งขายจนถึงสายการผลิตและบัญชี</p>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_project.png" alt="Project management"></div>
-        <div>
-          <div class="feature-tag">Project Management</div>
-          <h3>บริหารโครงการแบบ Agile + Waterfall</h3>
-          <p>วางแผน ติดตาม และส่งมอบงานด้วยเครื่องมือที่ทีมจริงใช้ พร้อม Role Workspace เฉพาะทางสำหรับ PM / BA / SA / Expert</p>
-          <ul class="feature-list">
-            <li>Backlog, Sprint, Board และ Timesheet ครบวงจร</li>
-            <li>Task hierarchy, worklog และ activity log</li>
-            <li>Workspace แยกตามบทบาท ดึงข้อมูลจากงานจริง</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_manufacturing.png" alt="Manufacturing"></div>
-        <div>
-          <div class="feature-tag">Manufacturing · MRP</div>
-          <h3>วางแผนการผลิตด้วย MRP Engine ประสิทธิภาพสูง</h3>
-          <p>คำนวณความต้องการวัตถุดิบ จัดตารางการผลิต และติดตามใบสั่งผลิตแบบเรียลไทม์ ขับเคลื่อนด้วย compute engine ที่เขียนด้วย Rust</p>
-          <ul class="feature-list">
-            <li>BOM, Routing, Work Order และ Lot genealogy</li>
-            <li>MRP net-requirement, Inventory และ Procurement</li>
-            <li>OEE, Work Center, กำลังการผลิต และปฏิทินการผลิต</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_quality.png" alt="Quality"></div>
-        <div>
-          <div class="feature-tag">Quality Management</div>
-          <h3>ควบคุมคุณภาพระดับมาตรฐานอุตสาหกรรม</h3>
-          <p>ครบทั้ง APQP / PPAP, FMEA, Control Plan และวงจร NCR / CAPA เชื่อมโยงตรงกับสายการผลิตและ lot traceability</p>
-          <ul class="feature-list">
-            <li>APQP / PPAP workflow และ Control Plan</li>
-            <li>FMEA, Inspection plan และผลตรวจ</li>
-            <li>NCR / CAPA พร้อมการสอบกลับ lot</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_workflow.png" alt="Workflow automation"></div>
-        <div>
-          <div class="feature-tag">Workflow Automation</div>
-          <h3>เวิร์กโฟลว์อัตโนมัติแบบ no-code</h3>
-          <p>ออกแบบกระบวนการอนุมัติและงานอัตโนมัติด้วย visual editor รันบน workflow runtime ที่รองรับ expression, switch, HTTP และ human task</p>
-          <ul class="feature-list">
-            <li>Visual workflow designer และ template</li>
-            <li>ขั้นตอนอนุมัติ, human task และ HTTP call</li>
-            <li>ติดตามสถานะการรันทุก instance</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_reports.png" alt="Reports & BI"></div>
-        <div>
-          <div class="feature-tag">Reports · BI</div>
-          <h3>แดชบอร์ดและรายงานเชิงวิเคราะห์</h3>
-          <p>สร้างแดชบอร์ดแบบ schema-driven ดึงตัวชี้วัดข้ามโมดูลมาแสดงผลในมุมมองเดียว ช่วยให้ตัดสินใจได้บนข้อมูลจริง</p>
-          <ul class="feature-list">
-            <li>Dashboard builder และ widget หลากหลาย</li>
-            <li>ตัวชี้วัดข้ามโมดูล (PM, MFG, Quality, Sales)</li>
-            <li>ออกแบบจาก JSON config ปรับแต่งได้ตามองค์กร</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature-row">
-        <div class="feature-media"><img src="assets/img_notification.png" alt="Notifications"></div>
-        <div>
-          <div class="feature-tag">Notifications</div>
-          <h3>แจ้งเตือนหลายช่องทางอัตโนมัติ</h3>
-          <p>ส่งการแจ้งเตือนเข้าระบบ, อีเมล และแชต (Teams / Slack / LINE) ตามเหตุการณ์ พร้อมตั้งค่าช่องทางรายบุคคล</p>
-          <ul class="feature-list">
-            <li>In-app, Email และ Chat webhook</li>
-            <li>ตั้งค่าช่องทางต่อผู้ใช้ต่อประเภทเหตุการณ์</li>
-            <li>ขับเคลื่อนด้วย event stream แบบ near real-time</li>
-          </ul>
-        </div>
+    <div class="term">
+      <div class="top"><i></i><i></i><i></i>&nbsp;&nbsp;demo.credentials</div>
+      <div class="body">
+        <div class="row"><span class="k">tenant_slug</span><span class="v">demo-co</span></div>
+        <div class="row"><span class="k">email</span><span class="v">demo@demo.co</span></div>
+        <div class="row"><span class="k">password</span><span class="v">DemoPass#2026</span></div>
+        <div class="row"><span class="k">endpoint</span><span class="v">/login ↗</span></div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- MODULES GRID -->
-  <section class="section" id="modules">
-    <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">All Modules</div>
-        <h2>โมดูลครบวงจรในแพลตฟอร์มเดียว</h2>
-        <p>ออกแบบให้แต่ละหน่วยงานทำงานบนข้อมูลชุดเดียวกัน ลดงานซ้ำซ้อนและความผิดพลาดจากการโอนข้อมูล</p>
-      </div>
-      <div class="grid">
-        <div class="card"><div class="ico">📋</div><h4>Project Management</h4><p>Backlog, Sprint, Task, Board, Timesheet และ Role Workspace</p></div>
-        <div class="card"><div class="ico">🏭</div><h4>Manufacturing</h4><p>MRP, Work Order, Inventory, Scheduling, OEE และ Costing</p></div>
-        <div class="card"><div class="ico">🔬</div><h4>Quality</h4><p>APQP/PPAP, FMEA, Control Plan, Inspection, NCR/CAPA</p></div>
-        <div class="card"><div class="ico">🧬</div><h4>Traceability</h4><p>Lot genealogy การสอบกลับวัตถุดิบถึงสินค้าสำเร็จรูป</p></div>
-        <div class="card"><div class="ico">⚙️</div><h4>Workflow Automation</h4><p>Visual designer + runtime สำหรับอนุมัติและงานอัตโนมัติ</p></div>
-        <div class="card"><div class="ico">📊</div><h4>Reports &amp; BI</h4><p>Dashboard เชิงวิเคราะห์ ปรับแต่งจาก schema</p></div>
-        <div class="card"><div class="ico">🔔</div><h4>Notifications</h4><p>In-app, Email, Teams/Slack/LINE ตามเหตุการณ์</p></div>
-        <div class="card"><div class="ico">👥</div><h4>HR</h4><p>พนักงาน, แผนก, ตำแหน่ง, payroll, leave และ training</p></div>
-        <div class="card"><div class="ico">💰</div><h4>Accounting</h4><p>ผังบัญชี, journal, invoice, aging และงบประมาณ</p></div>
-        <div class="card"><div class="ico">🤝</div><h4>Sales / CRM</h4><p>ลูกค้า, ใบเสนอราคา, ใบสั่งขาย เชื่อมตรงสู่การผลิต</p></div>
-        <div class="card"><div class="ico">📄</div><h4>Documents</h4><p>เอกสาร, เทมเพลต และลายเซ็นดิจิทัล (e-signature)</p></div>
-        <div class="card"><div class="ico">🛡️</div><h4>Security</h4><p>Multi-tenant RLS, JWT, Cedar authorization และ audit trail</p></div>
-      </div>
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <a href="index.html" class="brand">
+        <span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span>
+      </a>
+      <p>SWK Platform — แพลตฟอร์มบริหารโครงการและการผลิตครบวงจร พัฒนาด้วยสถาปัตยกรรมไมโครเซอร์วิสระดับองค์กร โดยบริษัท เอส ดับบลิว เค โซลูชั่น จำกัด</p>
     </div>
-  </section>
+    <div class="foot-bot">
+      <span>© 2026 บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด · ทะเบียน 0105559018855</span>
+      <button class="totop" onclick="scrollTo({top:0,behavior:'smooth'})">↑ กลับขึ้นบน</button>
+    </div>
+  </div>
+</footer>
 
-  <!-- DEMO CTA -->
-  <section class="section">
-    <div class="container">
-      <div class="cta-box">
-        <h2>ทดลองใช้งานจริงได้เลย</h2>
-        <p>เข้าสู่ระบบเดโมด้วยบัญชีตัวอย่าง สำรวจทุกโมดูลบนข้อมูลจำลองที่พร้อมใช้งาน — ไม่ต้องติดตั้งอะไรเพิ่ม</p>
-        <div class="cred">
-          <span><span class="k">องค์กร</span><b>demo-co</b></span>
-          <span><span class="k">อีเมล</span><b>demo@demo.co</b></span>
-          <span><span class="k">รหัสผ่าน</span><b>DemoPass#2026</b></span>
-        </div>
-        <div class="hero-actions" style="justify-content:center">
-          <a href="https://web-production-7ef95.up.railway.app/login" target="_blank" rel="noopener" class="btn btn-primary">เปิดระบบเดโม →</a>
-          <a href="index.html#contact" class="btn btn-secondary">ปรึกษาทีมงาน SWK</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-top">
-        <a href="index.html" class="logo">
-          <div class="logo-container">
-            <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs><linearGradient id="lg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs>
-              <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="url(#lg2)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <div class="logo-text"><span class="logo-name">SWK Solution</span><span class="logo-sub">Technology Solutions Agency</span></div>
-        </a>
-        <h4>SWK Platform — แพลตฟอร์มบริหารโครงการและการผลิตครบวงจร พัฒนาด้วยสถาปัตยกรรมไมโครเซอร์วิสระดับองค์กรโดย SWK Solution</h4>
-      </div>
-      <div class="footer-copyright">
-        <span>© 2026 บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด — เลขทะเบียนนิติบุคคล 0105559018855. สงวนลิขสิทธิ์ทั้งหมด.</span>
-        <button class="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">▲</button>
-      </div>
-    </div>
-  </footer>
 </body>
 </html>
