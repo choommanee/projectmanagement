@@ -7,239 +7,15 @@
 <meta name="description" content="บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ให้บริการพัฒนาซอฟต์แวร์ระดับองค์กร ออกแบบ UI/UX, โลโก้แบรนด์ และโซลูชัน IoT ครบวงจร ดำเนินกิจการมั่นคงด้วยทุนจดทะเบียน 1,000,000 บาท">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --ink:#0c0d10; --ink-2:#121419; --panel:#15171d; --panel-2:#1b1e26;
-  --line:rgba(233,228,217,.12); --line-2:rgba(233,228,217,.07);
-  --fg:#ece7dd; --fg-dim:#a7a59d; --fg-mut:#74726b;
-  --accent:#ff5a1f; --accent-2:#ff8a3d; --accent-soft:rgba(255,90,31,.10);
-  --ok:#5fcf80;
-  --t:'IBM Plex Sans Thai','Archivo',sans-serif; --d:'Archivo',sans-serif; --m:'IBM Plex Mono',monospace;
-  --gut:clamp(1.2rem,4vw,4rem);
-}
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{background:var(--ink);color:var(--fg);font-family:var(--t);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-body::before{content:"";position:fixed;inset:0;z-index:-2;background:
-  linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
-  background-size:clamp(40px,7vw,86px) clamp(40px,7vw,86px);
-  -webkit-mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 80%);
-          mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 80%)}
-body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;background:radial-gradient(70% 50% at 80% 0%,rgba(255,90,31,.06),transparent 60%)}
-a{color:inherit;text-decoration:none} img{display:block;max-width:100%}
-::selection{background:var(--accent);color:#fff}
-.wrap{max-width:1240px;margin:0 auto;padding-inline:var(--gut)}
-.mono{font-family:var(--m)}
-.kicker{font-family:var(--m);font-size:.72rem;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:.6rem}
-.kicker::before{content:"";width:26px;height:1px;background:var(--accent)}
-.kicker.dim{color:var(--fg-mut)}.kicker.dim::before{background:var(--fg-mut)}
-
-/* HEADER */
-header{position:sticky;top:0;z-index:60;background:rgba(12,13,16,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.hbar{display:flex;align-items:center;justify-content:space-between;height:64px;gap:1rem}
-.brand{display:flex;align-items:center;gap:.7rem}
-.brand .mark{width:34px;height:34px;border:1px solid var(--line);display:grid;place-items:center;background:var(--ink-2)}
-.brand b{font-family:var(--d);font-weight:800;font-size:1.02rem;letter-spacing:-.01em;line-height:1}
-.brand small{display:block;font-family:var(--m);font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;color:var(--fg-mut);margin-top:3px}
-nav.links{display:flex;gap:1.7rem}
-nav.links a{font-family:var(--m);font-size:.76rem;letter-spacing:.04em;color:var(--fg-dim);text-transform:uppercase;transition:color .2s;position:relative}
-nav.links a:hover{color:var(--fg)}
-nav.links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:1px;background:var(--accent);transition:width .25s}
-nav.links a:hover::after{width:100%}
-.cta{font-family:var(--m);font-size:.74rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:.6rem 1.05rem;border:1px solid var(--accent);color:var(--accent);transition:.2s;white-space:nowrap}
-.cta:hover{background:var(--accent);color:#fff}.cta.solid{background:var(--accent);color:#fff}.cta.solid:hover{background:var(--accent-2);border-color:var(--accent-2)}
-.burger{display:none;background:none;border:1px solid var(--line);color:var(--fg);width:40px;height:36px;font-size:1rem;cursor:pointer}
-#mtoggle{display:none}
-#mnav{display:none;border-bottom:1px solid var(--line);background:var(--ink-2)}
-#mnav a{display:block;padding:1rem var(--gut);border-top:1px solid var(--line-2);font-family:var(--m);font-size:.84rem;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-dim)}
-#mtoggle:checked~#mnav{display:block}
-
-/* BTN */
-.btn{font-family:var(--m);font-size:.8rem;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:.95rem 1.6rem;border:1px solid var(--line);color:var(--fg);transition:.22s;display:inline-flex;align-items:center;gap:.6rem;cursor:pointer}
-.btn:hover{border-color:var(--fg);transform:translateY(-2px)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
-
-/* HERO */
-.hero{padding:clamp(2.6rem,7vw,5.5rem) 0 clamp(2.4rem,5vw,4rem);border-bottom:1px solid var(--line)}
-.hero-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.6rem;font-family:var(--m);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:clamp(1.4rem,3.5vw,2.6rem)}
-.badge-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.4rem}
-.badge{font-family:var(--m);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;padding:.35rem .7rem;border:1px solid var(--line);color:var(--fg-dim)}
-.badge.live{border-color:var(--accent);color:var(--accent)}
-.hero h1{font-family:var(--t);font-weight:700;font-size:clamp(2rem,5.4vw,4.2rem);line-height:1.05;letter-spacing:-.02em;max-width:18ch}
-.hero h1 span{color:var(--accent)}
-.hero-grid{display:grid;grid-template-columns:1fr 1.02fr;gap:clamp(2rem,5vw,4rem);align-items:center;margin-top:clamp(1.6rem,4vw,2.6rem)}
-.lead{font-size:clamp(.98rem,1.2vw,1.1rem);color:var(--fg-dim);max-width:48ch;border-left:2px solid var(--accent);padding-left:1.1rem;margin-bottom:1.8rem}
-.hero-actions{display:flex;gap:.9rem;flex-wrap:wrap}
-.specs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);margin-top:clamp(2rem,5vw,3.2rem)}
-.specs div{padding:1.3rem 0;border-right:1px solid var(--line)} .specs div:last-child{border-right:0}
-.specs .n{font-family:var(--d);font-weight:800;font-size:clamp(1.5rem,3.2vw,2.3rem);line-height:1;letter-spacing:-.02em}
-.specs .n em{color:var(--accent);font-style:normal}
-.specs .l{font-family:var(--m);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-mut);margin-top:.5rem;max-width:24ch}
-
-/* hero tabs + panels */
-.tabbtns{display:flex;gap:0;border:1px solid var(--line);margin-bottom:-1px;width:fit-content}
-.tabbtn{font-family:var(--m);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:.6rem 1rem;background:none;border:0;border-right:1px solid var(--line);color:var(--fg-mut);cursor:pointer;transition:.2s}
-.tabbtn:last-child{border-right:0}.tabbtn.active{background:var(--accent);color:#fff}
-.panel{display:none}.panel.active{display:block}
-.plate{position:relative;border:1px solid var(--line);background:var(--ink-2);padding:10px}
-.plate::before,.plate::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--accent)}
-.plate::before{top:-1px;left:-1px;border-right:0;border-bottom:0}.plate::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
-.plate .barlbl{display:flex;align-items:center;gap:.5rem;font-family:var(--m);font-size:.64rem;color:var(--fg-mut);padding:.2rem .2rem .55rem;letter-spacing:.08em}
-.plate .barlbl i{width:8px;height:8px;border-radius:50%;background:var(--fg-mut)}.plate .barlbl i:first-child{background:var(--accent)}
-.plate img{width:100%;border:1px solid var(--line-2)}
-/* topology */
-.topo{border:1px solid var(--line);background:var(--ink-2);padding:1.4rem;min-height:340px;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-content:center}
-.topo .node{border:1px solid var(--line);padding:.9rem;background:var(--ink)}
-.topo .node .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:.5rem}
-.topo .node b{font-size:.86rem;display:block;margin-bottom:.2rem}
-.topo .node span{font-family:var(--m);font-size:.68rem;color:var(--fg-mut)}
-.topo .core{position:absolute;inset:0;margin:auto;width:64px;height:64px;border:1px solid var(--accent);border-radius:50%;display:grid;place-items:center;background:var(--ink);box-shadow:0 0 0 6px var(--ink)}
-.topo .core::after{content:"";width:14px;height:14px;background:var(--accent);border-radius:50%;animation:pulse 2.4s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
-
-/* SECTION */
-section{padding:clamp(3.2rem,7vw,6rem) 0;border-bottom:1px solid var(--line)}
-.sec-head{margin-bottom:clamp(2rem,5vw,3.4rem);max-width:52rem}
-.sec-head h2{font-family:var(--t);font-weight:700;font-size:clamp(1.6rem,3.4vw,2.6rem);letter-spacing:-.015em;line-height:1.12;margin:1rem 0 .8rem}
-.sec-head h2 span{color:var(--accent)}
-.sec-head p{color:var(--fg-dim);max-width:54ch}
-
-/* SERVICES */
-.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line)}
-.svc{padding:clamp(1.4rem,2.5vw,2rem);border-right:1px solid var(--line);transition:background .2s;position:relative}
-.svc:last-child{border-right:0}.svc:hover{background:var(--accent-soft)}
-.svc .code{font-family:var(--m);font-size:.66rem;color:var(--fg-mut);letter-spacing:.14em}
-.svc .ic{width:32px;height:32px;color:var(--accent);margin:1.1rem 0 1rem}
-.svc .ic svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
-.svc h3{font-family:var(--t);font-weight:600;font-size:1.12rem;margin-bottom:.6rem}
-.svc p{color:var(--fg-dim);font-size:.88rem}
-
-/* SHOWCASE */
-.show-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(1rem,2vw,1.5rem)}
-.show{border:1px solid var(--line);background:var(--ink-2);transition:.22s}
-.show:hover{border-color:var(--accent);transform:translateY(-4px)}
-.show .imgw{border-bottom:1px solid var(--line);overflow:hidden;aspect-ratio:16/10;background:var(--ink)}
-.show .imgw img{width:100%;height:100%;object-fit:cover;filter:saturate(.92)}
-.show .b{padding:1.3rem}
-.show h3{font-family:var(--t);font-weight:600;font-size:1.08rem;margin-bottom:.5rem}
-.show p{color:var(--fg-dim);font-size:.84rem;margin-bottom:1rem}
-.show .tags{display:flex;flex-wrap:wrap;gap:.4rem}
-.show .tags span{font-family:var(--m);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut);border:1px solid var(--line);padding:.25rem .5rem}
-
-/* SYNERGY */
-.syn{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(2rem,4vw,3.5rem);align-items:center;border:1px solid var(--line);padding:clamp(1.6rem,4vw,3rem)}
-.syn h3{font-family:var(--t);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.01em;margin:.9rem 0 1rem;line-height:1.15}
-.syn h3 span{color:var(--accent)}
-.syn>div>p{color:var(--fg-dim);margin-bottom:1.6rem;max-width:48ch}
-.benefit{display:flex;gap:.9rem;padding:1rem 0;border-top:1px solid var(--line)}
-.benefit .bi{width:26px;height:26px;flex:none;color:var(--accent)}.benefit .bi svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
-.benefit b{display:block;font-weight:600;font-size:.94rem;margin-bottom:.25rem}
-.benefit span{color:var(--fg-dim);font-size:.84rem}
-.monitor{border:1px solid var(--line);background:#0a0b0e;font-family:var(--m)}
-.monitor .h{display:flex;justify-content:space-between;align-items:center;padding:.8rem 1rem;border-bottom:1px solid var(--line);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut)}
-.monitor .h .on{color:var(--ok)}
-.monitor .r{display:flex;justify-content:space-between;padding:.8rem 1rem;border-bottom:1px solid var(--line-2);font-size:.8rem}
-.monitor .r:last-child{border-bottom:0}
-.monitor .r .lbl{color:var(--fg-mut)} .monitor .r .v{color:var(--fg)} .monitor .r .v.ok{color:var(--ok)} .monitor .r .v.ac{color:var(--accent-2)}
-.bar{height:8px;border:1px solid var(--line);width:120px;align-self:center}.bar>div{height:100%;background:var(--accent)}
-
-/* ESTIMATOR */
-.est{display:grid;grid-template-columns:1.3fr .7fr;border:1px solid var(--line)}
-.est-in{padding:clamp(1.4rem,3vw,2.2rem);border-right:1px solid var(--line)}
-.grp{margin-bottom:1.8rem}.grp:last-child{margin-bottom:0}
-.grp .gh{display:flex;justify-content:space-between;font-family:var(--m);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.8rem}
-.grp .gh span:last-child{color:var(--accent)}
-.opts{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-.opt-card{border:1px solid var(--line);padding:.85rem;cursor:pointer;transition:.18s}
-.opt-card:hover{border-color:var(--fg-dim)}
-.opt-card.active{border-color:var(--accent);background:var(--accent-soft)}
-.opt-title{display:block;font-weight:600;font-size:.9rem;margin-bottom:.2rem}
-.opt-desc{display:block;font-family:var(--m);font-size:.66rem;color:var(--fg-mut)}
-.range-slider{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:var(--line);outline:none}
-.range-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;background:var(--accent);cursor:pointer;border:3px solid var(--ink)}
-.range-slider::-moz-range-thumb{width:18px;height:18px;background:var(--accent);cursor:pointer;border:3px solid var(--ink);border-radius:0}
-.cbs{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-.cb-item{display:flex;align-items:center;gap:.6rem;border:1px solid var(--line);padding:.7rem .8rem;cursor:pointer;font-size:.84rem;transition:.18s}
-.cb-item:hover{border-color:var(--fg-dim)}
-.cb-item.active{border-color:var(--accent)}
-.cb-icon{width:16px;height:16px;border:1px solid var(--fg-mut);display:grid;place-items:center;font-size:.7rem;color:transparent;flex:none}
-.cb-item.active .cb-icon{background:var(--accent);border-color:var(--accent);color:#fff}
-.est-out{padding:clamp(1.4rem,3vw,2.2rem);display:flex;flex-direction:column;justify-content:center;background:var(--ink-2)}
-.est-out .el{font-family:var(--m);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.6rem}
-.est-out .ep{font-family:var(--d);font-weight:800;font-size:clamp(2rem,4.5vw,3rem);letter-spacing:-.02em;color:var(--accent);line-height:1}
-.est-meta{font-size:.8rem;color:var(--fg-dim);margin:1.4rem 0;line-height:1.9}
-.est-meta strong{color:var(--fg)}
-
-/* ABOUT */
-.about{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,4vw,3.5rem);align-items:start}
-.cred-item{display:flex;gap:.9rem;padding:1rem 0;border-top:1px solid var(--line)}
-.cred-item .ci{width:26px;height:26px;flex:none;color:var(--accent)}.cred-item .ci svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
-.cred-item b{display:block;font-weight:600;font-size:.92rem;margin-bottom:.25rem}.cred-item span{color:var(--fg-dim);font-size:.84rem}
-.dbd{border:1px solid var(--line)}
-.dbd .dh{font-family:var(--m);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
-.dbd .dr{display:flex;justify-content:space-between;gap:1rem;padding:.9rem 1.2rem;border-bottom:1px solid var(--line-2);font-size:.86rem}
-.dbd .dr:last-child{border-bottom:0}
-.dbd .dr .k{color:var(--fg-mut);font-family:var(--m);font-size:.74rem;white-space:nowrap}
-.dbd .dr .vv{text-align:right}
-
-/* CONTACT */
-.contact{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.6rem,4vw,3rem)}
-.cbox{border:1px solid var(--line);padding:clamp(1.4rem,3vw,2.2rem)}
-.cbox h3{font-family:var(--t);font-weight:700;font-size:1.3rem;margin-bottom:.6rem}
-.cbox .fd{color:var(--fg-dim);font-size:.88rem;margin-bottom:1.6rem}
-.fg{margin-bottom:1rem}.frow{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.fl{display:block;font-family:var(--m);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.5rem}
-.fc{width:100%;background:var(--ink-2);border:1px solid var(--line);color:var(--fg);font-family:var(--t);font-size:.92rem;padding:.75rem .85rem;transition:.2s}
-.fc:focus{outline:none;border-color:var(--accent)}
-textarea.fc{resize:vertical;min-height:96px}
-.mapcard{border:1px solid var(--line);background:var(--ink-2);padding:clamp(1.4rem,3vw,2rem)}
-.mapcard h3{font-family:var(--t);font-weight:700;font-size:1.2rem;margin-bottom:.5rem}
-.mapcard .fd{color:var(--fg-dim);font-size:.85rem;margin-bottom:1.2rem}
-.mapgrid{border:1px solid var(--line);height:160px;position:relative;background:
-  linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);background-size:22px 22px;margin-bottom:1.2rem;overflow:hidden}
-.mappin{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;background:var(--accent);border-radius:50%;box-shadow:0 0 0 6px rgba(255,90,31,.18)}
-.mappin::after{content:"📍 SWK HQ";position:absolute;top:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--m);font-size:.6rem;color:var(--accent);letter-spacing:.1em}
-.minfo{display:flex;gap:.8rem;padding:.8rem 0;border-top:1px solid var(--line)}
-.minfo .mi{width:22px;height:22px;flex:none;color:var(--accent)}.minfo .mi svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
-.minfo b{display:block;font-size:.84rem;font-weight:600;margin-bottom:.2rem}.minfo span{color:var(--fg-dim);font-size:.8rem}
-
-/* FOOTER */
-footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
-.foot-top{display:flex;justify-content:space-between;gap:2rem;flex-wrap:wrap;align-items:flex-start;padding-bottom:1.8rem;border-bottom:1px solid var(--line)}
-.foot-top p{font-family:var(--m);font-size:.78rem;color:var(--fg-dim);max-width:46ch;line-height:1.7;text-align:right}
-.foot-bot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1.4rem;font-family:var(--m);font-size:.72rem;color:var(--fg-mut);letter-spacing:.04em}
-.totop{border:1px solid var(--line);background:none;color:var(--fg-dim);font-family:var(--m);font-size:.7rem;letter-spacing:.1em;padding:.5rem .9rem;cursor:pointer;transition:.2s;text-transform:uppercase}
-.totop:hover{border-color:var(--accent);color:var(--accent)}
-
-/* reveal */
-[data-rev]{opacity:0;transform:translateY(20px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
-[data-rev].in{opacity:1;transform:none}
-
-/* RESPONSIVE */
-@media(max-width:980px){
-  .svc-grid{grid-template-columns:1fr 1fr}.svc:nth-child(2){border-right:0}.svc{border-bottom:1px solid var(--line)}
-  .show-grid{grid-template-columns:1fr 1fr}
-  .syn,.est,.about,.contact{grid-template-columns:1fr}
-  .est-in{border-right:0;border-bottom:1px solid var(--line)}
-}
-@media(max-width:900px){nav.links,.hbar .cta{display:none}.burger{display:grid;place-items:center}.hero-grid{grid-template-columns:1fr}}
-@media(max-width:600px){
-  .svc-grid{grid-template-columns:1fr}.svc{border-right:0;border-bottom:1px solid var(--line)}
-  .show-grid{grid-template-columns:1fr}
-  .specs{grid-template-columns:1fr}.specs div{border-right:0;border-bottom:1px solid var(--line);padding:1rem 0}
-  .opts,.cbs,.frow{grid-template-columns:1fr}
-  .foot-top p{text-align:left}
-  .dbd .dr{flex-direction:column;gap:.2rem}.dbd .dr .vv{text-align:left}
-}
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
   <div class="wrap"><div class="hbar">
     <a href="#" class="brand">
-      <span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="mark"><svg width="22" height="22" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#b7502e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span>
     </a>
     <nav class="links">
@@ -250,39 +26,31 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
       <a href="#about">เกี่ยวกับเรา</a>
       <a href="#contact">ติดต่อ</a>
     </nav>
-    <a href="#estimator" class="cta solid">คำนวณราคา</a>
+    <a href="#contact" class="cta solid">ร่วมงานกับเรา</a>
     <label for="mtoggle" class="burger">☰</label>
   </div></div>
   <input type="checkbox" id="mtoggle">
   <div id="mnav">
-    <a href="#services">บริการ</a>
-    <a href="#showcase">ผลงาน</a>
-    <a href="product.html">แพลตฟอร์ม PM×การผลิต</a>
-    <a href="#estimator">ประเมินราคา</a>
-    <a href="#about">เกี่ยวกับเรา</a>
-    <a href="#contact">ติดต่อ</a>
+    <a href="#services">บริการ</a><a href="#showcase">ผลงาน</a><a href="product.html">แพลตฟอร์ม PM×การผลิต</a>
+    <a href="#estimator">ประเมินราคา</a><a href="#about">เกี่ยวกับเรา</a><a href="#contact">ติดต่อ</a>
   </div>
 </header>
 
 <!-- HERO -->
 <div class="hero"><div class="wrap">
-  <div class="hero-meta">
-    <span>SWK SOLUTION CO., LTD.</span>
-    <span>SOFTWARE · UI/UX · IoT</span>
-    <span>EST. 2559 — BANGKOK</span>
-  </div>
   <div class="badge-row">
-    <span class="badge live">● ดำเนินกิจการอยู่</span>
+    <span class="badge live">ดำเนินกิจการอยู่</span>
     <span class="badge">จัดตั้งปี 2559</span>
     <span class="badge">ทุนจดทะเบียน 1,000,000 บาท</span>
   </div>
-  <h1>เราพัฒนาซอฟต์แวร์ระดับองค์กร<br>และ<span>โซลูชันนวัตกรรม</span>ล้ำสมัย</h1>
+  <span class="eyebrow">ดิจิทัลเอเจนซี · วิศวกรรมซอฟต์แวร์</span>
+  <h1>เราออกแบบและพัฒนา<br><em>ซอฟต์แวร์ที่องค์กรไว้ใจ</em></h1>
   <div class="hero-grid">
     <div data-rev>
-      <p class="lead">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ดิจิทัลเอเจนซีผู้เชี่ยวชาญงานรับพัฒนาซอฟต์แวร์ Custom, ออกแบบ UI/UX และอัตลักษณ์โลโก้แบรนด์พรีเมียม ตลอดจนบูรณาการซอฟต์แวร์ควบคุมฮาร์ดแวร์ IoT ครบวงจร</p>
+      <p class="lead">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด — พันธมิตรด้านการพัฒนาซอฟต์แวร์ Custom, ออกแบบ UI/UX และอัตลักษณ์แบรนด์พรีเมียม ตลอดจนระบบควบคุมฮาร์ดแวร์ IoT เรารับฟัง เข้าใจปัญหา และส่งมอบงานที่ใช้ได้จริง</p>
       <div class="hero-actions">
-        <a href="#estimator" class="btn primary">คำนวณราคาค่าบริการ</a>
-        <a href="#services" class="btn">สำรวจบริการ</a>
+        <a href="#contact" class="btn primary">เริ่มคุยกับเรา ↗</a>
+        <a href="#services" class="btn ghost">สำรวจบริการ</a>
       </div>
       <div class="specs">
         <div><div class="n">10<em>+</em></div><div class="l">ปี ความมั่นคงในการดำเนินกิจการ</div></div>
@@ -290,26 +58,10 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
         <div><div class="n">DBD</div><div class="l">นิติบุคคลจดทะเบียนถูกต้อง</div></div>
       </div>
     </div>
-    <div data-rev>
-      <div class="tabbtns">
-        <button class="tabbtn active" data-target="panel-dashboard">Product Dashboard</button>
-        <button class="tabbtn" data-target="panel-topology">System Topology</button>
-      </div>
-      <div class="panel active" id="panel-dashboard">
-        <div class="plate">
-          <div class="barlbl"><i></i><i></i><i></i>&nbsp;swk-solution.com/line-accounting</div>
-          <img src="assets/hero_real_1_1777219776698.png" alt="LINE Accounting / TaxSmart dashboard">
-        </div>
-      </div>
-      <div class="panel" id="panel-topology">
-        <div class="topo">
-          <div class="node"><b><span class="dot"></span>Client App</b><span>Custom_UI.tsx</span></div>
-          <div class="node"><b><span class="dot"></span>API Gateway</b><span>GraphQL / gRPC</span></div>
-          <div class="node"><b><span class="dot"></span>Services</b><span>Microservice_Core</span></div>
-          <div class="node"><b><span class="dot"></span>Data Layer</b><span>Postgres &amp; Redis</span></div>
-          <div class="core"></div>
-        </div>
-      </div>
+    <div class="plate" data-rev>
+      <div class="barlbl"><i></i><i></i><i></i>&nbsp;<span style="font-family:var(--serif);font-style:italic">swk-solution.com</span></div>
+      <span class="tag">Flagship Product</span>
+      <img src="assets/hero_real_1_1777219776698.png" alt="LINE Accounting / TaxSmart dashboard">
     </div>
   </div>
 </div></div>
@@ -317,24 +69,24 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <!-- SERVICES -->
 <section id="services"><div class="wrap">
   <div class="sec-head" data-rev>
-    <span class="kicker">บริการเฉพาะทางระดับมืออาชีพ</span>
-    <h2>เสาหลักความเชี่ยวชาญ<br><span>วิศวกรรมซอฟต์แวร์ครบวงจร</span></h2>
-    <p>ออกแบบสถาปัตยกรรมดิจิทัลชั้นยอด พัฒนาโค้ดที่ยืดหยุ่น และงานออกแบบที่มีสไตล์ เพื่อยกระดับประสบการณ์ผู้ใช้และแบรนด์ของคุณ</p>
+    <span class="eyebrow">บริการเฉพาะทาง</span>
+    <h2>เสาหลักความเชี่ยวชาญ — <em>วิศวกรรมซอฟต์แวร์ครบวงจร</em></h2>
+    <p>ออกแบบสถาปัตยกรรมดิจิทัลชั้นยอด พัฒนาโค้ดที่ยืดหยุ่น และงานออกแบบที่มีรสนิยม เพื่อยกระดับประสบการณ์ผู้ใช้และแบรนด์ของคุณ</p>
   </div>
   <div class="svc-grid" data-rev>
-    <div class="svc"><span class="code">S-01</span>
+    <div class="svc"><span class="code">01</span>
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></div>
       <h3>Custom Software</h3><p>รับพัฒนาซอฟต์แวร์ตามสั่ง เว็บแอป โมบายแอป ระบบคลังสินค้า และ Cloud Backend ที่ยืดหยุ่นและขยายตัวได้ดี</p>
     </div>
-    <div class="svc"><span class="code">S-02</span>
+    <div class="svc"><span class="code">02</span>
       <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5"/><rect x="3" y="11" width="18" height="5"/><path d="M3 18h12"/></svg></div>
       <h3>Enterprise SaaS</h3><p>ผู้พัฒนาแพลตฟอร์มบริหารโครงการ (PM Platform) แบบ All-in-one ข้อมูลไหลเชื่อมโยงเรียลไทม์ทั่วทั้งองค์กร</p>
     </div>
-    <div class="svc"><span class="code">S-03</span>
+    <div class="svc"><span class="code">03</span>
       <div class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></svg></div>
       <h3>IoT &amp; Automation</h3><p>วางระบบและเขียนซอฟต์แวร์เชื่อมต่อฮาร์ดแวร์ เซ็นเซอร์พลังงาน PLC และออโตเมชันในโรงงาน ผสานข้อมูลกายภาพกับแดชบอร์ด</p>
     </div>
-    <div class="svc"><span class="code">S-04</span>
+    <div class="svc"><span class="code">04</span>
       <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20l5-1L20 8a2 2 0 0 0-3-3L6 16z"/><path d="M14 6l3 3"/></svg></div>
       <h3>Branding &amp; UI/UX</h3><p>สตูดิโอออกแบบโลโก้แบรนด์พรีเมียม และ Redesign เว็บไซต์เดิมให้ทันสมัยระดับสากล เน้น UX ที่ลื่นไหลน่าใช้งาน</p>
     </div>
@@ -344,8 +96,8 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <!-- SHOWCASE -->
 <section id="showcase"><div class="wrap">
   <div class="sec-head" data-rev>
-    <span class="kicker dim">ขีดความสามารถการพัฒนา</span>
-    <h2>ขุมพลังเทคโนโลยีองค์กร<br><span>โมดูล LINE Accounting &amp; TaxSmart</span></h2>
+    <span class="eyebrow">ผลงานที่ภาคภูมิใจ</span>
+    <h2>ขุมพลังเทคโนโลยีองค์กร — <em>LINE Accounting &amp; TaxSmart</em></h2>
     <p>การันตีความประณีตในการออกแบบ User Interface ระดับเวิลด์คลาส อัดแน่นด้วยฟังก์ชันวิเคราะห์ชั้นสูงที่รองรับข้อมูลปริมาณมาก</p>
   </div>
   <div class="show-grid">
@@ -362,18 +114,19 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <section id="synergy"><div class="wrap">
   <div class="syn" data-rev>
     <div>
-      <span class="kicker">Enterprise SaaS Solutions</span>
-      <h3>ความลงตัวทางเทคโนโลยี<br>ด้วยแพลตฟอร์ม <span>PM Platform</span></h3>
+      <span class="eyebrow">Enterprise SaaS</span>
+      <h3>ความลงตัวทางเทคโนโลยี ด้วยแพลตฟอร์ม <em>PM Platform</em></h3>
       <p>ระบบ PM Platform ของ SWK Solution ขจัดความยุ่งยากในการเชื่อมต่อหลายระบบ มอบความลื่นไหลด้วยข้อมูลเรียลไทม์ โมดูลเชื่อมต่อกันทันทีโดยไม่ต้อง integrate เพิ่ม ครอบคลุมการควบคุมคุณภาพตามมาตรฐานเข้มงวด</p>
       <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><b>Dynamic Gantt Chart &amp; Critical Path</b><span>คำนวณเส้นทางวิกฤตของทุกโมดูล ประเมินความเสี่ยงและแจ้งเตือนความคืบหน้าทันทีเมื่อมีการเปลี่ยนแปลง</span></div></div>
       <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"/></svg></span><div><b>BOM &amp; Inventory Traceability</b><span>คลังและชิ้นส่วนเชื่อมโยงใบจัดซื้ออัตโนมัติ ติดตาม Lot การใช้งานแบบ end-to-end</span></div></div>
       <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/></svg></span><div><b>ระบบบริหารคุณภาพ APQP/PPAP/FMEA</b><span>รองรับมาตรฐานยานยนต์และการผลิตระดับสูง ออกใบ NCR และแผน CAPA ทันทีในระบบ</span></div></div>
+      <div class="hero-actions" style="margin-top:1.6rem"><a href="product.html" class="btn ghost">ดูรายละเอียดแพลตฟอร์ม →</a></div>
     </div>
     <div class="monitor">
-      <div class="h"><span>SWK PM · MONITOR</span><span class="on">● ACTIVE</span></div>
-      <div class="r"><span class="lbl">Project Health</span><span class="v ok">EXCELLENT 100%</span></div>
-      <div class="r"><span class="lbl">Quality Audit</span><span class="v">PASSED · Cpk 1.84</span></div>
-      <div class="r"><span class="lbl">DB Nodes</span><span class="v ac">99.99% UPTIME</span></div>
+      <div class="h"><span style="font-family:var(--serif);font-style:italic">PM · Monitor</span><span class="on">● Active</span></div>
+      <div class="r"><span class="lbl">Project Health</span><span class="v">Excellent · 100%</span></div>
+      <div class="r"><span class="lbl">Quality Audit</span><span class="v">Passed · Cpk 1.84</span></div>
+      <div class="r"><span class="lbl">DB Uptime</span><span class="v ac">99.99%</span></div>
       <div class="r"><span class="lbl">Deployments</span><span class="bar"><div style="width:95%"></div></span></div>
     </div>
   </div>
@@ -382,8 +135,8 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <!-- ESTIMATOR -->
 <section id="estimator"><div class="wrap">
   <div class="sec-head" data-rev>
-    <span class="kicker">คำนวณงบประมาณด่วน</span>
-    <h2>วางแผนงบประมาณโครงการ<br><span>ประเมินราคาอัจฉริยะ</span></h2>
+    <span class="eyebrow">วางแผนงบประมาณ</span>
+    <h2>ประเมินราคาโครงการ — <em>รู้งบเบื้องต้นทันที</em></h2>
     <p>เลือกความต้องการและการตั้งค่าระบบ เพื่อคำนวณงบประมาณเบื้องต้นสำหรับโครงการซอฟต์แวร์ ดีไซน์ หรือออโตเมชันของคุณ</p>
   </div>
   <div class="est" data-rev>
@@ -415,9 +168,9 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
       <span class="el">งบประมาณเริ่มต้นโดยประมาณ</span>
       <span class="ep" id="calc-display-price">฿135,000</span>
       <div class="est-meta">
-        ● รวม <strong>ซอร์สโค้ดลิขสิทธิ์ 100%</strong><br>
-        ● ฟรี Maintenance <strong>1 ปีเต็ม</strong><br>
-        ● ทีมวิศวกรซอฟต์แวร์ไทยมากประสบการณ์
+        — รวม <strong>ซอร์สโค้ดลิขสิทธิ์ 100%</strong><br>
+        — ฟรี Maintenance <strong>1 ปีเต็ม</strong><br>
+        — ทีมวิศวกรซอฟต์แวร์ไทยมากประสบการณ์
       </div>
       <a href="#contact" class="btn primary" id="estimate-send-btn" style="width:100%;justify-content:center">ขอรับใบเสนอราคา</a>
     </div>
@@ -428,9 +181,9 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <section id="about"><div class="wrap">
   <div class="about">
     <div data-rev>
-      <span class="kicker dim">เกี่ยวกับบริษัท</span>
-      <h2 style="font-family:var(--t);font-weight:700;font-size:clamp(1.6rem,3.4vw,2.4rem);letter-spacing:-.015em;line-height:1.12;margin:1rem 0 .9rem">พันธมิตรเทคโนโลยีที่มั่นคง<br><span style="color:var(--accent)">ดำเนินกิจการอย่างมืออาชีพ</span></h2>
-      <p style="color:var(--fg-dim);max-width:50ch">องค์กรวิศวกรรมเทคโนโลยีและผู้พัฒนาซอฟต์แวร์ที่จดทะเบียนมายาวนานกว่า 10 ปี มุ่งยกระดับประสิทธิภาพกระบวนการขององค์กรลูกค้าด้วยซอฟต์แวร์คุณภาพสูง และการบูรณาการระบบควบคุมทางกายภาพอย่างลงตัว</p>
+      <span class="eyebrow">เกี่ยวกับบริษัท</span>
+      <h2 style="font-size:clamp(1.8rem,3.8vw,2.6rem);font-weight:400;margin:.4rem 0 1rem">พันธมิตรเทคโนโลยีที่มั่นคง <em>ดำเนินกิจการอย่างมืออาชีพ</em></h2>
+      <p style="color:var(--ink-soft);max-width:50ch">องค์กรวิศวกรรมเทคโนโลยีและผู้พัฒนาซอฟต์แวร์ที่จดทะเบียนมายาวนานกว่า 10 ปี มุ่งยกระดับประสิทธิภาพกระบวนการขององค์กรลูกค้าด้วยซอฟต์แวร์คุณภาพสูง และการบูรณาการระบบควบคุมทางกายภาพอย่างลงตัว</p>
       <div style="margin-top:1.4rem">
         <div class="cred-item"><span class="ci"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5"/></svg></span><div><b>จดทะเบียนถูกต้องตามกฎหมาย</b><span>สถานะ "ยังดำเนินกิจการอยู่" (Active) โครงสร้างการเงินโปร่งใส ปราศจากหนี้สิน</span></div></div>
         <div class="cred-item"><span class="ci"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg></span><div><b>เลขทะเบียนนิติบุคคล 0105559018855</b><span>จดทะเบียนจัดตั้งเมื่อ 2 กุมภาพันธ์ พ.ศ. 2559 ตรวจสอบได้</span></div></div>
@@ -440,7 +193,7 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
       <div class="dh">DBD Corporate Profile</div>
       <div class="dr"><span class="k">ชื่อ (ไทย)</span><span class="vv">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด</span></div>
       <div class="dr"><span class="k">ชื่อ (EN)</span><span class="vv">SWK Solution Company Limited</span></div>
-      <div class="dr"><span class="k">เลขนิติบุคคล</span><span class="vv mono">0105559018855</span></div>
+      <div class="dr"><span class="k">เลขนิติบุคคล</span><span class="vv">0105559018855</span></div>
       <div class="dr"><span class="k">วันจัดตั้ง</span><span class="vv">2 กุมภาพันธ์ 2559</span></div>
       <div class="dr"><span class="k">ทุนจดทะเบียน</span><span class="vv">1,000,000 บาท</span></div>
       <div class="dr"><span class="k">ที่ตั้ง</span><span class="vv">224/58 ม.อาร์เค พาร์ค ถ.สายไหม เขตสายไหม กรุงเทพฯ 10220</span></div>
@@ -450,6 +203,10 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 
 <!-- CONTACT -->
 <section id="contact"><div class="wrap">
+  <div class="sec-head" data-rev>
+    <span class="eyebrow">มาเริ่มต้นด้วยกัน</span>
+    <h2>เล่าโจทย์ของคุณให้เราฟัง — <em>แล้วเรามาสร้างมันด้วยกัน</em></h2>
+  </div>
   <div class="contact">
     <div class="cbox" data-rev>
       <h3>ส่งคำขอปรึกษาโครงการ</h3>
@@ -485,24 +242,17 @@ footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
 <!-- FOOTER -->
 <footer><div class="wrap">
   <div class="foot-top">
-    <a href="#" class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span></a>
+    <a href="#" class="brand"><span class="mark"><svg width="22" height="22" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#b7502e" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span></a>
     <p>ผู้ให้บริการซอฟต์แวร์นวัตกรรม แพลตฟอร์มบริหารโครงการ และการออกแบบแบรนด์อัตลักษณ์ดิจิทัลครบวงจร ด้วยวิศวกรรมขั้นสูง</p>
   </div>
   <div class="foot-bot">
     <span>© 2026 บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด · ทะเบียน 0105559018855</span>
-    <button class="totop" onclick="scrollTo({top:0,behavior:'smooth'})">↑ กลับขึ้นบน</button>
+    <button type="button" class="totop" onclick="scrollTo({top:0,behavior:'smooth'})">↑ กลับขึ้นบน</button>
   </div>
 </div></footer>
 
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
-  // tabs
-  const tabs=document.querySelectorAll('.tabbtn'),panels=document.querySelectorAll('.panel');
-  tabs.forEach(b=>b.addEventListener('click',()=>{
-    tabs.forEach(t=>t.classList.remove('active'));panels.forEach(p=>p.classList.remove('active'));
-    b.classList.add('active');document.getElementById(b.dataset.target).classList.add('active');
-  }));
-  // estimator
   const cards=document.querySelectorAll('.opt-card'),range=document.getElementById('complexity-range'),
     rLbl=document.getElementById('range-val-complexity'),addons=document.querySelectorAll('.cb-item'),
     price=document.getElementById('calc-display-price'),sendBtn=document.getElementById('estimate-send-btn'),
@@ -515,8 +265,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     rLbl.textContent=labels[c-1];
     const cm=0.5+(c-1)*0.45;let add=0;
     document.querySelectorAll('.cb-item.active').forEach(i=>add+=parseFloat(i.dataset.addon));
-    const total=Math.round(base[t]*m*cm+add);
-    price.textContent='฿'+total.toLocaleString();
+    price.textContent='฿'+Math.round(base[t]*m*cm+add).toLocaleString();
     if(svcSel)svcSel.value=t;
   }
   cards.forEach(c=>c.addEventListener('click',()=>{cards.forEach(x=>x.classList.remove('active'));c.classList.add('active');calc();}));
@@ -529,8 +278,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(d)d.value=`สวัสดีครับ สนใจติดตั้งระบบงาน:\n- ประเภท: ${a.querySelector('.opt-title').textContent}\n- ขนาด: ${labels[c-1]}\n- ฟีเจอร์เสริม: ${sel.join(', ')||'ไม่มี'}\n- งบประมาณประเมิน: ${price.textContent}`;
   });
   calc();
-  // reveal
-  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.07,rootMargin:'0px 0px -40px 0px'});
   document.querySelectorAll('[data-rev]').forEach(el=>io.observe(el));
 });
 </script>
