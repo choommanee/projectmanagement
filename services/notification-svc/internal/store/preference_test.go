@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/pmplatform/services/notification-svc/internal/domain"
 	"github.com/pmplatform/services/notification-svc/internal/store"
 )
 
@@ -86,6 +87,54 @@ func TestPreference_UpsertAndGet(t *testing.T) {
 	}
 	if len(channels) != 1 || channels[0] != "slack" {
 		t.Fatalf("expected [slack], got %v", channels)
+	}
+}
+
+func TestPreference_ListAndUpsertMany(t *testing.T) {
+	p := prefTestPool(t)
+	ps := store.NewPreference(p)
+	tid := seedTenant(t, p)
+	uid := uuid.New()
+
+	// Empty initially.
+	list, err := ps.List(context.Background(), tid, uid)
+	if err != nil {
+		t.Fatalf("List empty: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("expected 0 rows, got %d", len(list))
+	}
+
+	// Bulk upsert two kinds.
+	in := []domain.Preference{
+		{Kind: "task.assigned", Channels: []string{"inapp", "email"}},
+		{Kind: "task.blocked", Channels: []string{"inapp"}},
+	}
+	if err := ps.UpsertMany(context.Background(), tid, uid, in); err != nil {
+		t.Fatalf("UpsertMany: %v", err)
+	}
+	list, err = ps.List(context.Background(), tid, uid)
+	if err != nil {
+		t.Fatalf("List after upsert: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(list))
+	}
+
+	// Re-upsert one kind with new channels → updates, not duplicates.
+	if err := ps.UpsertMany(context.Background(), tid, uid, []domain.Preference{
+		{Kind: "task.assigned", Channels: []string{"email"}},
+	}); err != nil {
+		t.Fatalf("UpsertMany update: %v", err)
+	}
+	list, _ = ps.List(context.Background(), tid, uid)
+	if len(list) != 2 {
+		t.Fatalf("expected still 2 rows, got %d", len(list))
+	}
+	for _, pr := range list {
+		if pr.Kind == "task.assigned" && (len(pr.Channels) != 1 || pr.Channels[0] != "email") {
+			t.Fatalf("task.assigned channels = %v, want [email]", pr.Channels)
+		}
 	}
 }
 

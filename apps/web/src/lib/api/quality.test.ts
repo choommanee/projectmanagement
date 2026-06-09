@@ -269,11 +269,11 @@ describe("quality API client", () => {
     });
     global.fetch = mockFetch;
 
-    const c = await addControlPlanChar("cp-001", { no: 1, characteristic: "Torque", spec: "20±2 Nm", sample_size: 5 });
+    const c = await addControlPlanChar("cp-001", { no: 1, characteristic: "Torque", spec: "20±2 Nm", sample_size: "5" });
     expect(c.id).toBe("char-001");
     expect(c.characteristic).toBe("Torque");
     expect(c.spec).toBe("20±2 Nm");
-    expect(c.sampleSize).toBe(5);
+    expect(c.sampleSize).toBe("5");
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/quality/control-plans/cp-001/characteristics",
       expect.objectContaining({ method: "POST" }),
@@ -425,5 +425,92 @@ describe("quality API client", () => {
     });
 
     await expect(createApqp({ item_id: "", name: "X" })).rejects.toThrow("item_id required");
+  });
+
+  // 16. getCAPA reads first item from {items,total} wrapper (bug 4)
+  it("getCAPA unwraps items[0] from list envelope", async () => {
+    (global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [
+          {
+            ID: "capa-007",
+            NonconformanceID: "ncr-001",
+            RootCause: "Tooling wear",
+            Action: "Replace tooling",
+            Status: "in_progress",
+            Evidence: "",
+            CreatedAt: "2026-05-20T00:00:00Z",
+            UpdatedAt: "2026-05-20T00:00:00Z",
+          },
+        ],
+        total: 1,
+      }),
+    });
+
+    const c = await getCAPA("ncr-001");
+    expect(c).not.toBeNull();
+    expect(c!.id).toBe("capa-007");
+    expect(c!.rootCause).toBe("Tooling wear");
+    expect(c!.status).toBe("in_progress");
+  });
+
+  // 17. getCAPA returns null on empty items list
+  it("getCAPA returns null when items list is empty", async () => {
+    (global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ items: [], total: 0 }),
+    });
+
+    const c = await getCAPA("ncr-no-capa");
+    expect(c).toBeNull();
+  });
+
+  // 18. listPpapElements maps Go EvidenceURL (URL-acronym) casing (bug 6)
+  it("listPpapElements maps EvidenceURL acronym casing", async () => {
+    (global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            ID: "el-1",
+            SubmissionID: "ppap-001",
+            ElementNo: 1,
+            Name: "Design Records",
+            Status: "complete",
+            EvidenceURL: "https://example.com/evidence.pdf",
+            Notes: "",
+            UpdatedAt: "2026-05-01T00:00:00Z",
+          },
+        ],
+      }),
+    });
+
+    const list = await listPpapElements("ppap-001");
+    expect(list[0].evidenceUrl).toBe("https://example.com/evidence.pdf");
+  });
+
+  // 19. addControlPlanChar keeps non-numeric sample_size as a string (bug 7)
+  it("addControlPlanChar preserves non-numeric sample_size as string", async () => {
+    (global.fetch as MockFetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ID: "char-009",
+        ControlPlanID: "cp-001",
+        No: 1,
+        Characteristic: "Visual",
+        Spec: "no defects",
+        SampleSize: "100%",
+        SampleFreq: "each",
+        MeasurementMethod: "Visual",
+        ReactionPlan: "Scrap",
+        SortOrder: 0,
+      }),
+    });
+
+    const c = await addControlPlanChar("cp-001", { no: 1, characteristic: "Visual", sample_size: "100%" });
+    expect(c.sampleSize).toBe("100%");
   });
 });

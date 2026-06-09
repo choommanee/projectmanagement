@@ -62,6 +62,11 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.Get("/invoices/{id}", getInvoice(svc))
 		r.With(libauth.RequireAction(authz, "accounting.invoice.update", "*")).Patch("/invoices/{id}", updateInvoice(svc))
 		r.With(libauth.RequireAction(authz, "accounting.invoice.delete", "*")).Delete("/invoices/{id}", deleteInvoice(svc))
+
+		// Budgets
+		r.Get("/budgets", listBudgets(svc))
+		r.With(libauth.RequireAction(authz, "accounting.budget.set", "*")).Post("/budgets", setBudget(svc))
+		r.With(libauth.RequireAction(authz, "accounting.budget.set", "*")).Patch("/budgets/{accountId}", setBudgetForAccount(svc))
 	})
 
 	return r
@@ -132,6 +137,8 @@ func createAccount(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.account.create", "account", a.ID.String(), nil,
+			map[string]any{"code": a.Code, "name": a.Name, "account_type": a.AccountType})
 		writeJSON(w, 201, a)
 	}
 }
@@ -242,6 +249,9 @@ func updateAccount(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.account.update", "account", id.String(),
+			map[string]any{"name": cur.Name, "active": cur.Active},
+			map[string]any{"name": a.Name, "active": a.Active})
 		writeJSON(w, 200, a)
 	}
 }
@@ -270,6 +280,7 @@ func deleteAccount(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.account.delete", "account", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -314,6 +325,8 @@ func createJournalEntry(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.je.create", "journal_entry", e.ID.String(), nil,
+			map[string]any{"ref_no": e.RefNo})
 		writeJSON(w, 201, e)
 	}
 }
@@ -417,6 +430,9 @@ func updateJournalEntry(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.je.update", "journal_entry", id.String(),
+			map[string]any{"memo": cur.Memo},
+			map[string]any{"memo": e.Memo})
 		writeJSON(w, 200, e)
 	}
 }
@@ -443,6 +459,10 @@ func postJournalEntry(svc *service.Service) http.HandlerFunc {
 		}
 		e, err := svc.JournalEntries.Post(r.Context(), tid, id, req.Version)
 		if err != nil {
+			if errors.Is(err, domain.ErrInvalidInput) {
+				writeErr(w, 400, err)
+				return
+			}
 			if errors.Is(err, domain.ErrConflict) {
 				writeErr(w, 409, err)
 				return
@@ -450,6 +470,8 @@ func postJournalEntry(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.je.post", "journal_entry", id.String(), nil,
+			map[string]any{"ref_no": e.RefNo, "status": e.Status})
 		writeJSON(w, 200, e)
 	}
 }
@@ -621,6 +643,8 @@ func createInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.invoice.create", "invoice", inv.ID.String(), nil,
+			map[string]any{"inv_no": inv.InvNo, "inv_type": inv.InvType, "amount": inv.Amount})
 		writeJSON(w, 201, inv)
 	}
 }
@@ -728,6 +752,13 @@ func updateInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		action := "accounting.invoice.update"
+		if req.Status != "" && req.Status != cur.Status {
+			action = "accounting.invoice.status"
+		}
+		emitAudit(svc, r, action, "invoice", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": inv.Status})
 		writeJSON(w, 200, inv)
 	}
 }
@@ -756,7 +787,88 @@ func deleteInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "accounting.invoice.delete", "invoice", id.String(), nil, nil)
 		w.WriteHeader(204)
+	}
+}
+
+// ---- Budgets ----
+
+func listBudgets(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		items, err := svc.Budgets.List(r.Context(), tid)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": items})
+	}
+}
+
+type setBudgetReq struct {
+	AccountID string  `json:"account_id"`
+	Amount    float64 `json:"amount"`
+}
+
+func setBudget(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		var req setBudgetReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		accountID, err := uuid.Parse(req.AccountID)
+		if err != nil {
+			writeErr(w, 400, errors.New("valid account_id required"))
+			return
+		}
+		b, err := svc.Budgets.Upsert(r.Context(), tid, accountID, req.Amount)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "accounting.budget.set", "budget", accountID.String(), nil,
+			map[string]any{"amount": req.Amount})
+		writeJSON(w, 200, b)
+	}
+}
+
+type setBudgetAmountReq struct {
+	Amount float64 `json:"amount"`
+}
+
+func setBudgetForAccount(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
+		if err != nil {
+			writeErr(w, 400, errors.New("valid accountId required"))
+			return
+		}
+		var req setBudgetAmountReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		b, err := svc.Budgets.Upsert(r.Context(), tid, accountID, req.Amount)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "accounting.budget.set", "budget", accountID.String(), nil,
+			map[string]any{"amount": req.Amount})
+		writeJSON(w, 200, b)
 	}
 }
 

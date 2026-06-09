@@ -6,6 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/pmplatform/libs/go/audit v0.0.0
 	github.com/pmplatform/libs/go/nats v0.0.0
 	github.com/pmplatform/libs/go/notification v0.0.0
 	github.com/pmplatform/libs/go/otel v0.0.0
@@ -55,6 +56,7 @@ require (
 )
 
 replace (
+	github.com/pmplatform/libs/go/audit => ../../libs/go/audit
 	github.com/pmplatform/libs/go/nats => ../../libs/go/nats
 	github.com/pmplatform/libs/go/notification => ../../libs/go/notification
 	github.com/pmplatform/libs/go/otel => ../../libs/go/otel

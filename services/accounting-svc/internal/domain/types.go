@@ -85,6 +85,17 @@ const (
 	InvStatusCancelled InvStatus = "cancelled"
 )
 
+// ---- Account Budget ----
+
+type AccountBudget struct {
+	ID        uuid.UUID
+	TenantID  uuid.UUID
+	AccountID uuid.UUID
+	Amount    float64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Invoice struct {
 	ID              uuid.UUID
 	TenantID        uuid.UUID

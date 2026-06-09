@@ -5,9 +5,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pmplatform/libs/go/audit"
 	"github.com/pmplatform/services/tenant-svc/internal/domain"
 	"github.com/pmplatform/services/tenant-svc/internal/store"
 )
+
+// AuditPublisher is satisfied by *audit.PgPublisher and *audit.Fallback.
+type AuditPublisher interface {
+	Publish(ctx context.Context, action string, ev audit.Event) error
+}
 
 // Service is the tenant-svc application service.
 // CustomFields is optional; it is nil if the pool was not wired at boot
@@ -15,6 +21,10 @@ import (
 type Service struct {
 	s            *store.Store
 	CustomFields *store.CustomFieldStore
+
+	// Audit records significant mutations to audit_log. Optional: nil makes
+	// the audit helper a no-op.
+	Audit AuditPublisher
 }
 
 // New creates a Service backed by the given Store. Use WithCustomFields to
@@ -24,6 +34,12 @@ func New(s *store.Store) *Service { return &Service{s: s} }
 // WithCustomFields attaches the custom field store to the service.
 func (svc *Service) WithCustomFields(cf *store.CustomFieldStore) *Service {
 	svc.CustomFields = cf
+	return svc
+}
+
+// WithAudit attaches an audit publisher and returns the service for chaining.
+func (svc *Service) WithAudit(p AuditPublisher) *Service {
+	svc.Audit = p
 	return svc
 }
 

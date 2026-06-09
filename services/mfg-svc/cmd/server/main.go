@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
 	notiflib "github.com/pmplatform/libs/go/notification"
@@ -68,8 +69,12 @@ func main() {
 		}
 	}
 
+	// Audit publisher: direct Postgres write so it works with NATS down.
+	auditPub := audit.NewPgPublisher(p, "mfg-svc")
+
 	svc := service.New(items, wcs, boms, routings, workOrders, mrp, genealogy, inventory, suppliers, purchaseOrders, mrpEngineURL, traceEngineURL).
-		WithNotifPublisher(notifPub)
+		WithNotifPublisher(notifPub).
+		WithAuditPublisher(auditPub)
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

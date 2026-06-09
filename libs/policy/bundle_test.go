@@ -68,6 +68,14 @@ func TestBundleGrid(t *testing.T) {
 		{"document.workspace.ensure allow tenant-admin", "document.workspace.ensure", []string{"tenant-admin"}, false, true},
 		{"document.update deny mfg-operator", "document.update", []string{"mfg-operator"}, false, false},
 		{"document.delete deny anon", "document.delete", nil, false, false},
+		// H1: document.sign.* is the act-as-signer surface — allowed for a
+		// normal authenticated human role, but DENIED for the workflow-service
+		// service principal (least-privilege; it never acts as a signer).
+		{"document.sign.sign allow project-manager (human)", "document.sign.sign", []string{"project-manager"}, false, true},
+		{"document.sign.sign deny workflow-service", "document.sign.sign", []string{"workflow-service"}, false, false},
+		{"document.sign.decline deny workflow-service", "document.sign.decline", []string{"workflow-service"}, false, false},
+		{"document.sign.view deny workflow-service", "document.sign.view", []string{"workflow-service"}, false, false},
+		{"document.sign.otp.request deny workflow-service", "document.sign.otp.request", []string{"workflow-service"}, false, false},
 
 		// --- mfg-svc -------------------------------------------------------
 		{"mfg.item.create allow mfg-operator", "mfg.item.create", []string{"mfg-operator"}, false, true},
@@ -105,6 +113,21 @@ func TestBundleGrid(t *testing.T) {
 		// so only authenticated-user cases are exercised here.
 		{"notif.mark_all_read allow project-manager", "notif.mark_all_read", []string{"project-manager"}, false, true},
 		{"notif.mark_all_read allow tenant-admin", "notif.mark_all_read", []string{"tenant-admin"}, false, true},
+
+		// --- service-to-service: workflow-service role ---------------------
+		// The workflow runtime engine token may perform exactly the five
+		// actions its node kernels need, and nothing more.
+		{"document.create allow workflow-service", "document.create", []string{"workflow-service"}, false, true},
+		{"document.sign.envelope.create allow workflow-service", "document.sign.envelope.create", []string{"workflow-service"}, false, true},
+		{"document.sign.send allow workflow-service", "document.sign.send", []string{"workflow-service"}, false, true},
+		{"project.task.create allow workflow-service", "project.task.create", []string{"workflow-service"}, false, true},
+		{"project.task.update allow workflow-service", "project.task.update", []string{"workflow-service"}, false, true},
+		// Negative: workflow-service must NOT inherit destructive or unrelated
+		// privileges.
+		{"project.delete deny workflow-service", "project.delete", []string{"workflow-service"}, true, false},
+		{"document.delete deny workflow-service", "document.delete", []string{"workflow-service"}, false, false},
+		{"mfg.work_order.release deny workflow-service", "mfg.work_order.release", []string{"workflow-service"}, false, false},
+		{"jwt.rotate deny workflow-service", "jwt.rotate", []string{"workflow-service"}, false, false},
 
 		// --- destructive forbid grid ---------------------------------------
 		// tenant.delete: even platform-admin needs confirm=true; tenant-admin
@@ -203,6 +226,14 @@ func TestBundleABACGrid(t *testing.T) {
 		{"document.update same-tenant allow", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
 		{"document.update cross-tenant deny", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
 		{"document.update cross-tenant deny tenant-admin", "document.update", `Document::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"tenant-admin"}, "t-call", false, false},
+
+		// --- document.sign.* cross-tenant (M2) ----------------------------
+		{"document.sign.envelope.create same-tenant allow", "document.sign.envelope.create", `Document::"d1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
+		{"document.sign.envelope.create cross-tenant deny", "document.sign.envelope.create", `Document::"d1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"document.sign.send cross-tenant deny", "document.sign.send", `SignEnvelope::"e1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"document.sign.void cross-tenant deny", "document.sign.void", `SignEnvelope::"e1"`, map[string]any{"tenant_id": "t-other"}, []string{"tenant-admin"}, "t-call", false, false},
+		{"document.sign.verify_link.create cross-tenant deny", "document.sign.verify_link.create", `SignEnvelope::"e1"`, map[string]any{"tenant_id": "t-other"}, []string{"project-manager"}, "t-call", false, false},
+		{"document.sign.send same-tenant allow", "document.sign.send", `SignEnvelope::"e1"`, map[string]any{"tenant_id": "t-call"}, []string{"project-manager"}, "t-call", false, true},
 
 		// --- mfg.* --------------------------------------------------------
 		{"mfg.item.update same-tenant allow", "mfg.item.update", `Item::"i1"`, map[string]any{"tenant_id": "t-call"}, []string{"mfg-operator"}, "t-call", false, true},

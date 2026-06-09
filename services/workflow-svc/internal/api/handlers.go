@@ -70,8 +70,11 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		// Instances
 		r.Get("/workflows/{id}/instances", listInstances(svc))
 		r.With(libauth.RequireActionScoped(authz, "workflow.instance.start", "Workflow::{:id}", loaderOpts...)).Post("/workflows/{id}/start", startInstance(svc))
+		// Tenant-wide run history (read-only, like the per-workflow list above).
+		r.Get("/instances", listAllInstances(svc))
 		r.Get("/instances/{id}", getInstance(svc))
 		r.With(libauth.RequireActionScoped(authz, "workflow.instance.resume", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/resume", resumeInstance(svc))
+		r.With(libauth.RequireActionScoped(authz, "workflow.instance.retry", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/retry", retryInstance(svc))
 		r.With(libauth.RequireActionScoped(authz, "workflow.instance.cancel", "Instance::{:id}", loaderOpts...)).Post("/instances/{id}/cancel", cancelInstance(svc))
 
 		// Templates (system-wide, no tenant scope on reads)
@@ -150,6 +153,8 @@ func createWorkflow(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.create", "workflow_definition", d.ID.String(), nil,
+			map[string]any{"name": d.Name, "status": d.Status})
 		writeJSON(w, 201, d)
 	}
 }
@@ -254,6 +259,8 @@ func updateWorkflow(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.update", "workflow_definition", id.String(), nil,
+			map[string]any{"name": d.Name, "status": d.Status})
 		writeJSON(w, 200, d)
 	}
 }
@@ -282,6 +289,7 @@ func deleteWorkflow(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.delete", "workflow_definition", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -344,6 +352,8 @@ func createVersion(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.version.create", "workflow_version", v.ID.String(), nil,
+			map[string]any{"definition_id": defID.String(), "rev": v.Rev})
 
 		writeJSON(w, 201, v)
 	}
@@ -426,6 +436,8 @@ func publishWorkflow(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.publish", "workflow_definition", defID.String(), nil,
+			map[string]any{"rev": req.Rev})
 		d, _ := svc.Defs.GetByID(r.Context(), tid, defID)
 		writeJSON(w, 200, d)
 	}
@@ -459,6 +471,33 @@ func listInstances(svc *service.Service) http.HandlerFunc {
 	}
 }
 
+// listAllInstances lists instances across all workflow definitions for the
+// tenant (paginated, optional ?status= filter). Read-only — no Cedar action,
+// matching the per-workflow instance list route.
+func listAllInstances(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		status := r.URL.Query().Get("status")
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+		items, total, err := svc.Instances.ListAll(r.Context(), tid, store.ListInstancesOpts{
+			Status: status, Limit: limit, Offset: offset,
+		})
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if items == nil {
+			items = []*domain.WorkflowInstance{}
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
+	}
+}
+
 type startInstanceReq struct {
 	Input json.RawMessage `json:"input,omitempty"`
 }
@@ -486,6 +525,12 @@ func startInstance(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		instID := ""
+		if result.Instance != nil {
+			instID = result.Instance.ID.String()
+		}
+		emitAudit(svc, r, "workflow.instance.start", "workflow_instance", instID, nil,
+			map[string]any{"definition_id": defID.String()})
 		writeJSON(w, 201, result)
 	}
 }
@@ -549,6 +594,35 @@ func resumeInstance(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.instance.resume", "workflow_instance", id.String(), nil, nil)
+		writeJSON(w, 200, result)
+	}
+}
+
+func retryInstance(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		result, err := svc.RetryInstance(r.Context(), tid, id)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
+			case errors.Is(err, domain.ErrInvalidInput):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		emitAudit(svc, r, "workflow.instance.retry", "workflow_instance", id.String(), nil, nil)
 		writeJSON(w, 200, result)
 	}
 }
@@ -573,6 +647,8 @@ func cancelInstance(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.instance.cancel", "workflow_instance", id.String(), nil,
+			map[string]any{"status": inst.Status})
 		writeJSON(w, 200, inst)
 	}
 }
@@ -653,6 +729,8 @@ func createFromTemplate(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.create", "workflow_definition", wf.ID.String(), nil,
+			map[string]any{"name": wf.Name, "template_id": tmplID.String()})
 
 		writeJSON(w, 201, map[string]any{"workflow": wf, "version": ver})
 	}
@@ -748,6 +826,8 @@ func completeHumanTask(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "workflow.human_task.complete", "human_task", id.String(), nil,
+			map[string]any{"outcome": req.Outcome})
 		writeJSON(w, 200, result)
 	}
 }

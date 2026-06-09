@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -13,6 +14,7 @@ import (
 
 	libauth "github.com/pmplatform/libs/go/auth"
 
+	"github.com/pmplatform/services/notification-svc/internal/domain"
 	"github.com/pmplatform/services/notification-svc/internal/service"
 	"github.com/pmplatform/services/notification-svc/internal/store"
 )
@@ -44,6 +46,13 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		// The store UPDATE uses tenant_id + user_id + id so only the owning
 		// user's row is touched; Cedar is redundant and broken for this route.
 		r.Post("/notifications/{id}/read", markRead(svc))
+
+		// GET/PUT /v1/notification-preferences — no Cedar guard; the rows are
+		// scoped to (tenant_id, user_id) via principalOr400 + RLS, exactly like
+		// the mark-read routes. A Cedar wildcard resource cannot express the
+		// "owns this preference" check, so it would always deny.
+		r.Get("/notification-preferences", listPreferences(svc))
+		r.Put("/notification-preferences", putPreferences(svc))
 	})
 
 	return r
@@ -89,7 +98,12 @@ func listNotifications(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"items": items})
+		total, err := svc.Count(r.Context(), tid, uid, opts)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
 	}
 }
 
@@ -128,6 +142,64 @@ func markAllRead(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"updated": n})
+	}
+}
+
+func listPreferences(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, uid, ok := principalOr400(w, r)
+		if !ok {
+			return
+		}
+		prefs, err := svc.ListPreferences(r.Context(), tid, uid)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"preferences": prefs})
+	}
+}
+
+func putPreferences(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, uid, ok := principalOr400(w, r)
+		if !ok {
+			return
+		}
+		// Accept either a bare array [{kind,channels}] or {"preferences":[...]}.
+		var prefs []domain.Preference
+		raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			writeErr(w, 400, errors.New("cannot read body"))
+			return
+		}
+		if err := json.Unmarshal(raw, &prefs); err != nil {
+			var wrapped struct {
+				Preferences []domain.Preference `json:"preferences"`
+			}
+			if err2 := json.Unmarshal(raw, &wrapped); err2 != nil {
+				writeErr(w, 400, errors.New("body must be a JSON array of {kind, channels}"))
+				return
+			}
+			prefs = wrapped.Preferences
+		}
+		for _, p := range prefs {
+			if p.Kind == "" {
+				writeErr(w, 400, errors.New("each preference requires a non-empty kind"))
+				return
+			}
+		}
+		if err := svc.SetPreferences(r.Context(), tid, uid, prefs); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		// Echo back the persisted set so the client can confirm.
+		saved, err := svc.ListPreferences(r.Context(), tid, uid)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"preferences": saved})
 	}
 }
 

@@ -52,24 +52,14 @@ function fmtDate(d: string | null | undefined): string {
   try { return new Date(d).toLocaleDateString(); } catch { return d; }
 }
 
-/** Best-effort linkage: check if the SO id or soNumber appears in PO notes */
+/** Real linkage: PO.sourceSoId FK points back to the originating sales order. */
 function filterLinkedPOs(pos: PurchaseOrder[], so: SalesOrder): PurchaseOrder[] {
-  const needle = so.id.toLowerCase();
-  const needleNum = so.soNumber.toLowerCase();
-  return pos.filter(po => {
-    const hay = (po.notes ?? "").toLowerCase();
-    return hay.includes(needle) || hay.includes(needleNum);
-  });
+  return pos.filter(po => po.sourceSoId === so.id);
 }
 
-/** Best-effort linkage: check if the SO id or soNumber appears in WO notes */
+/** Real linkage: WO.sourceSoId FK points back to the originating sales order. */
 function filterLinkedWOs(wos: WorkOrder[], so: SalesOrder): WorkOrder[] {
-  const needle = so.id.toLowerCase();
-  const needleNum = so.soNumber.toLowerCase();
-  return wos.filter(wo => {
-    const hay = (wo.notes ?? "").toLowerCase();
-    return hay.includes(needle) || hay.includes(needleNum);
-  });
+  return wos.filter(wo => wo.sourceSoId === so.id);
 }
 
 // ─── column header ─────────────────────────────────────────────────────────

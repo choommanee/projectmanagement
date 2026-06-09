@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { Tag } from "@pmplatform/ui-kit";
-import { listItems, listBomsForItem, type Item, type BOMLine, type BOMHeader } from "@/lib/api/mfg";
+import { listItems, listBomsForItem, getBom, type Item, type BOMLine, type BOMHeader } from "@/lib/api/mfg";
 
 interface ItemCost {
   item: Item;
@@ -19,28 +19,28 @@ function fmt(n: number) {
   }).format(n);
 }
 
-/** Extract a numeric cost from item attrs (stored as standard_cost or standardCost) */
-function getStdCost(item: Item): number {
-  if (!item.attrs) return 0;
-  const v =
-    (item.attrs as Record<string, unknown>)["standard_cost"] ??
-    (item.attrs as Record<string, unknown>)["standardCost"] ??
-    (item.attrs as Record<string, unknown>)["unit_cost"] ??
-    (item.attrs as Record<string, unknown>)["unitCost"];
+/**
+ * Standard cost is stored on the item's `attrs` (Items → attributes). This is
+ * the only cost source modelled by mfg-svc today; there is no first-class
+ * standard-cost column or routing labor rate (see page banner).
+ */
+function getStdCost(item: Item | undefined): number {
+  if (!item || !item.attrs) return 0;
+  const a = item.attrs as Record<string, unknown>;
+  const v = a["standard_cost"] ?? a["standardCost"] ?? a["unit_cost"] ?? a["unitCost"];
   return typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) || 0 : 0;
 }
 
-/** Extract unit cost from a BOM line's extended attrs if available */
-function getLineCost(line: BOMLine): number {
-  if (!line.notes) return 0;
-  // notes may carry JSON payload from some integrations; try to parse
-  try {
-    const parsed = JSON.parse(line.notes) as Record<string, unknown>;
-    const v = parsed["unit_cost"] ?? parsed["unitCost"];
-    return typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) || 0 : 0;
-  } catch {
-    return 0;
-  }
+/**
+ * Real single-level material cost for one BOM line: the child component's
+ * standard cost × required quantity (scrap-adjusted). Components without a
+ * standard cost contribute 0 — surfaced honestly rather than fabricated.
+ */
+function lineMaterialCost(line: BOMLine, itemsById: Map<string, Item>): number {
+  const child = itemsById.get(line.childItemId);
+  const unit = getStdCost(child);
+  const effectiveQty = line.qty * (1 + (line.scrapPct || 0) / 100);
+  return unit * effectiveQty;
 }
 
 export default function ItemCostingPage() {
@@ -57,36 +57,54 @@ export default function ItemCostingPage() {
       .then(async ({ items: itemList }) => {
         setItems(itemList);
 
-        // Load default BOMs for all items
+        // Load default BOM headers for all items. The list endpoint does not
+        // embed lines, so fetch the chosen BOM's detail (getBom) to obtain them
+        // — same pattern the BOM page uses.
         const results = await Promise.allSettled(
           itemList.map((i) => listBomsForItem(i.id))
         );
-        const map = new Map<string, { header: BOMHeader; lines: BOMLine[] }>();
+        const headerByItem = new Map<string, BOMHeader>();
         results.forEach((res, idx) => {
           if (res.status === "fulfilled" && res.value.length > 0) {
-            // Prefer active/default BOM; fall back to first
             const header =
               res.value.find((b) => b.isDefault && b.status === "active") ??
               res.value.find((b) => b.status === "active") ??
               res.value[0];
-            const lines = header.lines ?? [];
-            if (lines.length > 0) {
-              map.set(itemList[idx].id, { header, lines });
-            }
+            headerByItem.set(itemList[idx].id, header);
           }
         });
+        const detailResults = await Promise.allSettled(
+          Array.from(headerByItem.entries()).map(async ([itemId, header]) => {
+            const full = await getBom(header.id);
+            return [itemId, full] as const;
+          })
+        );
+        const map = new Map<string, { header: BOMHeader; lines: BOMLine[] }>();
+        for (const res of detailResults) {
+          if (res.status === "fulfilled") {
+            const [itemId, full] = res.value;
+            const lines = full.lines ?? [];
+            if (lines.length > 0) map.set(itemId, { header: full, lines });
+          }
+        }
         setBomMap(map);
       })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
 
+  const itemsById = useMemo(() => {
+    const m = new Map<string, Item>();
+    for (const i of items) m.set(i.id, i);
+    return m;
+  }, [items]);
+
   const costs = useMemo((): ItemCost[] => {
     return items
       .map((item) => {
         const entry = bomMap.get(item.id);
         const lines = entry?.lines ?? [];
-        const materialCost = lines.reduce((s, l) => s + getLineCost(l) * l.qty, 0);
+        const materialCost = lines.reduce((s, l) => s + lineMaterialCost(l, itemsById), 0);
         return {
           item,
           bomHeader: entry?.header ?? null,
@@ -96,7 +114,7 @@ export default function ItemCostingPage() {
         };
       })
       .filter((c) => c.bomLineCount > 0 || getStdCost(c.item) > 0);
-  }, [items, bomMap]);
+  }, [items, bomMap, itemsById]);
 
   const filtered = useMemo(
     () =>
@@ -117,6 +135,14 @@ export default function ItemCostingPage() {
     <div className="flex flex-col gap-4 p-6">
       <Breadcrumb items={[{ label: "MFG", href: "/mfg/home" }, { label: "Item Costing" }]} />
       <h1 className="text-xl font-semibold">Item Costing Worksheet</h1>
+
+      <div className="rounded border border-info/30 bg-info/10 px-3 py-2 text-xs text-ink-2">
+        Material cost is a single-level roll-up: each component&apos;s standard cost
+        (set per item in Items → attributes) × scrap-adjusted quantity from the
+        active BOM. Components without a standard cost contribute 0.
+        Routing / labor and multi-level (sub-assembly) costs are not yet modelled
+        in the backend, so this worksheet reflects direct material only.
+      </div>
 
       <input
         value={search}
@@ -215,7 +241,8 @@ export default function ItemCostingPage() {
               ) : (
                 <div className="flex flex-col gap-2">
                   {selectedLines.map((l, i) => {
-                    const unitCost = getLineCost(l);
+                    const unitCost = getStdCost(itemsById.get(l.childItemId));
+                    const lineTotal = lineMaterialCost(l, itemsById);
                     return (
                       <div
                         key={l.id || i}
@@ -231,20 +258,20 @@ export default function ItemCostingPage() {
                           </span>
                           {unitCost > 0 && <span>Unit cost: {fmt(unitCost)}</span>}
                         </div>
-                        {unitCost > 0 && (
+                        {lineTotal > 0 && (
                           <div className="text-right font-mono font-semibold">
-                            = {fmt(unitCost * l.qty)}
+                            = {fmt(lineTotal)}
                           </div>
                         )}
                       </div>
                     );
                   })}
-                  {selectedLines.some((l) => getLineCost(l) > 0) && (
+                  {selectedLines.some((l) => lineMaterialCost(l, itemsById) > 0) && (
                     <div className="border-t border-line pt-2 flex justify-between text-sm font-semibold">
                       <span>Total Material</span>
                       <span className="font-mono">
                         {fmt(
-                          selectedLines.reduce((s, l) => s + getLineCost(l) * l.qty, 0)
+                          selectedLines.reduce((s, l) => s + lineMaterialCost(l, itemsById), 0)
                         )}
                       </span>
                     </div>

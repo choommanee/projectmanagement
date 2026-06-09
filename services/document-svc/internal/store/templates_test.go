@@ -65,7 +65,9 @@ func TestGetTemplateByID(t *testing.T) {
 	tmpl := &domain.Template{
 		ID: uuid.New(), TenantID: tid,
 		Type: domain.DocumentType("note"), Name: "Quick Note Template",
-		Body: map[string]any{"type": "doc", "content": []any{}},
+		Body: map[string]any{"type": "doc", "content": []any{
+			map[string]any{"type": "heading", "attrs": map[string]any{"level": float64(1)}},
+		}},
 	}
 	if err := tmpls.Create(ctx, tmpl); err != nil {
 		t.Fatalf("Create: %v", err)
@@ -80,6 +82,16 @@ func TestGetTemplateByID(t *testing.T) {
 	}
 	if got.Type != tmpl.Type {
 		t.Fatalf("expected type=%s, got %s", tmpl.Type, got.Type)
+	}
+	// Regression guard: GetByID must populate Body (it previously returned the
+	// Scan error directly and never decoded body → callers saw body=null,
+	// breaking the template detail view + template instantiation).
+	if got.Body == nil || got.Body["type"] != "doc" {
+		t.Fatalf("expected body to round-trip, got %v", got.Body)
+	}
+	content, ok := got.Body["content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("expected 1 content node in body, got %v", got.Body["content"])
 	}
 
 	// Not found for random ID

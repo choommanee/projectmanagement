@@ -9,6 +9,7 @@ require (
 	github.com/pmplatform/libs/go/nats v0.0.0
 	github.com/pmplatform/libs/go/notification v0.0.0
 	github.com/pmplatform/libs/go/otel v0.0.0
+	github.com/pmplatform/libs/go/serviceauth v0.0.0
 	github.com/rs/zerolog v1.35.1
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 )
@@ -58,4 +59,5 @@ replace (
 	github.com/pmplatform/libs/go/nats => ../../libs/go/nats
 	github.com/pmplatform/libs/go/notification => ../../libs/go/notification
 	github.com/pmplatform/libs/go/otel => ../../libs/go/otel
+	github.com/pmplatform/libs/go/serviceauth => ../../libs/go/serviceauth
 )

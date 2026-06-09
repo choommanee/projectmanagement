@@ -20,6 +20,7 @@ type Service struct {
 	Worklog  *store.WorklogStore
 	Activity *store.ActivityStore
 	notif    notiflib.Publisher
+	audit    AuditPublisher
 }
 
 func New(p *store.Projects, t *store.Tasks, s *store.Sprints) *Service {
@@ -98,13 +99,13 @@ type UpdateProjectInput struct {
 	TenantID    uuid.UUID
 	ID          uuid.UUID
 	Name        string
-	Description string
+	Description *string // nil = no change; pointer to "" = clear
 	Status      domain.ProjectStatus
 	OwnerID     *uuid.UUID
 	ProgressPct *int
 	Tags        []string
-	StartDate   *time.Time
-	DueDate     *time.Time
+	StartDate   **time.Time // outer nil = no change; inner nil = clear
+	DueDate     **time.Time
 	Version     int
 	UserID      string // caller, for notification routing
 }
@@ -119,8 +120,8 @@ func (svc *Service) UpdateProject(ctx context.Context, in UpdateProjectInput) (*
 	if in.Name != "" {
 		p.Name = in.Name
 	}
-	if in.Description != "" {
-		p.Description = in.Description
+	if in.Description != nil {
+		p.Description = *in.Description // pointer to "" clears
 	}
 	if in.Status != "" {
 		p.Status = in.Status
@@ -135,10 +136,10 @@ func (svc *Service) UpdateProject(ctx context.Context, in UpdateProjectInput) (*
 		p.Tags = in.Tags
 	}
 	if in.StartDate != nil {
-		p.StartDate = in.StartDate
+		p.StartDate = *in.StartDate // inner nil clears
 	}
 	if in.DueDate != nil {
-		p.DueDate = in.DueDate
+		p.DueDate = *in.DueDate
 	}
 	p.Version = in.Version
 	if err := svc.Projects.Update(ctx, p); err != nil {
@@ -166,10 +167,14 @@ type CreateTaskInput struct {
 	Code, Title         string
 	Description         string
 	Type                domain.TaskType
+	Status              domain.TaskStatus
 	Priority            domain.TaskPriority
 	AssigneeID          *uuid.UUID
 	ReviewerID          *uuid.UUID
 	EstimateMd          float64
+	StartDate           *time.Time
+	DueDate             *time.Time
+	Tags                []string
 }
 
 // CreateTask validates and creates a new task.
@@ -183,8 +188,20 @@ func (svc *Service) CreateTask(ctx context.Context, in CreateTaskInput) (*domain
 	if in.Type == "" {
 		in.Type = domain.TaskTypeTask
 	}
+	switch in.Status {
+	case "":
+		in.Status = domain.TaskTodo
+	case domain.TaskTodo, domain.TaskInProgress, domain.TaskBlocked,
+		domain.TaskReview, domain.TaskDone, domain.TaskCancelled:
+		// valid as-is
+	default:
+		return nil, domain.ErrInvalidInput
+	}
 	if in.Priority == "" {
 		in.Priority = domain.PrioMed
+	}
+	if in.Tags == nil {
+		in.Tags = []string{}
 	}
 	t := &domain.Task{
 		ID:          uuid.New(),
@@ -195,12 +212,14 @@ func (svc *Service) CreateTask(ctx context.Context, in CreateTaskInput) (*domain
 		Title:       in.Title,
 		Description: in.Description,
 		Type:        in.Type,
-		Status:      domain.TaskTodo,
+		Status:      in.Status,
 		Priority:    in.Priority,
 		AssigneeID:  in.AssigneeID,
 		ReviewerID:  in.ReviewerID,
 		EstimateMd:  in.EstimateMd,
-		Tags:        []string{},
+		StartDate:   in.StartDate,
+		DueDate:     in.DueDate,
+		Tags:        in.Tags,
 		Version:     1,
 	}
 	if err := svc.Tasks.Create(ctx, t); err != nil {

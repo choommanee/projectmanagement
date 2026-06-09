@@ -109,6 +109,8 @@ func postInventoryTransaction(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.inventory.post", "inventory_transaction", txn.ID.String(),
+			map[string]any{"txn_type": string(txn.TxnType), "qty": txn.Qty})
 		writeJSON(w, 201, txn)
 	}
 }

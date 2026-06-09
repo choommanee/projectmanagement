@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +13,10 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
+	natsx "github.com/pmplatform/libs/go/nats"
+	notiflib "github.com/pmplatform/libs/go/notification"
 	libotel "github.com/pmplatform/libs/go/otel"
 	libpolicy "github.com/pmplatform/libs/policy"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -49,12 +53,42 @@ func main() {
 	authz := &libpolicy.Adapter{Policies: ps}
 	var _ libauth.Authorizer = authz // compile-time interface check
 
+	// NATS: notification publisher + domain-event emitter (document.sign_*).
+	// Both degrade to no-ops when NATS is unavailable so the service still boots.
+	var notifPub notiflib.Publisher = notiflib.NoopPublisher{}
+	var emitter service.EventEmitter = service.NoopEmitter{}
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		if nc, err := natsx.Connect(natsURL); err != nil {
+			log.Warn().Err(err).Msg("nats unavailable — sign notifications/events disabled")
+		} else {
+			defer nc.Close()
+			if pub, err := notiflib.NewJetStreamPublisher(nc); err != nil {
+				log.Warn().Err(err).Msg("notif publisher init failed")
+			} else {
+				notifPub = pub
+			}
+			if e, err := newDocEventEmitter(nc); err != nil {
+				log.Warn().Err(err).Msg("doc event emitter init failed")
+			} else {
+				emitter = e
+			}
+		}
+	}
+
 	svc := service.New(
 		store.NewWorkspaces(p),
 		store.NewDocuments(p),
 		store.NewComments(p),
 		store.NewTemplates(p),
-	).WithSignatures(store.NewSignatures(p))
+	).WithSignatures(store.NewSignatures(p)).
+		WithVerifyLinks(store.NewVerifyLinks(p)).
+		WithNotifPublisher(notifPub).
+		// Platform audit_log publisher (direct Postgres write — works with NATS
+		// down). Separate from the signing hash-chain sign_event trail.
+		WithAuditPublisher(audit.NewPgPublisher(p, "document-svc")).
+		WithEventEmitter(emitter)
+	// Trust layer: key custody provider, RFC 3161 TSA, platform cert (trust.go).
+	wireTrust(context.Background(), p, svc)
 	// Plan #6 Task 6 — wire the Cedar resource loader.
 	loader := api.NewCedarLoader(p)
 	h := api.NewRouterWithLoader(svc, authz, loader)
@@ -99,4 +133,24 @@ func envOr(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// docEventEmitter publishes document.sign_* domain events on the DOCEVENTS
+// JetStream stream (subjects "document.>"). workflow-svc subscribes to
+// "document.sign_requested" for its trigger listener.
+type docEventEmitter struct{ c *natsx.Client }
+
+func newDocEventEmitter(c *natsx.Client) (*docEventEmitter, error) {
+	if err := c.EnsureStream(context.Background(), "DOCEVENTS", []string{"document.>"}); err != nil {
+		return nil, err
+	}
+	return &docEventEmitter{c: c}, nil
+}
+
+func (e *docEventEmitter) Emit(ctx context.Context, subject string, payload map[string]any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return e.c.Publish(ctx, subject, data)
 }

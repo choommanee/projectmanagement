@@ -37,6 +37,13 @@ func (s *SalesOrderStore) Create(ctx context.Context, so *domain.SalesOrder) err
 	so.UpdatedAt = so.CreatedAt
 	so.Version = 1
 	return withTenant(ctx, s.p, so.TenantID, func(tx pgx.Tx) error {
+		if so.SONumber == "" {
+			code, err := nextCode(ctx, tx, so.TenantID, "sales_order", "SO")
+			if err != nil {
+				return err
+			}
+			so.SONumber = code
+		}
 		_, err := tx.Exec(ctx, `
 			INSERT INTO sales_order(id, tenant_id, so_number, customer_id, status,
 			                        order_date, requested_date, notes, created_by, version)
@@ -232,6 +239,24 @@ func (s *SalesOrderStore) DeleteLine(ctx context.Context, tid, lineID uuid.UUID)
 		ct, err := tx.Exec(ctx,
 			`DELETE FROM so_line WHERE id=$1 AND tenant_id=$2`,
 			lineID, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// Delete hard-deletes a sales order. so_line rows are removed via the
+// ON DELETE CASCADE foreign key. Returns ErrNotFound when the order is absent.
+func (s *SalesOrderStore) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`DELETE FROM sales_order WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
 		)
 		if err != nil {
 			return err

@@ -61,6 +61,8 @@ func createOpportunity(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.opportunity.create", "opportunity", o.ID.String(), nil,
+			map[string]any{"title": o.Title, "stage": o.Stage, "value": o.Value})
 		writeJSON(w, 201, o)
 	}
 }
@@ -195,6 +197,33 @@ func updateOpportunity(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.opportunity.update", "opportunity", id.String(),
+			map[string]any{"stage": cur.Stage},
+			map[string]any{"stage": o.Stage})
 		writeJSON(w, 200, o)
+	}
+}
+
+func deleteOpportunity(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Opportunities.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.opportunity.delete", "opportunity", id.String(), nil, nil)
+		w.WriteHeader(204)
 	}
 }

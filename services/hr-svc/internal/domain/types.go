@@ -16,29 +16,29 @@ var (
 // ---- Department ----
 
 type Department struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	Code      string
-	Name      string
-	ParentID  *uuid.UUID
-	Active    bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Version   int
+	ID        uuid.UUID  `json:"id"`
+	TenantID  uuid.UUID  `json:"tenant_id"`
+	Code      string     `json:"code"`
+	Name      string     `json:"name"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	Active    bool       `json:"active"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	Version   int        `json:"version"`
 }
 
 // ---- Position ----
 
 type Position struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	Code      string
-	Name      string
-	Grade     string
-	Active    bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Version   int
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	Code      string    `json:"code"`
+	Name      string    `json:"name"`
+	Grade     string    `json:"grade"`
+	Active    bool      `json:"active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Version   int       `json:"version"`
 }
 
 // ---- Employee ----
@@ -53,21 +53,21 @@ const (
 )
 
 type Employee struct {
-	ID              uuid.UUID
-	TenantID        uuid.UUID
-	EmpNo           string
-	FirstName       string
-	LastName        string
-	Email           string
-	Phone           string
-	DepartmentID    *uuid.UUID
-	PositionID      *uuid.UUID
-	Status          EmpStatus
-	HireDate        time.Time
-	TerminationDate *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Version         int
+	ID              uuid.UUID  `json:"id"`
+	TenantID        uuid.UUID  `json:"tenant_id"`
+	EmpNo           string     `json:"emp_no"`
+	FirstName       string     `json:"first_name"`
+	LastName        string     `json:"last_name"`
+	Email           string     `json:"email"`
+	Phone           string     `json:"phone"`
+	DepartmentID    *uuid.UUID `json:"department_id"`
+	PositionID      *uuid.UUID `json:"position_id"`
+	Status          EmpStatus  `json:"status"`
+	HireDate        time.Time  `json:"hire_date"`
+	TerminationDate *time.Time `json:"termination_date"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	Version         int        `json:"version"`
 }
 
 // ---- Payroll ----

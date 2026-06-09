@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	libotel "github.com/pmplatform/libs/go/otel"
 	libpolicy "github.com/pmplatform/libs/policy"
@@ -47,6 +48,10 @@ func main() {
 	opportunities := store.NewOpportunityStore(p)
 
 	svc := service.New(customers, salesOrders, quotations, invoices, shipments, opportunities)
+
+	// Audit trail: direct Postgres writer (no NATS dependency). Every
+	// significant mutation is recorded in audit_log via the api emit helper.
+	svc.WithAudit(audit.NewPgPublisher(p, "sales-svc"))
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

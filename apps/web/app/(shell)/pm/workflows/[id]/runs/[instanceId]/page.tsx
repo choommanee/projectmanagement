@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { RefreshCw, Play, XCircle, RotateCcw } from "lucide-react";
+import { RefreshCw, Play, XCircle, RotateCcw, PenLine } from "lucide-react";
+import Link from "next/link";
 import { Button, Tag } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { ProcessFlowBar } from "@/shell/ProcessFlowBar";
 import {
-  getInstance, resumeInstance, cancelInstance, startInstance, completeHumanTask,
+  getInstance, resumeInstance, cancelInstance, startInstance, retryInstance, completeHumanTask,
   type InstanceDetail, type StepExecution, type HumanTask,
 } from "@/lib/api/workflows";
+import { HumanTaskForm } from "@/components/workflow/HumanTaskForm";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,23 +135,12 @@ function StepsTab({ steps }: { steps: StepExecution[] }) {
 // ─── Human tasks tab ──────────────────────────────────────────────────────────
 
 function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () => void }) {
-  const [responseJson, setResponseJson] = useState("{}");
-  const [jsonError, setJsonError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const isPending = !task.outcome;
   const isOverdue = task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
 
-  const handleComplete = async (outcome: string) => {
-    let data: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(responseJson);
-      data = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : {};
-      setJsonError(null);
-    } catch {
-      setJsonError("Invalid JSON in response data");
-      return;
-    }
+  const handleComplete = async (outcome: string, data: Record<string, unknown>) => {
     setSubmitting(true);
     setActionError(null);
     try {
@@ -157,7 +148,6 @@ function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () =
       onComplete();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Failed to complete task");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -170,29 +160,12 @@ function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () =
         {task.outcome ? (
           <Tag tone={task.outcome === "rejected" ? "danger" : "success"}>{task.outcome}</Tag>
         ) : (
-          <Tag tone="warning">pending approval</Tag>
+          <Tag tone="warning">pending</Tag>
         )}
         {task.assigneeId && (
           <span className="ml-auto text-[11px] text-ink-3">Assigned to: {task.assigneeId.slice(0, 8)}…</span>
         )}
       </div>
-
-      {/* Prompt */}
-      {task.form?.prompt != null && (
-        <p className="mb-3 text-sm text-ink leading-relaxed">{String(task.form.prompt)}</p>
-      )}
-
-      {/* Form fields from DSL */}
-      {task.form && Object.keys(task.form).filter(k => k !== "prompt").length > 0 && (
-        <div className="mb-3 space-y-1">
-          {Object.entries(task.form).filter(([k]) => k !== "prompt").map(([k, v]) => (
-            <div key={k} className="flex gap-2 text-xs">
-              <span className="w-28 shrink-0 font-medium text-ink-3">{k}</span>
-              <span className="text-ink">{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Timing */}
       <div className="mb-3 flex flex-wrap gap-4 text-[11px] text-ink-3">
@@ -200,7 +173,7 @@ function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () =
         {task.completedAt && <span>Completed: {fmtDate(task.completedAt)}</span>}
         {task.slaDeadline && (
           <span className={isOverdue ? "font-medium text-danger" : ""}>
-            SLA: {fmtDate(task.slaDeadline)}{isOverdue ? " ⚠ overdue" : ""}
+            SLA: {fmtDate(task.slaDeadline)}{isOverdue ? " · overdue" : ""}
           </span>
         )}
       </div>
@@ -213,43 +186,15 @@ function HumanTaskCard({ task, onComplete }: { task: HumanTask; onComplete: () =
         </div>
       )}
 
-      {/* Pending — action area */}
+      {/* Pending — schema-driven action form */}
       {isPending && (
-        <div className="mt-3 space-y-3 rounded-md border border-line bg-surface-2 p-3">
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-ink-3">
-              Response data (JSON, optional)
-            </label>
-            <textarea
-              value={responseJson}
-              onChange={(e) => { setResponseJson(e.target.value); setJsonError(null); }}
-              rows={3}
-              className="w-full rounded-sm border border-line bg-paper px-2 py-1.5 font-mono text-[11px] text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
-              placeholder='{"comment": "looks good"}'
-            />
-            {jsonError && <p className="mt-0.5 text-[11px] text-danger">{jsonError}</p>}
-          </div>
-          {actionError && (
-            <p className="rounded-sm border border-danger/30 bg-danger/5 px-2 py-1 text-[11px] text-danger">{actionError}</p>
-          )}
-          <div className="flex gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={submitting}
-              onClick={() => handleComplete("approved")}
-            >
-              {submitting ? "Submitting…" : "✓ Approve"}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => handleComplete("rejected")}
-              disabled={submitting}
-              className="border-danger/30 text-danger hover:bg-danger/5 hover:border-danger"
-            >
-              ✗ Reject
-            </Button>
-          </div>
+        <div className="mt-3 rounded-md border border-line bg-surface-2 p-3">
+          <HumanTaskForm
+            task={task}
+            submitting={submitting}
+            error={actionError}
+            onSubmit={handleComplete}
+          />
         </div>
       )}
     </div>
@@ -283,7 +228,9 @@ export default function RunViewerPage() {
   const [resuming, setResuming] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [rerunning, setRerunning] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -301,6 +248,13 @@ export default function RunViewerPage() {
     const timer = setInterval(() => { load(); }, 3000);
     return () => clearInterval(timer);
   }, [detail?.status, load]);
+
+  // Ticking clock for the wake_at countdown while paused on a timer.
+  useEffect(() => {
+    if (detail?.status !== "paused" || !detail?.wakeAt) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [detail?.status, detail?.wakeAt]);
 
   const handleResume = async () => {
     setResuming(true);
@@ -323,6 +277,19 @@ export default function RunViewerPage() {
       setActionMsg(e instanceof Error ? e.message : "Cancel failed");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    setActionMsg(null);
+    try {
+      await retryInstance(instanceId);
+      await load();
+    } catch (e) {
+      setActionMsg(e instanceof Error ? e.message : "Retry failed");
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -364,13 +331,39 @@ export default function RunViewerPage() {
     );
   }
 
+  const isActive = detail.status === "running" || detail.status === "paused";
   const commandActions = [
     { id: "refresh", label: "Refresh", icon: <RefreshCw size={14} />, onClick: load },
+    ...(detail.status === "failed" ? [{ id: "retry", label: retrying ? "Retrying…" : "Retry", icon: <RotateCcw size={14} />, onClick: handleRetry, disabled: retrying, variant: "primary" as const }] : []),
     ...(detail.status === "paused" ? [{ id: "resume", label: resuming ? "Resuming…" : "Resume", icon: <Play size={14} />, onClick: handleResume, disabled: resuming, variant: "primary" as const }] : []),
-    ...(detail.status === "running" ? [{ id: "cancel", label: cancelling ? "Cancelling…" : "Cancel", icon: <XCircle size={14} />, onClick: handleCancel, disabled: cancelling, variant: "danger" as const }] : []),
+    ...(isActive ? [{ id: "cancel", label: cancelling ? "Cancelling…" : "Cancel", icon: <XCircle size={14} />, onClick: handleCancel, disabled: cancelling, variant: "danger" as const }] : []),
     { id: "sep", kind: "separator" as const },
     { id: "rerun", label: rerunning ? "Starting…" : "Run again with same input", icon: <RotateCcw size={14} />, onClick: handleRerun, disabled: rerunning },
   ];
+
+  const wakeMs = detail.status === "paused" && detail.wakeAt ? new Date(detail.wakeAt).getTime() - now : null;
+  const wakeLabel = (() => {
+    if (wakeMs == null) return null;
+    if (wakeMs <= 0) return "resuming…";
+    const s = Math.floor(wakeMs / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  })();
+
+  // Awaiting-signature pause: distinct from a timer pause (wakeAt) and a
+  // human-task pause (shown in the Human Tasks tab).
+  const awaitingSignature = detail.status === "paused" && !!detail.pendingEnvelopeId;
+  const signatureDocId = (() => {
+    const inp = detail.input as Record<string, unknown> | null;
+    const fromInput = inp && typeof inp === "object" ? inp["document_id"] : null;
+    const vars = detail.variables;
+    const fromVars = vars && typeof vars === "object" ? (vars as Record<string, unknown>)["document_id"] : null;
+    const v = fromInput ?? fromVars;
+    return v != null ? String(v) : null;
+  })();
 
   const flowStage = detail.status === "completed" ? "completed"
     : detail.status === "paused" ? "paused"
@@ -405,14 +398,74 @@ export default function RunViewerPage() {
                 <span>Duration: {fmtDuration(detail.startedAt, detail.endedAt)}</span>
               </div>
             </div>
-            {detail.status === "paused" && (
-              <Button variant="primary" size="sm" onClick={handleResume} disabled={resuming}>
-                <Play size={14} /> {resuming ? "Resuming…" : "Resume Instance"}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {detail.status === "failed" && (
+                <Button variant="primary" size="sm" onClick={handleRetry} disabled={retrying}>
+                  <RotateCcw size={14} /> {retrying ? "Retrying…" : "Retry"}
+                </Button>
+              )}
+              {detail.status === "paused" && (
+                <Button variant="primary" size="sm" onClick={handleResume} disabled={resuming}>
+                  <Play size={14} /> {resuming ? "Resuming…" : "Resume Instance"}
+                </Button>
+              )}
+              {isActive && (
+                <Button variant="danger" size="sm" onClick={handleCancel} disabled={cancelling}>
+                  <XCircle size={14} /> {cancelling ? "Cancelling…" : "Cancel"}
+                </Button>
+              )}
+            </div>
           </div>
 
-          {detail.error && (
+          {/* Awaiting-signature banner */}
+          {awaitingSignature && (
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-signal/40 bg-signal/5 px-3 py-2.5 text-xs">
+              <PenLine size={15} className="text-signal" />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-signal">⏳ รอลงนามเอกสาร / Awaiting signature</p>
+                <p className="mt-0.5 text-ink-3">
+                  Envelope <span className="font-mono text-ink-2">{detail.pendingEnvelopeId?.slice(0, 8)}…</span>
+                  {" "}is waiting to be signed. The run resumes automatically once all signers complete (or it declines).
+                </p>
+              </div>
+              {signatureDocId ? (
+                <Link
+                  href={`/docs/documents/${signatureDocId}?tab=signatures`}
+                  className="shrink-0 rounded border border-signal/40 bg-signal/10 px-3 py-1.5 font-medium text-signal hover:bg-signal/15"
+                >
+                  เปิดเพื่อลงนาม / Open to sign
+                </Link>
+              ) : (
+                <span className="shrink-0 text-ink-3">No document linked</span>
+              )}
+            </div>
+          )}
+
+          {/* Paused-on-timer banner */}
+          {!awaitingSignature && wakeLabel && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-warning">
+              <span className="font-medium">Paused on timer</span>
+              <span className="text-ink-3">
+                resumes at {fmtDate(detail.wakeAt)} · in <span className="font-mono tabular-nums text-ink-2">{wakeLabel}</span>
+              </span>
+            </div>
+          )}
+
+          {/* Failure banner with retry */}
+          {detail.status === "failed" && detail.error && (
+            <div className="mb-3 flex items-start justify-between gap-3 rounded-md border border-danger bg-danger/10 px-3 py-2 text-xs text-danger">
+              <div>
+                <span className="font-semibold">Instance failed</span>
+                <p className="mt-0.5 font-mono text-[11px] leading-relaxed">{detail.error}</p>
+                {detail.cursor && <p className="mt-1 text-[11px] text-ink-3">Will retry from step: <span className="font-mono text-ink-2">{detail.cursor}</span></p>}
+              </div>
+              <Button variant="primary" size="sm" onClick={handleRetry} disabled={retrying} className="shrink-0">
+                <RotateCcw size={14} /> {retrying ? "Retrying…" : "Retry"}
+              </Button>
+            </div>
+          )}
+
+          {detail.error && detail.status !== "failed" && (
             <div className="mb-3 rounded-md border border-danger bg-danger/10 px-3 py-2 text-xs text-danger">
               {detail.error}
             </div>

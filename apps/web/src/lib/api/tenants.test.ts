@@ -38,10 +38,13 @@ describe("tenants API client", () => {
     await expect(updateTenant("1", { name: "x", version: 1 })).rejects.toThrow(/conflict/);
   });
 
-  it("deleteTenant sends version query", async () => {
+  it("deleteTenant sends version query and destructive-confirm header", async () => {
     const mock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
     global.fetch = mock;
     await deleteTenant("1", 3);
-    expect(mock).toHaveBeenCalledWith("/api/tenants/1?version=3", { method: "DELETE" });
+    expect(mock).toHaveBeenCalledWith("/api/tenants/1?version=3", {
+      method: "DELETE",
+      headers: { "X-Confirm-Destructive": "true" },
+    });
   });
 });

@@ -19,21 +19,21 @@ const (
 )
 
 type Project struct {
-	ID          uuid.UUID
-	TenantID    uuid.UUID
-	Code        string
-	Name        string
-	Description string
-	Status      ProjectStatus
-	OwnerID     *uuid.UUID
-	StartDate   *time.Time
-	DueDate     *time.Time
-	ProgressPct int
-	Tags        []string
-	Settings    map[string]any
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Version     int
+	ID          uuid.UUID      `json:"id"`
+	TenantID    uuid.UUID      `json:"tenant_id"`
+	Code        string         `json:"code"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Status      ProjectStatus  `json:"status"`
+	OwnerID     *uuid.UUID     `json:"owner_id"`
+	StartDate   *time.Time     `json:"start_date"`
+	DueDate     *time.Time     `json:"due_date"`
+	ProgressPct int            `json:"progress_pct"`
+	Tags        []string       `json:"tags"`
+	Settings    map[string]any `json:"settings"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	Version     int            `json:"version"`
 }
 
 type TaskType string
@@ -69,26 +69,28 @@ const (
 )
 
 type Task struct {
-	ID, TenantID, ProjectID uuid.UUID
-	ParentID                *uuid.UUID
-	Code                    string
-	Title                   string
-	Description             string
-	Type                    TaskType
-	Status                  TaskStatus
-	Priority                TaskPriority
-	AssigneeID              *uuid.UUID
-	ReviewerID              *uuid.UUID
-	EstimateMd              float64
-	ActualMd                float64
-	ProgressPct             int
-	StartDate               *time.Time
-	DueDate                 *time.Time
-	SortOrder               int
-	Tags                    []string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	Version                 int
+	ID          uuid.UUID    `json:"id"`
+	TenantID    uuid.UUID    `json:"tenant_id"`
+	ProjectID   uuid.UUID    `json:"project_id"`
+	ParentID    *uuid.UUID   `json:"parent_id"`
+	Code        string       `json:"code"`
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Type        TaskType     `json:"type"`
+	Status      TaskStatus   `json:"status"`
+	Priority    TaskPriority `json:"priority"`
+	AssigneeID  *uuid.UUID   `json:"assignee_id"`
+	ReviewerID  *uuid.UUID   `json:"reviewer_id"`
+	EstimateMd  float64      `json:"estimate_md"`
+	ActualMd    float64      `json:"actual_md"`
+	ProgressPct int          `json:"progress_pct"`
+	StartDate   *time.Time   `json:"start_date"`
+	DueDate     *time.Time   `json:"due_date"`
+	SortOrder   int          `json:"sort_order"`
+	Tags        []string     `json:"tags"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	Version     int          `json:"version"`
 }
 
 type DepType string
@@ -101,12 +103,13 @@ const (
 )
 
 type TaskDependency struct {
-	ID                         uuid.UUID
-	TenantID                   uuid.UUID
-	PredecessorID, SuccessorID uuid.UUID
-	Type                       DepType
-	LagDays                    int
-	CreatedAt                  time.Time
+	ID            uuid.UUID `json:"id"`
+	TenantID      uuid.UUID `json:"tenant_id"`
+	PredecessorID uuid.UUID `json:"predecessor_id"`
+	SuccessorID   uuid.UUID `json:"successor_id"`
+	Type          DepType   `json:"type"`
+	LagDays       int       `json:"lag_days"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type SprintStatus string
@@ -118,14 +121,18 @@ const (
 )
 
 type Sprint struct {
-	ID, TenantID, ProjectID uuid.UUID
-	Name                    string
-	Goal                    string
-	Status                  SprintStatus
-	StartDate, EndDate      *time.Time
-	CapacityPts             int
-	CreatedAt, UpdatedAt    time.Time
-	Version                 int
+	ID          uuid.UUID    `json:"id"`
+	TenantID    uuid.UUID    `json:"tenant_id"`
+	ProjectID   uuid.UUID    `json:"project_id"`
+	Name        string       `json:"name"`
+	Goal        string       `json:"goal"`
+	Status      SprintStatus `json:"status"`
+	StartDate   *time.Time   `json:"start_date"`
+	EndDate     *time.Time   `json:"end_date"`
+	CapacityPts int          `json:"capacity_pts"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	Version     int          `json:"version"`
 }
 
 var (
@@ -145,14 +152,16 @@ func ValidateCode(c string) error {
 }
 
 type WorklogEntry struct {
-	ID        uuid.UUID
-	TenantID  uuid.UUID
-	TaskID    uuid.UUID
-	UserID    uuid.UUID
-	LoggedMd  float64
-	WorkDate  time.Time
-	Note      string
-	CreatedAt time.Time
+	ID        uuid.UUID `json:"id"`
+	TenantID  uuid.UUID `json:"tenant_id"`
+	TaskID    uuid.UUID `json:"task_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	LoggedMd  float64   `json:"logged_md"`
+	WorkDate  time.Time `json:"work_date"`
+	Note      string    `json:"note"`
+	Version   int       `json:"version"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type CreateWorklogParams struct {
@@ -161,4 +170,14 @@ type CreateWorklogParams struct {
 	LoggedMd float64
 	WorkDate time.Time
 	Note     string
+}
+
+// UpdateWorklogParams carries the editable fields for a worklog entry.
+// Nil pointers mean "leave unchanged". Version is the optimistic-lock guard.
+type UpdateWorklogParams struct {
+	ID       uuid.UUID
+	LoggedMd *float64
+	WorkDate *time.Time
+	Note     *string
+	Version  int
 }

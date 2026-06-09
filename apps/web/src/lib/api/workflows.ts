@@ -86,6 +86,13 @@ export interface WorkflowInstance {
   triggerKind: string;
   startedAt: string | null;
   endedAt: string | null;
+  /** When the instance is paused on a timer, the wall-clock time it will resume. */
+  wakeAt: string | null;
+  /**
+   * When the instance is paused awaiting an e-signature (cursor on a
+   * `request_signature` step), the id of the signature envelope to sign.
+   */
+  pendingEnvelopeId: string | null;
 }
 
 export interface InstanceDetail extends WorkflowInstance {
@@ -181,6 +188,8 @@ export function normInstance(raw: Record<string, unknown>): WorkflowInstance {
     triggerKind: String(raw["trigger_kind"] ?? raw["TriggerKind"] ?? g(raw, "triggerKind") ?? ""),
     startedAt: (g(raw, "startedAt") ?? raw["StartedAt"] ?? raw["started_at"] ?? null) as string | null,
     endedAt: (g(raw, "endedAt") ?? raw["EndedAt"] ?? raw["ended_at"] ?? null) as string | null,
+    wakeAt: (raw["wake_at"] ?? raw["WakeAt"] ?? g(raw, "wakeAt") ?? null) as string | null,
+    pendingEnvelopeId: (raw["pending_envelope_id"] ?? raw["PendingEnvelopeID"] ?? g(raw, "pendingEnvelopeId") ?? null) as string | null,
   };
 }
 
@@ -434,6 +443,67 @@ export async function createWorkflowFromTemplate(templateId: string, name: strin
   return normWorkflowDef(wfRaw);
 }
 
+/** Canonical name of the seeded "Document Approval (Project)" workflow/template. */
+export const DOC_APPROVAL_WORKFLOW_NAME = "Document Approval (Project)";
+
+/**
+ * Find-or-create-and-publish the Document Approval workflow for this tenant, then
+ * return a *published* workflow id ready to start.
+ *
+ * 1. GET workflows → if one named "Document Approval (Project)" already exists, use it.
+ *    - if it's not yet published, publish its latest draft.
+ * 2. else create one from the seeded system template (createWorkflowFromTemplate),
+ *    then publish its first version.
+ */
+export async function ensureDocApprovalWorkflow(): Promise<WorkflowDef> {
+  // 1. Look for an existing definition by name.
+  const { items } = await listWorkflows({ q: DOC_APPROVAL_WORKFLOW_NAME, limit: 50 });
+  let def =
+    items.find((w) => w.name === DOC_APPROVAL_WORKFLOW_NAME) ??
+    items.find((w) => w.name.toLowerCase().includes("document approval"));
+
+  // 2. Create from template if missing.
+  if (!def) {
+    const templates = await listWorkflowTemplates();
+    const tpl =
+      templates.find((t) => t.name === DOC_APPROVAL_WORKFLOW_NAME) ??
+      templates.find((t) => t.name.toLowerCase().includes("document approval"));
+    if (!tpl) throw new Error(`Seeded template "${DOC_APPROVAL_WORKFLOW_NAME}" not found`);
+    def = await createWorkflowFromTemplate(tpl.id, DOC_APPROVAL_WORKFLOW_NAME);
+  }
+
+  // 3. Ensure it is published.
+  if (def.status !== "published") {
+    const versions = await listVersions(def.id);
+    if (versions.length > 0) {
+      // Publish the highest rev (latest authored version).
+      const latest = [...versions].sort((a, b) => b.rev - a.rev)[0];
+      def = await publishVersion(def.id, { rev: latest.rev, version: def.version });
+    }
+  }
+
+  return def;
+}
+
+/**
+ * Retry a FAILED instance — re-runs from its cursor. Backend returns 409 if the
+ * instance is not in `failed` status. Available only when `status === "failed"`.
+ */
+export async function retryInstance(id: string): Promise<WorkflowInstance> {
+  const r = await apiFetch(`${SVC}/instances/${id}/retry`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e as Record<string, string>).error ?? `retryInstance failed: ${r.status}`);
+  }
+  const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  const raw = (body.instance ?? body) as Record<string, unknown>;
+  return normInstance(raw);
+}
+
 export async function cancelInstance(id: string): Promise<void> {
   const r = await apiFetch(`${SVC}/instances/${id}/cancel`, {
     method: "POST",
@@ -480,7 +550,7 @@ export async function listInstanceHumanTasks(instanceId: string): Promise<HumanT
 export async function completeHumanTask(
   id: string,
   input: { outcome: string; data?: Record<string, unknown> }
-): Promise<void> {
+): Promise<WorkflowInstance | null> {
   const r = await apiFetch(`${SVC}/human-tasks/${id}/complete`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -490,4 +560,113 @@ export async function completeHumanTask(
     const e = await r.json().catch(() => ({}));
     throw new Error((e as Record<string, string>).error ?? `completeHumanTask failed: ${r.status}`);
   }
+  // Returns the resumed-instance envelope { instance, steps, ... }; tolerate empty body.
+  const body = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return null;
+  const raw = (body.instance ?? body) as Record<string, unknown>;
+  return raw && Object.keys(raw).length ? normInstance(raw) : null;
+}
+
+// ─── Human-task form schema ──────────────────────────────────────────────────
+// `form` is freeform author JSON. The common authored shape is:
+//   { prompt, fields: [{ name, label, type, required, options? }], outcomes?: [...] }
+// Parse defensively — callers fall back to a raw JSON editor when this returns null.
+
+export type HumanFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "select"
+  | "checkbox"
+  | "date";
+
+export interface HumanFormField {
+  name: string;
+  label: string;
+  type: HumanFieldType;
+  required: boolean;
+  options: { label: string; value: string }[];
+  placeholder?: string;
+}
+
+export interface HumanFormSchema {
+  prompt: string | null;
+  fields: HumanFormField[];
+  /** Author-declared outcomes; empty → caller defaults to approve/reject. */
+  outcomes: string[];
+}
+
+const KNOWN_FIELD_TYPES: HumanFieldType[] = [
+  "text",
+  "textarea",
+  "number",
+  "select",
+  "checkbox",
+  "date",
+];
+
+function normOption(o: unknown): { label: string; value: string } | null {
+  if (o == null) return null;
+  if (typeof o === "string" || typeof o === "number" || typeof o === "boolean") {
+    return { label: String(o), value: String(o) };
+  }
+  if (typeof o === "object") {
+    const r = o as Record<string, unknown>;
+    const value = r.value ?? r.id ?? r.key;
+    if (value == null) return null;
+    return { label: String(r.label ?? r.name ?? value), value: String(value) };
+  }
+  return null;
+}
+
+/**
+ * Parse a human-task `form` blob into a renderable schema. Returns `null` when
+ * the blob doesn't carry a usable `fields[]` array AND has no outcomes/prompt —
+ * the caller then renders a raw JSON fallback.
+ */
+export function parseHumanForm(form: Record<string, unknown> | null | undefined): HumanFormSchema | null {
+  if (!form || typeof form !== "object") return null;
+
+  const promptRaw = form.prompt ?? form.title ?? form.message;
+  const prompt = promptRaw == null ? null : String(promptRaw);
+
+  const rawFields = form.fields ?? form.inputs;
+  const fields: HumanFormField[] = [];
+  if (Array.isArray(rawFields)) {
+    for (const f of rawFields) {
+      if (!f || typeof f !== "object") continue;
+      const r = f as Record<string, unknown>;
+      const name = r.name ?? r.id ?? r.key;
+      if (name == null) continue;
+      let type = String(r.type ?? "text").toLowerCase() as HumanFieldType;
+      if ((type as string) === "boolean") type = "checkbox";
+      if ((type as string) === "string") type = "text";
+      if (!KNOWN_FIELD_TYPES.includes(type)) type = "text";
+      const rawOpts = r.options ?? r.choices ?? r.values;
+      const options = Array.isArray(rawOpts)
+        ? rawOpts.map(normOption).filter((o): o is { label: string; value: string } => o != null)
+        : [];
+      fields.push({
+        name: String(name),
+        label: String(r.label ?? r.title ?? name),
+        type: type === "select" && options.length === 0 ? "text" : type,
+        required: Boolean(r.required),
+        options,
+        placeholder: r.placeholder != null ? String(r.placeholder) : undefined,
+      });
+    }
+  }
+
+  const rawOutcomes = form.outcomes ?? form.actions ?? form.decisions;
+  const outcomes: string[] = Array.isArray(rawOutcomes)
+    ? rawOutcomes
+        .map((o) => (typeof o === "object" && o ? (o as Record<string, unknown>).value ?? (o as Record<string, unknown>).name : o))
+        .filter((o) => o != null)
+        .map(String)
+    : [];
+
+  // Not usable as a schema-driven form — let the caller fall back to raw JSON.
+  if (fields.length === 0 && outcomes.length === 0 && prompt == null) return null;
+
+  return { prompt, fields, outcomes };
 }

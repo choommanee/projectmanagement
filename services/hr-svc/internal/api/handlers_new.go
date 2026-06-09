@@ -638,6 +638,8 @@ func createPayrollRun(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.payroll_run.create", "payroll_run", pr.ID.String(), nil,
+			map[string]any{"period": pr.Period, "status": pr.Status})
 		writeJSON(w, 201, pr)
 	}
 }
@@ -709,6 +711,8 @@ func patchPayrollRun(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.payroll_run.update", "payroll_run", id.String(), nil,
+			map[string]any{"status": pr.Status})
 		writeJSON(w, 200, pr)
 	}
 }

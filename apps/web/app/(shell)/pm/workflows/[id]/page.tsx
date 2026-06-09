@@ -19,7 +19,7 @@ import "reactflow/dist/style.css";
 import {
   Save, Upload, Play, Trash2, RefreshCw, ChevronRight, Eye, Clock,
   Zap, GitBranch, Globe, UserCheck, Timer, Bell, Square,
-  Variable, Plus, X, Check, Radio, ListPlus, FilePlus,
+  Variable, Plus, X, Check, Radio, ListPlus, FilePlus, PenLine,
 } from "lucide-react";
 import { Button, Input, Tag, TextArea } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
@@ -38,6 +38,7 @@ const STEP_TYPES = [
   { type: "switch",          label: "Switch",         icon: GitBranch, color: "text-accent" },
   { type: "http",            label: "HTTP",           icon: Globe,     color: "text-success" },
   { type: "human_task",      label: "Human Task",     icon: UserCheck, color: "text-signal" },
+  { type: "request_signature", label: "Request Signature", icon: PenLine, color: "text-signal" },
   { type: "create_task",     label: "Create Task",    icon: ListPlus,  color: "text-success" },
   { type: "create_document", label: "Create Document",icon: FilePlus,  color: "text-accent" },
   { type: "wait",            label: "Wait",           icon: Timer,     color: "text-ink-3" },
@@ -54,8 +55,13 @@ function stepSummary(step: DslStep): string {
   if (step.type === "set_variable") return `${step.name} = ${String(step.value ?? "").slice(0, 30)}`;
   if (step.type === "http") return `${step.method ?? "GET"} ${String(step.url ?? "").slice(0, 40)}`;
   if (step.type === "human_task") return String((step.form as Record<string, unknown>)?.prompt ?? step.assignee ?? "");
+  if (step.type === "request_signature") {
+    const signers = step.signers;
+    const count = Array.isArray(signers) ? `${signers.length} signer(s)` : String(signers ?? "");
+    return String(step.title ?? count ?? "");
+  }
   if (step.type === "wait") return String(step.duration ?? "");
-  if (step.type === "notification") return String(step.template ?? "");
+  if (step.type === "notification") return String(step.title ?? step.message ?? "");
   if (step.type === "end") return String(step.result ?? "");
   if (step.type === "switch") return `${(step.cases as unknown[])?.length ?? 0} cases`;
   return "";
@@ -178,6 +184,131 @@ function KVEditor({
         <Plus size={11} /> Add header
       </button>
     </div>
+  );
+}
+
+// ─── request_signature field editor ────────────────────────────────────────
+
+interface InlineSigner { signer_id: string; name?: string; email?: string }
+
+function RequestSignatureFields({
+  step,
+  set,
+}: {
+  step: DslStep;
+  set: (field: string, value: unknown) => void;
+}) {
+  const signers = step.signers;
+  // Inline mode when signers is an array; template mode when it's a string (e.g. {{input.signers}}).
+  const inline = Array.isArray(signers);
+  const inlineSigners: InlineSigner[] = inline ? (signers as InlineSigner[]) : [];
+
+  return (
+    <>
+      <div>
+        <label className="mb-1 block font-medium text-ink-2">Document ID</label>
+        <Input
+          value={String(step.document_id ?? "")}
+          onChange={(e) => set("document_id", e.target.value)}
+          placeholder="{{input.document_id}}"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block font-medium text-ink-2">Title</label>
+        <Input
+          value={String(step.title ?? "")}
+          onChange={(e) => set("title", e.target.value)}
+          placeholder="{{input.title}} or e.g. Document approval"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block font-medium text-ink-2">Signing order</label>
+        <select
+          aria-label="Signing order"
+          value={String(step.signing_order ?? "sequential")}
+          onChange={(e) => set("signing_order", e.target.value)}
+          className="w-full rounded border border-line bg-paper px-2 py-1 text-xs text-ink"
+        >
+          <option value="sequential">sequential</option>
+          <option value="parallel">parallel</option>
+        </select>
+      </div>
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <label className="font-medium text-ink-2">Signers</label>
+          <button
+            type="button"
+            onClick={() => set("signers", inline ? "{{input.signers}}" : [])}
+            className="text-[10px] text-ink-3 hover:text-accent"
+          >
+            {inline ? "use template" : "use inline list"}
+          </button>
+        </div>
+
+        {!inline ? (
+          <Input
+            value={String(signers ?? "")}
+            onChange={(e) => set("signers", e.target.value)}
+            placeholder="{{input.signers}}"
+            className="font-mono text-xs"
+          />
+        ) : (
+          <div className="space-y-2">
+            {inlineSigners.map((s, i) => (
+              <div key={i} className="rounded border border-line p-2 space-y-1">
+                <div className="flex items-center gap-1">
+                  <Input
+                    value={s.signer_id ?? ""}
+                    onChange={(e) => {
+                      const next = [...inlineSigners];
+                      next[i] = { ...next[i], signer_id: e.target.value };
+                      set("signers", next);
+                    }}
+                    placeholder="signer_id (UUID)"
+                    className="flex-1 font-mono text-[11px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set("signers", inlineSigners.filter((_, j) => j !== i))}
+                    className="shrink-0 rounded p-1 text-ink-3 hover:text-danger"
+                    title="Remove signer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <Input
+                  value={s.name ?? ""}
+                  onChange={(e) => {
+                    const next = [...inlineSigners];
+                    next[i] = { ...next[i], name: e.target.value };
+                    set("signers", next);
+                  }}
+                  placeholder="name (optional)"
+                  className="text-[11px]"
+                />
+                <Input
+                  value={s.email ?? ""}
+                  onChange={(e) => {
+                    const next = [...inlineSigners];
+                    next[i] = { ...next[i], email: e.target.value };
+                    set("signers", next);
+                  }}
+                  placeholder="email (optional)"
+                  className="text-[11px]"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => set("signers", [...inlineSigners, { signer_id: "" }])}
+              className="flex items-center gap-1 text-xs text-ink-3 hover:text-ink"
+            >
+              <Plus size={11} /> Add signer
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -373,16 +504,22 @@ function PropPanel({ step, onChange }: PropPanelProps) {
               />
             </div>
             <div>
-              <label className="mb-1 block font-medium text-ink-2">SLA deadline (ISO-8601 duration)</label>
-              <Input value={String(step.sla ?? "")} onChange={(e) => set("sla", e.target.value)} placeholder="PT4H" />
+              <label className="mb-1 block font-medium text-ink-2">SLA (duration)</label>
+              <Input value={String(step.sla ?? "")} onChange={(e) => set("sla", e.target.value)} placeholder="4h" />
+              <p className="mt-0.5 text-[10px] text-ink-3">Format: 30s / 5m / 2h / 1d. Task is flagged overdue past this.</p>
             </div>
           </>
         )}
 
+        {step.type === "request_signature" && (
+          <RequestSignatureFields step={step} set={set} />
+        )}
+
         {step.type === "wait" && (
           <div>
-            <label className="mb-1 block font-medium text-ink-2">Duration (ISO-8601)</label>
-            <Input value={String(step.duration ?? "")} onChange={(e) => set("duration", e.target.value)} placeholder="PT1H" />
+            <label className="mb-1 block font-medium text-ink-2">Duration</label>
+            <Input value={String(step.duration ?? "")} onChange={(e) => set("duration", e.target.value)} placeholder="1h" />
+            <p className="mt-0.5 text-[10px] text-ink-3">Format: 30s / 5m / 2h / 1d (ISO-8601 like PT1H is not supported)</p>
           </div>
         )}
 
@@ -391,20 +528,49 @@ function PropPanel({ step, onChange }: PropPanelProps) {
             <div>
               <label className="mb-1 block font-medium text-ink-2">Channel</label>
               <select
-                value={String(step.channel ?? "email")}
+                aria-label="Notification channel"
+                value={String(step.channel ?? "in_app")}
                 onChange={(e) => set("channel", e.target.value)}
                 className="w-full rounded border border-line bg-paper px-2 py-1 text-xs text-ink"
               >
-                {["email", "slack", "webhook"].map((c) => <option key={c} value={c}>{c}</option>)}
+                {["in_app", "email", "webhook"].map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block font-medium text-ink-2">Template</label>
-              <Input value={String(step.template ?? "")} onChange={(e) => set("template", e.target.value)} />
+              <label className="mb-1 block font-medium text-ink-2">Title</label>
+              <Input
+                value={String(step.title ?? "")}
+                onChange={(e) => set("title", e.target.value)}
+                placeholder="Workflow notification"
+              />
             </div>
             <div>
-              <label className="mb-1 block font-medium text-ink-2">To</label>
-              <Input value={String(step.to ?? "")} onChange={(e) => set("to", e.target.value)} />
+              <label className="mb-1 block font-medium text-ink-2">Message</label>
+              <TextArea
+                value={String(step.message ?? "")}
+                onChange={(e) => set("message", e.target.value)}
+                rows={3}
+                className="font-mono text-xs"
+                placeholder="Hello {{input.name}} — supports {{...}} templates"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Recipient (user UUID)</label>
+              <Input
+                value={String(step.recipient ?? "")}
+                onChange={(e) => set("recipient", e.target.value)}
+                placeholder="{{input.user_id}} or UUID"
+                className="font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-ink-2">Kind (optional)</label>
+              <Input
+                value={String(step.kind ?? "")}
+                onChange={(e) => set("kind", e.target.value)}
+                placeholder="workflow.notification"
+                className="font-mono text-xs"
+              />
             </div>
           </>
         )}
@@ -917,26 +1083,49 @@ function TriggerTab({ def, onSaved }: TriggerTabProps) {
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Trigger Type</p>
         <div className="flex flex-col gap-2">
-          {(["manual", "event", "schedule"] as const).map((t) => (
-            <label key={t} className="flex cursor-pointer items-center gap-3 rounded-md border border-line bg-paper px-3 py-2.5 hover:bg-surface-2">
-              <input
-                type="radio"
-                name="trigger-type"
-                value={t}
-                checked={triggerType === t}
-                onChange={() => setTriggerType(t)}
-                className="accent-accent"
-              />
-              <div>
-                <p className="text-sm font-medium capitalize text-ink">{t}</p>
-                <p className="text-xs text-ink-3">
-                  {t === "manual" && "Started manually via button or API"}
-                  {t === "event" && "Auto-starts when a NATS event matches"}
-                  {t === "schedule" && "Auto-starts on a cron schedule"}
-                </p>
-              </div>
-            </label>
-          ))}
+          {(["manual", "event", "schedule"] as const).map((t) => {
+            // Honesty: schedule has no cron scheduler yet (inert) — disabled.
+            // Event needs the NATS event bus to be running — flagged.
+            const comingSoon = t === "schedule";
+            return (
+              <label
+                key={t}
+                className={`flex items-center gap-3 rounded-md border border-line bg-paper px-3 py-2.5 ${
+                  comingSoon ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-surface-2"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="trigger-type"
+                  value={t}
+                  checked={triggerType === t}
+                  onChange={() => setTriggerType(t)}
+                  disabled={comingSoon}
+                  className="accent-accent"
+                />
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-medium capitalize text-ink">
+                    {t}
+                    {t === "event" && (
+                      <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium normal-case text-warning">
+                        requires NATS event bus
+                      </span>
+                    )}
+                    {comingSoon && (
+                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium normal-case text-ink-3">
+                        coming soon
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-ink-3">
+                    {t === "manual" && "Started manually via button or API"}
+                    {t === "event" && "Auto-starts when a NATS event matches — inactive unless NATS is running"}
+                    {t === "schedule" && "Auto-starts on a cron schedule — no scheduler runs these yet"}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
         </div>
       </div>
 
@@ -1094,6 +1283,13 @@ export default function WorkflowDetailPage() {
     if (type === "switch") newStep.cases = [];
     if (type === "http") { newStep.method = "GET"; newStep.url = ""; }
     if (type === "human_task") { newStep.assignee = ""; newStep.form = { prompt: "" }; }
+    if (type === "notification") { newStep.channel = "in_app"; newStep.message = ""; }
+    if (type === "request_signature") {
+      newStep.document_id = "{{input.document_id}}";
+      newStep.signers = "{{input.signers}}";
+      newStep.signing_order = "sequential";
+      newStep.title = "{{input.title}}";
+    }
     setDslSteps((prev) => [...prev, newStep]);
     setSelectedStepId(newId);
   }, []);

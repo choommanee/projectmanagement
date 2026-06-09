@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -577,6 +577,7 @@ function EditDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<Project["status"]>("planning");
+  const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -586,6 +587,7 @@ function EditDialog({
       setName(project.name);
       setDescription(project.description ?? "");
       setStatus(project.status);
+      setStartDate(project.startDate ? project.startDate.slice(0, 10) : "");
       setDueDate(project.dueDate ? project.dueDate.slice(0, 10) : "");
       setErr(null);
     }
@@ -597,10 +599,13 @@ function EditDialog({
     setBusy(true);
     setErr(null);
     try {
+      // Always send description so an emptied input clears the field;
+      // null dates clear them server-side (optDate contract).
       const updated = await updateProject(project.id, {
         name: name.trim(),
-        description: description.trim() || undefined,
+        description: description.trim(),
         status,
+        start_date: startDate || null,
         due_date: dueDate || null,
         version: project.version,
       });
@@ -617,7 +622,7 @@ function EditDialog({
       open={!!project}
       onClose={onClose}
       title="Edit project"
-      description="Update name, description, status or due date."
+      description="Update name, description, status or dates."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -632,13 +637,21 @@ function EditDialog({
         <Field label="Description">
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description…" />
         </Field>
+        <Field label="Status">
+          <SelectNative
+            label="Status"
+            value={status}
+            onChange={(v) => setStatus(v as Project["status"])}
+            options={["planning", "active", "on_hold", "completed", "cancelled"]}
+          />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Status">
-            <SelectNative
-              label="Status"
-              value={status}
-              onChange={(v) => setStatus(v as Project["status"])}
-              options={["planning", "active", "on_hold", "completed", "cancelled"]}
+          <Field label="Start Date">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
             />
           </Field>
           <Field label="Due Date">

@@ -89,6 +89,7 @@ export default function BacklogPage() {
   const [typeFilter, setTypeFilter] = useState<TaskType | "">("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [localOrder, setLocalOrder] = useState<Task[]>([]);
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
   const { data: fetchResult, isLoading, refetch } = useQuery({
     queryKey: ["backlog-tasks"],
@@ -111,6 +112,20 @@ export default function BacklogPage() {
   const reorderMutation = useMutation({
     mutationFn: ({ id, sortOrder, version }: { id: string; sortOrder: number; version: number }) =>
       updateTask(id, { sort_order: sortOrder, version }),
+    onSuccess: (updated) => {
+      // Merge the fresh version (and persisted sortOrder) back into local state
+      // so the next drag doesn't PATCH with a stale version and 409.
+      setLocalOrder((prev) =>
+        prev.map((t) =>
+          t.id === updated.id ? { ...t, version: updated.version, sortOrder: updated.sortOrder } : t,
+        ),
+      );
+      setReorderError(null);
+    },
+    onError: (err) => {
+      setReorderError(err instanceof Error ? err.message : "Reorder failed");
+      void refetch(); // resync local order + versions with the server
+    },
   });
 
   const handleDragEnd = useCallback(
@@ -186,6 +201,22 @@ export default function BacklogPage() {
         </div>
         <span className="ml-auto font-mono text-[11px] text-ink-3">{filtered.length} items</span>
       </div>
+
+      {reorderError && (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center justify-between border-b border-danger/40 bg-danger/5 px-4 py-1.5 text-[12px] text-danger"
+        >
+          <span>{reorderError}</span>
+          <button
+            type="button"
+            className="font-medium underline-offset-2 hover:underline"
+            onClick={() => setReorderError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Column header */}
       <div className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3">

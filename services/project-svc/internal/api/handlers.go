@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,11 +88,19 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.Get("/tasks/{id}/worklogs", listWorklogs(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).
 			Post("/tasks/{id}/worklogs", createWorklog(svc))
+		// Worklog edit/delete are keyed on the worklog id (not a Task/Project the
+		// loader models) — gate with RequireAction + resource "*"; RLS scopes rows.
+		r.With(libauth.RequireAction(authz, "project.task.worklog.update", "*")).Patch("/worklogs/{id}", updateWorklog(svc))
+		r.With(libauth.RequireAction(authz, "project.task.worklog.delete", "*")).Delete("/worklogs/{id}", deleteWorklog(svc))
 
 		// Task comments & activity feed
 		r.Get("/tasks/{id}/comments", listTaskComments(svc))
 		r.With(libauth.RequireActionScoped(authz, "project.task.update", "Task::{:id}", loaderOpts...)).
 			Post("/tasks/{id}/comments", createTaskComment(svc))
+		// Comment edit/delete are keyed on the comment id — gate with RequireAction
+		// + resource "*"; RLS scopes rows to the caller's tenant.
+		r.With(libauth.RequireAction(authz, "project.task.comment.update", "*")).Patch("/comments/{id}", updateTaskComment(svc))
+		r.With(libauth.RequireAction(authz, "project.task.comment.delete", "*")).Delete("/comments/{id}", deleteTaskComment(svc))
 		r.Get("/tasks/{id}/activity", listTaskActivity(svc))
 
 		// Dependencies — the row is keyed on the dependency id, which the
@@ -112,6 +121,63 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 	})
 
 	return r
+}
+
+// optUUID distinguishes "field absent" from "explicit JSON null" for nullable
+// UUID patch fields. encoding/json skips absent fields (Set stays false) but
+// DOES invoke UnmarshalJSON for an explicit `null`, so Set=true/Val=nil means
+// "clear the FK". A plain **uuid.UUID cannot express this: json gives a nil
+// outer pointer for null, which is indistinguishable from absent.
+type optUUID struct {
+	Set bool
+	Val *uuid.UUID
+}
+
+func (o *optUUID) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Val = nil
+		return nil
+	}
+	var id uuid.UUID
+	if err := json.Unmarshal(b, &id); err != nil {
+		return err
+	}
+	o.Val = &id
+	return nil
+}
+
+// optDate distinguishes absent / null / "" (clear) / "YYYY-MM-DD" or RFC3339
+// (set) for nullable date patch fields. Same rationale as optUUID.
+type optDate struct {
+	Set bool
+	Val *time.Time
+}
+
+func (o *optDate) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Val = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == "" {
+		o.Val = nil
+		return nil
+	}
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		o.Val = &t
+		return nil
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return errors.New("invalid date format, expected YYYY-MM-DD")
+	}
+	o.Val = &t
+	return nil
 }
 
 // tenantOr400 parses the X-Tenant-Id header and returns the tenant UUID or writes 400.
@@ -168,6 +234,7 @@ func createProject(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.create", "project", p.ID.String())
 		writeJSON(w, 201, p)
 	}
 }
@@ -220,13 +287,13 @@ func listProjects(svc *service.Service) http.HandlerFunc {
 
 type updateProjectReq struct {
 	Name        string               `json:"name,omitempty"`
-	Description string               `json:"description,omitempty"`
+	Description *string              `json:"description"` // nil = no change; "" = clear
 	Status      domain.ProjectStatus `json:"status,omitempty"`
 	OwnerID     *uuid.UUID           `json:"owner_id,omitempty"`
 	ProgressPct *int                 `json:"progress_pct,omitempty"`
 	Tags        []string             `json:"tags,omitempty"`
-	StartDate   *string              `json:"start_date,omitempty"`
-	DueDate     *string              `json:"due_date,omitempty"`
+	StartDate   optDate              `json:"start_date"` // absent = no change; null/"" = clear
+	DueDate     optDate              `json:"due_date"`
 	Version     int                  `json:"version"`
 }
 
@@ -251,31 +318,7 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 		if c, ok := libauth.FromCtx(r.Context()); ok {
 			callerID = c.Subject
 		}
-		// Parse optional date strings (YYYY-MM-DD or RFC3339).
-		parseDatePtr := func(s *string) (*time.Time, error) {
-			if s == nil || *s == "" {
-				return nil, nil
-			}
-			if t, err := time.Parse("2006-01-02", *s); err == nil {
-				return &t, nil
-			}
-			t, err := time.Parse(time.RFC3339, *s)
-			if err != nil {
-				return nil, err
-			}
-			return &t, nil
-		}
-		startDate, err := parseDatePtr(req.StartDate)
-		if err != nil {
-			writeErr(w, 400, errors.New("invalid start_date format, expected YYYY-MM-DD"))
-			return
-		}
-		dueDate, err := parseDatePtr(req.DueDate)
-		if err != nil {
-			writeErr(w, 400, errors.New("invalid due_date format, expected YYYY-MM-DD"))
-			return
-		}
-		p, err := svc.UpdateProject(r.Context(), service.UpdateProjectInput{
+		in := service.UpdateProjectInput{
 			TenantID:    tid,
 			ID:          id,
 			Name:        req.Name,
@@ -284,11 +327,17 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 			OwnerID:     req.OwnerID,
 			ProgressPct: req.ProgressPct,
 			Tags:        req.Tags,
-			StartDate:   startDate,
-			DueDate:     dueDate,
 			Version:     req.Version,
 			UserID:      callerID,
-		})
+		}
+		// optDate: Set=false leaves the field unchanged; Set=true with nil Val clears it.
+		if req.StartDate.Set {
+			in.StartDate = &req.StartDate.Val
+		}
+		if req.DueDate.Set {
+			in.DueDate = &req.DueDate.Val
+		}
+		p, err := svc.UpdateProject(r.Context(), in)
 		if err != nil {
 			switch {
 			case errors.Is(err, domain.ErrNotFound):
@@ -300,6 +349,7 @@ func updateProject(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.update", "project", p.ID.String())
 		writeJSON(w, 200, p)
 	}
 }
@@ -329,6 +379,7 @@ func deleteProject(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.delete", "project", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -336,15 +387,19 @@ func deleteProject(svc *service.Service) http.HandlerFunc {
 // --- Tasks ---
 
 type createTaskReq struct {
-	Code        string               `json:"code"`
-	Title       string               `json:"title"`
-	Description string               `json:"description,omitempty"`
-	ParentID    *uuid.UUID           `json:"parent_id,omitempty"`
-	Type        domain.TaskType      `json:"type,omitempty"`
-	Priority    domain.TaskPriority  `json:"priority,omitempty"`
-	AssigneeID  *uuid.UUID           `json:"assignee_id,omitempty"`
-	ReviewerID  *uuid.UUID           `json:"reviewer_id,omitempty"`
-	EstimateMd  float64              `json:"estimate_md,omitempty"`
+	Code        string              `json:"code"`
+	Title       string              `json:"title"`
+	Description string              `json:"description,omitempty"`
+	ParentID    *uuid.UUID          `json:"parent_id,omitempty"`
+	Type        domain.TaskType     `json:"type,omitempty"`
+	Status      domain.TaskStatus   `json:"status,omitempty"`
+	Priority    domain.TaskPriority `json:"priority,omitempty"`
+	AssigneeID  *uuid.UUID          `json:"assignee_id,omitempty"`
+	ReviewerID  *uuid.UUID          `json:"reviewer_id,omitempty"`
+	EstimateMd  float64             `json:"estimate_md,omitempty"`
+	StartDate   optDate             `json:"start_date"`
+	DueDate     optDate             `json:"due_date"`
+	Tags        []string            `json:"tags,omitempty"`
 }
 
 func createTask(svc *service.Service) http.HandlerFunc {
@@ -371,10 +426,14 @@ func createTask(svc *service.Service) http.HandlerFunc {
 			Title:       req.Title,
 			Description: req.Description,
 			Type:        req.Type,
+			Status:      req.Status,
 			Priority:    req.Priority,
 			AssigneeID:  req.AssigneeID,
 			ReviewerID:  req.ReviewerID,
 			EstimateMd:  req.EstimateMd,
+			StartDate:   req.StartDate.Val,
+			DueDate:     req.DueDate.Val,
+			Tags:        req.Tags,
 		})
 		if err != nil {
 			switch {
@@ -385,6 +444,7 @@ func createTask(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.create", "task", t.ID.String())
 		writeJSON(w, 201, t)
 	}
 }
@@ -431,11 +491,7 @@ func listAllTasks(svc *service.Service) http.HandlerFunc {
 			Limit:     limit,
 			Offset:    offset,
 		}
-		if assigneeStr := r.URL.Query().Get("assignee"); assigneeStr != "" {
-			if aid, err := uuid.Parse(assigneeStr); err == nil {
-				opts.Assignee = &aid
-			}
-		}
+		applyTaskFilters(r, &opts)
 
 		items, total, err := svc.Tasks.List(r.Context(), tid, opts)
 		if err != nil {
@@ -443,6 +499,34 @@ func listAllTasks(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "total": total})
+	}
+}
+
+// applyTaskFilters reads the optional role-workspace task filters
+// (assignee, reviewer, type, tag) from the request query and applies them to
+// opts. tag accepts a comma-separated list and matches tasks holding ANY of
+// the supplied tags (array overlap). Unparseable UUIDs are silently ignored so
+// a bad filter degrades to "no filter" rather than a 400.
+func applyTaskFilters(r *http.Request, opts *store.ListTasksOpts) {
+	if assigneeStr := r.URL.Query().Get("assignee"); assigneeStr != "" {
+		if aid, err := uuid.Parse(assigneeStr); err == nil {
+			opts.Assignee = &aid
+		}
+	}
+	if reviewerStr := r.URL.Query().Get("reviewer"); reviewerStr != "" {
+		if rid, err := uuid.Parse(reviewerStr); err == nil {
+			opts.Reviewer = &rid
+		}
+	}
+	if t := r.URL.Query().Get("type"); t != "" {
+		opts.Type = t
+	}
+	if tagStr := r.URL.Query().Get("tag"); tagStr != "" {
+		for _, t := range strings.Split(tagStr, ",") {
+			if t = strings.TrimSpace(t); t != "" {
+				opts.Tags = append(opts.Tags, t)
+			}
+		}
 	}
 }
 
@@ -469,11 +553,7 @@ func listTasks(svc *service.Service) http.HandlerFunc {
 			Limit:     limit,
 			Offset:    offset,
 		}
-		if assigneeStr := r.URL.Query().Get("assignee"); assigneeStr != "" {
-			if aid, err := uuid.Parse(assigneeStr); err == nil {
-				opts.Assignee = &aid
-			}
-		}
+		applyTaskFilters(r, &opts)
 
 		items, total, err := svc.Tasks.List(r.Context(), tid, opts)
 		if err != nil {
@@ -483,7 +563,6 @@ func listTasks(svc *service.Service) http.HandlerFunc {
 		writeJSON(w, 200, map[string]any{"items": items, "total": total})
 	}
 }
-
 
 func listProjectTaskDeps(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -504,48 +583,32 @@ func listProjectTaskDeps(svc *service.Service) http.HandlerFunc {
 		if deps == nil {
 			deps = []domain.TaskDependency{}
 		}
-		type depJSON struct {
-			ID            string `json:"id"`
-			PredecessorID string `json:"predecessorId"`
-			SuccessorID   string `json:"successorId"`
-			Type          string `json:"type"`
-			LagDays       int    `json:"lagDays"`
-		}
-		out := make([]depJSON, len(deps))
-		for i, d := range deps {
-			out[i] = depJSON{
-				ID:            d.ID.String(),
-				PredecessorID: d.PredecessorID.String(),
-				SuccessorID:   d.SuccessorID.String(),
-				Type:          string(d.Type),
-				LagDays:       d.LagDays,
-			}
-		}
-		writeJSON(w, 200, out)
+		writeJSON(w, 200, map[string]any{"items": deps, "total": len(deps)})
 	}
 }
 
 // updateTaskReq fields are all optional so that a PATCH request only touches
 // the fields the caller explicitly provided. String fields use *string so that
-// callers can send `"title": ""` to clear a value. The legacy value-type
-// fields (Title, Description, Type, Status, Priority) are converted to
-// pointers during decoding via a custom json.RawMessage approach — we keep
-// the approach simple by using json.Number / raw decode into the patch struct
-// directly via pointer fields.
+// callers can send `"title": ""` to clear a value. Nullable FK / date fields
+// use optUUID / optDate so an explicit JSON null (or "" for dates) reaches the
+// store's clear branch — a plain **T receives a nil outer pointer for null,
+// which is indistinguishable from "field absent".
 type updateTaskReqV2 struct {
 	Title       *string              `json:"title"`
 	Description *string              `json:"description"`
 	Type        *domain.TaskType     `json:"type"`
 	Status      *domain.TaskStatus   `json:"status"`
 	Priority    *domain.TaskPriority `json:"priority"`
-	AssigneeID  **uuid.UUID          `json:"assignee_id"`
-	ReviewerID  **uuid.UUID          `json:"reviewer_id"`
+	AssigneeID  optUUID              `json:"assignee_id"`
+	ReviewerID  optUUID              `json:"reviewer_id"`
 	EstimateMd  *float64             `json:"estimate_md"`
 	ActualMd    *float64             `json:"actual_md"`
 	ProgressPct *int                 `json:"progress_pct"`
 	SortOrder   *int                 `json:"sort_order"`
 	Tags        *[]string            `json:"tags"`
-	ParentID    **uuid.UUID          `json:"parent_id"`
+	ParentID    optUUID              `json:"parent_id"`
+	StartDate   optDate              `json:"start_date"`
+	DueDate     optDate              `json:"due_date"`
 	Version     int                  `json:"version"`
 }
 
@@ -577,9 +640,23 @@ func updateTask(svc *service.Service) http.HandlerFunc {
 			ProgressPct: req.ProgressPct,
 			SortOrder:   req.SortOrder,
 			Tags:        req.Tags,
-			AssigneeID:  req.AssigneeID,
-			ReviewerID:  req.ReviewerID,
-			ParentID:    req.ParentID,
+		}
+		// opt types: Set=false → field absent → leave unchanged (outer nil).
+		// Set=true with nil Val → explicit null/"" → clear in the store.
+		if req.AssigneeID.Set {
+			p.AssigneeID = &req.AssigneeID.Val
+		}
+		if req.ReviewerID.Set {
+			p.ReviewerID = &req.ReviewerID.Val
+		}
+		if req.ParentID.Set {
+			p.ParentID = &req.ParentID.Val
+		}
+		if req.StartDate.Set {
+			p.StartDate = &req.StartDate.Val
+		}
+		if req.DueDate.Set {
+			p.DueDate = &req.DueDate.Val
 		}
 		if req.Title != nil {
 			p.Title = req.Title
@@ -620,6 +697,7 @@ func updateTask(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.update", "task", t.ID.String())
 		writeJSON(w, 200, t)
 	}
 }
@@ -649,6 +727,7 @@ func deleteTask(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.delete", "task", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -725,7 +804,95 @@ func createWorklog(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.worklog.create", "worklog", entry.ID.String())
 		writeJSON(w, 201, entry)
+	}
+}
+
+// PATCH /worklogs/{id}
+func updateWorklog(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req struct {
+			LoggedMd *float64 `json:"logged_md"`
+			WorkDate *string  `json:"work_date"`
+			Note     *string  `json:"note"`
+			Version  int      `json:"version"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if req.LoggedMd != nil && *req.LoggedMd <= 0 {
+			writeErr(w, 400, errors.New("logged_md must be > 0"))
+			return
+		}
+		var workDate *time.Time
+		if req.WorkDate != nil && *req.WorkDate != "" {
+			t, err := time.Parse("2006-01-02", *req.WorkDate)
+			if err != nil {
+				writeErr(w, 400, errors.New("invalid work_date, expected YYYY-MM-DD"))
+				return
+			}
+			workDate = &t
+		}
+		entry, err := svc.Worklog.Update(r.Context(), tid, domain.UpdateWorklogParams{
+			ID:       id,
+			LoggedMd: req.LoggedMd,
+			WorkDate: workDate,
+			Note:     req.Note,
+			Version:  req.Version,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "project.task.worklog.update", "worklog", entry.ID.String())
+		writeJSON(w, 200, entry)
+	}
+}
+
+// DELETE /worklogs/{id}
+func deleteWorklog(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		version, _ := strconv.Atoi(r.URL.Query().Get("version"))
+		if version <= 0 {
+			writeErr(w, 400, errors.New("version query param required"))
+			return
+		}
+		if err := svc.Worklog.Delete(r.Context(), tid, id, version); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "project.task.worklog.delete", "worklog", id.String())
+		w.WriteHeader(204)
 	}
 }
 
@@ -766,6 +933,7 @@ func addDependency(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.add_dependency", "task_dependency", dep.ID.String())
 		writeJSON(w, 201, dep)
 	}
 }
@@ -785,6 +953,7 @@ func removeDependency(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "project.task.remove_dependency", "task_dependency", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -792,12 +961,12 @@ func removeDependency(svc *service.Service) http.HandlerFunc {
 // --- Sprints ---
 
 type createSprintReq struct {
-	Name        string               `json:"name"`
-	Goal        string               `json:"goal,omitempty"`
-	Status      domain.SprintStatus  `json:"status,omitempty"`
-	StartDate   *string              `json:"start_date,omitempty"`
-	EndDate     *string              `json:"end_date,omitempty"`
-	CapacityPts int                  `json:"capacity_pts,omitempty"`
+	Name        string              `json:"name"`
+	Goal        string              `json:"goal,omitempty"`
+	Status      domain.SprintStatus `json:"status,omitempty"`
+	StartDate   *string             `json:"start_date,omitempty"`
+	EndDate     *string             `json:"end_date,omitempty"`
+	CapacityPts int                 `json:"capacity_pts,omitempty"`
 }
 
 func createSprint(svc *service.Service) http.HandlerFunc {
@@ -858,6 +1027,7 @@ func createSprint(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "project.sprint.create", "sprint", sp.ID.String())
 		writeJSON(w, 201, sp)
 	}
 }
@@ -954,6 +1124,10 @@ func updateSprint(svc *service.Service) http.HandlerFunc {
 		}
 		sp, err := svc.Sprints.GetByID(r.Context(), tid, id)
 		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
 			writeErr(w, 500, err)
 			return
 		}
@@ -1007,6 +1181,8 @@ func updateSprint(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWriteMeta(svc, r, tid, "project.sprint.update", "sprint", sp.ID.String(),
+			map[string]any{"status": string(sp.Status)})
 		writeJSON(w, 200, sp)
 	}
 }
@@ -1022,14 +1198,21 @@ func deleteSprint(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if err := svc.Sprints.Delete(r.Context(), tid, id); err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				writeErr(w, 404, err)
-				return
-			}
-			writeErr(w, 500, err)
+		version, _ := strconv.Atoi(r.URL.Query().Get("version"))
+		if version <= 0 {
+			writeErr(w, 400, errors.New("version query param required"))
 			return
 		}
+		if err := svc.Sprints.Delete(r.Context(), tid, id, version); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "project.sprint.delete", "sprint", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -1054,6 +1237,8 @@ func assignTask(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "project.sprint.assign_task", "sprint", sprintID.String(),
+			map[string]any{"task_id": taskID.String()})
 		w.WriteHeader(204)
 	}
 }
@@ -1078,6 +1263,8 @@ func unassignTask(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "project.sprint.unassign_task", "sprint", sprintID.String(),
+			map[string]any{"task_id": taskID.String()})
 		w.WriteHeader(204)
 	}
 }
@@ -1104,13 +1291,18 @@ func listTaskComments(svc *service.Service) http.HandlerFunc {
 		if comments == nil {
 			comments = []domain.TaskComment{}
 		}
-		writeJSON(w, 200, map[string]any{"items": comments})
+		writeJSON(w, 200, map[string]any{"items": comments, "total": len(comments)})
 	}
 }
 
 type createCommentReq struct {
 	Body     string `json:"body"`
-	AuthorID string `json:"authorId"`
+	AuthorID string `json:"author_id"`
+}
+
+type updateCommentReq struct {
+	Body    string `json:"body"`
+	Version int    `json:"version"`
 }
 
 // POST /tasks/{id}/comments
@@ -1142,7 +1334,76 @@ func createTaskComment(svc *service.Service) http.HandlerFunc {
 		}
 		// record activity event (best-effort: comment creation failure does not roll back the comment)
 		_ = svc.Activity.RecordActivity(r.Context(), tid, taskID, &authorID, "commented", "", req.Body[:min(len(req.Body), 80)])
+		auditWriteMeta(svc, r, tid, "project.task.comment.create", "task_comment", c.ID,
+			map[string]any{"task_id": taskID.String()})
 		writeJSON(w, 201, c)
+	}
+}
+
+// PATCH /comments/{id}
+func updateTaskComment(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req updateCommentReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if req.Body == "" {
+			writeErr(w, 400, errors.New("body required"))
+			return
+		}
+		c, err := svc.Activity.UpdateComment(r.Context(), tid, id, req.Body, req.Version)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "project.task.comment.update", "task_comment", id.String())
+		writeJSON(w, 200, c)
+	}
+}
+
+// DELETE /comments/{id}
+func deleteTaskComment(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		version, _ := strconv.Atoi(r.URL.Query().Get("version"))
+		if version <= 0 {
+			writeErr(w, 400, errors.New("version query param required"))
+			return
+		}
+		if err := svc.Activity.SoftDeleteComment(r.Context(), tid, id, version); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrConflict):
+				writeErr(w, 409, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "project.task.comment.delete", "task_comment", id.String())
+		w.WriteHeader(204)
 	}
 }
 
@@ -1179,4 +1440,3 @@ func writeJSON(w http.ResponseWriter, code int, body any) {
 func writeErr(w http.ResponseWriter, code int, err error) {
 	writeJSON(w, code, map[string]string{"error": err.Error()})
 }
-

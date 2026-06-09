@@ -104,12 +104,12 @@ export default function CapacityPlanningPage() {
   }, [workCenters, grid, thisWeekKey]);
 
   function cellClass(load: number, capacity: number): string {
-    if (capacity === 0) return "bg-zinc-800 text-zinc-400";
+    if (capacity === 0) return "bg-surface-2 text-ink-3";
     const pct = load / capacity;
-    if (pct > 1) return "bg-red-950 text-red-300 border-red-700";
-    if (pct > 0.8) return "bg-amber-950 text-amber-300 border-amber-700";
-    if (load === 0) return "bg-zinc-900 text-zinc-500";
-    return "bg-emerald-950 text-emerald-300 border-emerald-800";
+    if (pct > 1) return "bg-danger/10 text-danger border-danger/40";
+    if (pct > 0.8) return "bg-warning/10 text-warning border-warning/40";
+    if (load === 0) return "bg-surface text-ink-3";
+    return "bg-success/10 text-success border-success/30";
   }
 
   return (
@@ -118,70 +118,70 @@ export default function CapacityPlanningPage() {
 
       {/* summary tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="border border-zinc-700 rounded bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Work Centers</p>
-          <p className="text-2xl font-mono font-bold text-zinc-100">{workCenters.length}</p>
+        <div className="border border-line rounded bg-surface p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-widest mb-1">Work Centers</p>
+          <p className="text-2xl font-mono font-bold text-ink">{workCenters.length}</p>
         </div>
-        <div className="border border-zinc-700 rounded bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Overloaded (Wk 1)</p>
-          <p className={`text-2xl font-mono font-bold ${overloadedCount > 0 ? "text-red-400" : "text-emerald-400"}`}>
+        <div className="border border-line rounded bg-surface p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-widest mb-1">Overloaded (Wk 1)</p>
+          <p className={`text-2xl font-mono font-bold ${overloadedCount > 0 ? "text-danger" : "text-success"}`}>
             {overloadedCount}
           </p>
         </div>
-        <div className="border border-zinc-700 rounded bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Active Work Orders</p>
-          <p className="text-2xl font-mono font-bold text-zinc-100">{workOrders.length}</p>
+        <div className="border border-line rounded bg-surface p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-widest mb-1">Active Work Orders</p>
+          <p className="text-2xl font-mono font-bold text-ink">{workOrders.length}</p>
         </div>
-        <div className="border border-zinc-700 rounded bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Planning Horizon</p>
-          <p className="text-2xl font-mono font-bold text-zinc-100">4 wks</p>
+        <div className="border border-line rounded bg-surface p-4">
+          <p className="text-xs text-ink-3 uppercase tracking-widest mb-1">Planning Horizon</p>
+          <p className="text-2xl font-mono font-bold text-ink">4 wks</p>
         </div>
       </div>
 
       {/* legend */}
-      <div className="flex items-center gap-4 text-xs text-zinc-400">
-        <span className="font-semibold text-zinc-300">Legend:</span>
+      <div className="flex items-center gap-4 text-xs text-ink-3">
+        <span className="font-semibold text-ink-2">Legend:</span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm bg-emerald-950 border border-emerald-800" />
+          <span className="inline-block w-3 h-3 rounded-sm bg-success/10 border border-success/30" />
           Normal (&le;80%)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm bg-amber-950 border border-amber-700" />
+          <span className="inline-block w-3 h-3 rounded-sm bg-warning/10 border border-warning/40" />
           High (80–100%)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm bg-red-950 border border-red-700" />
+          <span className="inline-block w-3 h-3 rounded-sm bg-danger/10 border border-danger/40" />
           Overloaded (&gt;100%)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded-sm bg-zinc-900 border border-zinc-700" />
+          <span className="inline-block w-3 h-3 rounded-sm bg-surface border border-line" />
           No load
         </span>
       </div>
 
       {error && (
-        <div className="border border-red-700 bg-red-950 text-red-300 rounded px-4 py-3 text-sm">
+        <div className="border border-danger/40 bg-danger/10 text-danger rounded px-4 py-3 text-sm">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-zinc-400 text-sm py-12 text-center">Loading capacity data...</div>
+        <div className="text-ink-3 text-sm py-12 text-center">Loading capacity data...</div>
       ) : workCenters.length === 0 ? (
-        <div className="text-zinc-500 text-sm py-12 text-center">No work centers found.</div>
+        <div className="text-ink-3 text-sm py-12 text-center">No work centers found.</div>
       ) : (
         /* capacity grid */
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse border border-zinc-700">
+          <table className="w-full text-sm border-collapse border border-line">
             <thead>
-              <tr className="bg-zinc-800 text-zinc-300 uppercase text-xs tracking-wider">
-                <th className="border border-zinc-700 px-4 py-2 text-left w-52">Work Center</th>
-                <th className="border border-zinc-700 px-4 py-2 text-center w-24">Type</th>
-                <th className="border border-zinc-700 px-4 py-2 text-center w-24">Cap/Wk (h)</th>
+              <tr className="bg-surface-2 text-ink-2 uppercase text-xs tracking-wider">
+                <th className="border border-line px-4 py-2 text-left w-52">Work Center</th>
+                <th className="border border-line px-4 py-2 text-center w-24">Type</th>
+                <th className="border border-line px-4 py-2 text-center w-24">Cap/Wk (h)</th>
                 {weeks.map((w) => (
-                  <th key={w.key} className="border border-zinc-700 px-4 py-2 text-center min-w-[130px]">
-                    <div className="font-mono text-zinc-100">{w.key}</div>
-                    <div className="text-zinc-400 font-normal normal-case text-xs">{w.label}</div>
+                  <th key={w.key} className="border border-line px-4 py-2 text-center min-w-[130px]">
+                    <div className="font-mono text-ink">{w.key}</div>
+                    <div className="text-ink-3 font-normal normal-case text-xs">{w.label}</div>
                   </th>
                 ))}
               </tr>
@@ -190,17 +190,17 @@ export default function CapacityPlanningPage() {
               {workCenters.map((wc) => {
                 const capPerWeek = wc.capacityPerDayHrs * 5;
                 return (
-                  <tr key={wc.id} className="hover:bg-zinc-800/40 transition-colors">
-                    <td className="border border-zinc-700 px-4 py-2">
-                      <div className="font-medium text-zinc-100">{wc.name}</div>
-                      <div className="text-xs text-zinc-500 font-mono">{wc.code}</div>
+                  <tr key={wc.id} className="hover:bg-surface-2/40 transition-colors">
+                    <td className="border border-line px-4 py-2">
+                      <div className="font-medium text-ink">{wc.name}</div>
+                      <div className="text-xs text-ink-3 font-mono">{wc.code}</div>
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-center">
-                      <span className="text-xs px-1.5 py-0.5 rounded border border-zinc-600 text-zinc-400 uppercase font-mono">
+                    <td className="border border-line px-4 py-2 text-center">
+                      <span className="text-xs px-1.5 py-0.5 rounded border border-line-strong text-ink-3 uppercase font-mono">
                         {wc.type}
                       </span>
                     </td>
-                    <td className="border border-zinc-700 px-4 py-2 text-center font-mono text-zinc-300">
+                    <td className="border border-line px-4 py-2 text-center font-mono text-ink-2">
                       {capPerWeek.toFixed(0)}
                     </td>
                     {weeks.map((w) => {
@@ -209,7 +209,7 @@ export default function CapacityPlanningPage() {
                       return (
                         <td
                           key={w.key}
-                          className={`border border-zinc-700 px-3 py-2 text-center ${cellClass(load, capPerWeek)}`}
+                          className={`border border-line px-3 py-2 text-center ${cellClass(load, capPerWeek)}`}
                         >
                           <div className="font-mono font-semibold text-sm">
                             {load.toFixed(0)}<span className="text-xs opacity-60"> / {capPerWeek.toFixed(0)}</span>

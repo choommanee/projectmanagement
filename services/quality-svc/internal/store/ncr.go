@@ -115,6 +115,8 @@ func (s *NCRStore) List(ctx context.Context, tid uuid.UUID, opts ListNCROpts) ([
 type UpdateNCRInput struct {
 	Status      domain.NCRStatus
 	Description string
+	Qty         float64
+	Severity    int
 	Version     int
 }
 
@@ -122,9 +124,9 @@ func (s *NCRStore) Update(ctx context.Context, tid, id uuid.UUID, in UpdateNCRIn
 	var n domain.Nonconformance
 	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
 		ct, err := tx.Exec(ctx, `
-			UPDATE nonconformance SET status=$3, description=$4, updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$5`,
-			id, tid, in.Status, in.Description, in.Version)
+			UPDATE nonconformance SET status=$3, description=$4, qty=$5, severity=$6, updated_at=now(), version=version+1
+			WHERE id=$1 AND tenant_id=$2 AND version=$7`,
+			id, tid, in.Status, in.Description, in.Qty, in.Severity, in.Version)
 		if err != nil {
 			return err
 		}

@@ -113,7 +113,7 @@ export interface ControlPlanChar {
   no: number;
   characteristic: string;
   spec: string;
-  sampleSize: number;
+  sampleSize: string;
   sampleFreq: string;
   measurementMethod: string;
   reactionPlan: string;
@@ -205,7 +205,7 @@ function normPpapElement(r: Record<string, unknown>): PpapElement {
     elementNo: Number(gid(r, "elementNo", "element_no") ?? r["ElementNo"] ?? 0),
     name: String(g(r, "name") ?? ""),
     status: (g(r, "status") ?? "not_required") as PpapElementStatus,
-    evidenceUrl: String(gid(r, "evidenceUrl", "evidence_url") ?? r["EvidenceUrl"] ?? ""),
+    evidenceUrl: String(gid(r, "evidenceUrl", "evidence_url") ?? r["EvidenceURL"] ?? r["EvidenceUrl"] ?? ""),
     notes: String(g(r, "notes") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -260,7 +260,7 @@ function normControlPlanChar(r: Record<string, unknown>): ControlPlanChar {
     no: Number(g(r, "no") ?? r["No"] ?? 0),
     characteristic: String(g(r, "characteristic") ?? ""),
     spec: String(g(r, "spec") ?? ""),
-    sampleSize: Number(gid(r, "sampleSize", "sample_size") ?? r["SampleSize"] ?? 0),
+    sampleSize: String(gid(r, "sampleSize", "sample_size") ?? r["SampleSize"] ?? ""),
     sampleFreq: String(gid(r, "sampleFreq", "sample_freq") ?? r["SampleFreq"] ?? ""),
     measurementMethod: String(gid(r, "measurementMethod", "measurement_method") ?? r["MeasurementMethod"] ?? ""),
     reactionPlan: String(gid(r, "reactionPlan", "reaction_plan") ?? r["ReactionPlan"] ?? ""),
@@ -627,7 +627,7 @@ export async function addControlPlanChar(controlPlanId: string, char: {
   no: number;
   characteristic: string;
   spec?: string;
-  sample_size?: number;
+  sample_size?: string;
   sample_freq?: string;
   measurement_method?: string;
   reaction_plan?: string;
@@ -648,7 +648,7 @@ export async function addControlPlanChar(controlPlanId: string, char: {
 export async function updateControlPlanChar(id: string, patch: {
   characteristic?: string;
   spec?: string;
-  sample_size?: number;
+  sample_size?: string;
   sample_freq?: string;
   measurement_method?: string;
   reaction_plan?: string;
@@ -778,8 +778,14 @@ export async function getCAPA(ncrId: string): Promise<CAPA | null> {
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`getCAPA failed: ${r.status}`);
   const body = await r.json();
-  if (!body || !body.id && !body.ID) return null;
-  return normCAPA(body);
+  if (!body) return null;
+  // Backend returns {items:[...],total}. CAPA is 1-per-NCR in the UI, so take
+  // the first item. Fall back to a bare object for older/alternate shapes.
+  const row = Array.isArray(body.items)
+    ? (body.items[0] as Record<string, unknown> | undefined)
+    : (body.id || body.ID ? (body as Record<string, unknown>) : undefined);
+  if (!row || (!row.id && !row.ID)) return null;
+  return normCAPA(row);
 }
 
 export async function attachCAPA(ncrId: string, input: {

@@ -81,6 +81,47 @@ func TestSummaryCountsAcrossEntities(t *testing.T) {
 	}
 }
 
+// TestSummaryIsolatesFailingCounts is a regression test for a bug where a
+// single count against a not-yet-migrated table (e.g. nonconformance_report)
+// aborted the shared transaction, silently zeroing EVERY count that ran after
+// it (documents, audit events, workflow runs). safeCount now wraps each query
+// in a savepoint, so an audit_log row seeded here must still be counted even
+// though earlier counts in the same Summary may fail.
+func TestSummaryIsolatesFailingCounts(t *testing.T) {
+	p := testPool(t)
+	m := store.NewMetrics(p)
+	tid := newTenantID(t, p)
+
+	// Seed an audit_log row (audit_events is the LAST count in Summary, after
+	// the nonconformance_report count that errors when the table is missing).
+	ctx := context.Background()
+	tx, err := p.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	if _, err := tx.Exec(ctx, "SET LOCAL app.current_tenant = '"+tid.String()+"'"); err != nil {
+		t.Fatalf("set tenant: %v", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO audit_log(tenant_id, service, action, result, ts) VALUES ($1,'test','test.action','success', now())`,
+		tid,
+	); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("seed audit_log: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	summary, err := m.Summary(ctx, tid)
+	if err != nil {
+		t.Fatalf("Summary: %v", err)
+	}
+	if summary.AuditEvents24h < 1 {
+		t.Fatalf("AuditEvents24h: got %d, want >=1 — a failing count earlier in the tx zeroed it", summary.AuditEvents24h)
+	}
+}
+
 func TestTimeseriesByDay(t *testing.T) {
 	p := testPool(t)
 	m := store.NewMetrics(p)

@@ -43,6 +43,7 @@ type PurchaseOrder struct {
 	Status       POStatus
 	OrderDate    *time.Time
 	ExpectedDate *time.Time
+	SourceSoID   *uuid.UUID
 	Notes        string
 	CreatedBy    uuid.UUID
 	Lines        []POLine

@@ -1,6 +1,7 @@
 use axum::{routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -35,15 +36,27 @@ pub struct Step {
     // http
     pub method: Option<String>,
     pub url: Option<String>,
+    /// Extra request headers; values are template-resolved against the context.
+    pub headers: Option<HashMap<String, String>>,
+    /// Request body. A string is template-resolved (and parsed as JSON when
+    /// possible); any other JSON value has its nested strings template-resolved.
+    pub body: Option<Value>,
     pub retry: Option<RetryConfig>,
     // human_task
     pub assignee: Option<String>,
     pub form: Option<Value>,
+    /// SLA duration ("30s"/"5m"/"2h"/"1d"); template-resolvable. Parsed to
+    /// seconds and surfaced on the HumanTaskResult so workflow-svc can compute
+    /// sla_deadline = now + sla.
+    pub sla: Option<String>,
     // wait
     pub duration: Option<String>,
     // notification
     pub channel: Option<String>,
     pub message: Option<String>,
+    pub title: Option<String>,
+    pub kind: Option<String>,
+    pub recipient: Option<String>,
     // end
     pub result: Option<Value>,
     // create_task / update_task_status
@@ -57,6 +70,10 @@ pub struct Step {
     // create_document
     pub doc_title: Option<String>,
     pub doc_content: Option<String>,
+    // request_signature
+    pub document_id: Option<String>,
+    pub signers: Option<Value>,
+    pub signing_order: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -82,6 +99,20 @@ pub struct ExecuteInput {
     pub input: Value,
     pub variables: Value,
     pub resume_from_step_id: Option<String>,
+    /// Bearer token forwarded on every outgoing cross-service HTTP call.
+    /// Absent => no Authorization header (legacy behavior).
+    #[serde(default)]
+    pub auth_token: Option<String>,
+    /// Tenant id forwarded as `X-Tenant-Id` on every outgoing cross-service
+    /// HTTP call. Absent => no header.
+    #[serde(default)]
+    pub tenant_id: Option<String>,
+    /// Resume semantics. None / Some(true) (default) => skip up-to-AND-including
+    /// the cursor step, then continue (correct for human_task / wait / signature
+    /// pauses). Some(false) => re-execute the cursor step itself (skip only steps
+    /// strictly BEFORE the cursor); used to retry a FAILED step.
+    #[serde(default)]
+    pub resume_inclusive: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -100,6 +131,32 @@ pub struct HumanTaskResult {
     pub step_id: String,
     pub assignee: Option<String>,
     pub form: Value,
+    /// Parsed SLA duration in seconds (from the step's `sla` field). None when
+    /// the step declares no SLA. workflow-svc computes sla_deadline from this.
+    pub sla_seconds: Option<i64>,
+}
+
+/// A resolved notification produced by a `notification` step. The Rust engine
+/// never sends mail/webhooks itself — it only resolves templates and returns
+/// the structured result; workflow-svc fans it out via libs/go/notification.
+#[derive(Debug, Serialize, Clone)]
+pub struct NotificationResult {
+    pub step_id: String,
+    pub channel: String,
+    pub recipient: Option<String>,
+    pub message: String,
+    pub kind: String,
+    pub title: String,
+}
+
+/// A signature envelope created by a `request_signature` step that the engine
+/// paused on. workflow-svc persists this so it can correlate the document-svc
+/// envelope webhook (signed/declined) back to the paused instance and resume.
+#[derive(Debug, Serialize, Clone)]
+pub struct PendingSignature {
+    pub step_id: String,
+    pub envelope_id: String,
+    pub document_id: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -111,6 +168,15 @@ pub struct ExecuteOutput {
     pub error: Option<String>,
     pub steps: Vec<StepResult>,
     pub human_tasks: Vec<HumanTaskResult>,
+    /// Notifications resolved during this run, to be delivered by workflow-svc.
+    pub notifications: Vec<NotificationResult>,
+    /// When the engine pauses on a `wait` step this is the number of seconds
+    /// the service should sleep before resuming (used to compute wake_at).
+    /// None for human_task pauses (which wake on task completion).
+    pub wake_seconds: Option<i64>,
+    /// Set only when the engine just paused on a `request_signature` step.
+    /// Null otherwise.
+    pub pending_signature: Option<PendingSignature>,
 }
 
 // ─── Expression Evaluator ─────────────────────────────────────────────────────
@@ -543,10 +609,21 @@ fn resolve_template(s: &str, ctx: &ExprContext) -> String {
 
 // ─── Step executor ────────────────────────────────────────────────────────────
 
+/// Outcome of running a (sub)list of steps when execution stops early:
+/// (status, output, cursor, error).
+type RunOutcome = (String, Option<Value>, Option<String>, Option<String>);
+
 struct Executor {
     variables: Value,
     steps: Vec<StepResult>,
     human_tasks: Vec<HumanTaskResult>,
+    notifications: Vec<NotificationResult>,
+    wake_seconds: Option<i64>,
+    pending_signature: Option<PendingSignature>,
+    auth_token: Option<String>,
+    tenant_id: Option<String>,
+    /// true => skip cursor inclusively (default); false => re-run the cursor step.
+    resume_inclusive: bool,
 }
 
 impl Executor {
@@ -555,7 +632,29 @@ impl Executor {
             variables,
             steps: Vec::new(),
             human_tasks: Vec::new(),
+            notifications: Vec::new(),
+            wake_seconds: None,
+            pending_signature: None,
+            auth_token: None,
+            tenant_id: None,
+            resume_inclusive: true,
         }
+    }
+
+    /// Build the auth/tenant header list for an outgoing cross-service call.
+    fn svc_headers(&self) -> Vec<(String, String)> {
+        let mut h = Vec::new();
+        if let Some(tok) = &self.auth_token {
+            if !tok.is_empty() {
+                h.push(("Authorization".to_string(), format!("Bearer {}", tok)));
+            }
+        }
+        if let Some(tid) = &self.tenant_id {
+            if !tid.is_empty() {
+                h.push(("X-Tenant-Id".to_string(), tid.clone()));
+            }
+        }
+        h
     }
 
     fn ctx(&self, input: &Value) -> ExprContext {
@@ -573,8 +672,8 @@ impl Executor {
         steps: &[Step],
         input: &Value,
         resume_from: Option<&str>,
-        is_inline: bool,
-    ) -> Option<(String, Option<Value>, Option<String>, Option<String>)> {
+        _is_inline: bool,
+    ) -> Option<RunOutcome> {
         // (status, output, cursor, error)
         // When resuming, skip all steps UP TO AND INCLUDING the cursor step,
         // then continue from the step after the cursor.
@@ -583,41 +682,49 @@ impl Executor {
         for step in steps {
             if skipping {
                 if step.id == resume_from.unwrap_or("") {
-                    // Found the cursor step — skip it (already executed/paused) and resume from next
+                    // Found the cursor step.
                     skipping = false;
-                    continue;
-                }
-                // Cursor may be nested inside a switch case's do-steps.
-                // Re-evaluate the matching case and recurse with resume_from still set.
-                if step.step_type == "switch" {
-                    if let Some(cases) = &step.cases {
-                        let ctx = self.ctx(input);
-                        for case in cases {
-                            let case_matches = case.when == "default"
-                                || eval_expr(&case.when, &ctx).map(|v| is_truthy(&v)).unwrap_or(false);
-                            if case_matches && contains_step_id(&case.do_steps, resume_from.unwrap_or("")) {
-                                skipping = false;
-                                let step_input = json!({"variables": self.variables, "input": input});
-                                self.steps.push(StepResult {
-                                    step_id: step.id.clone(),
-                                    step_type: step.step_type.clone(),
-                                    status: "completed".into(),
-                                    input: step_input,
-                                    output: json!({"matched": true}),
-                                    error: None,
-                                    duration_ms: 0,
-                                });
-                                if let Some(result) = self.run_steps(&case.do_steps, input, resume_from, true) {
-                                    return Some(result);
+                    if self.resume_inclusive {
+                        // Inclusive (default): cursor already executed/paused — skip
+                        // it and resume from the next step.
+                        continue;
+                    }
+                    // Non-inclusive: re-execute the cursor step itself — fall through
+                    // to the normal execution path below WITHOUT continuing.
+                } else {
+                    // Cursor may be nested inside a switch case's do-steps.
+                    // Re-evaluate the matching case and recurse with resume_from set.
+                    if step.step_type == "switch" {
+                        if let Some(cases) = &step.cases {
+                            let ctx = self.ctx(input);
+                            for case in cases {
+                                let case_matches = case.when == "default"
+                                    || eval_expr(&case.when, &ctx).map(|v| is_truthy(&v)).unwrap_or(false);
+                                if case_matches && contains_step_id(&case.do_steps, resume_from.unwrap_or("")) {
+                                    skipping = false;
+                                    let step_input = json!({"variables": self.variables, "input": input});
+                                    self.steps.push(StepResult {
+                                        step_id: step.id.clone(),
+                                        step_type: step.step_type.clone(),
+                                        status: "completed".into(),
+                                        input: step_input,
+                                        output: json!({"matched": true}),
+                                        error: None,
+                                        duration_ms: 0,
+                                    });
+                                    if let Some(result) = self.run_steps(&case.do_steps, input, resume_from, true) {
+                                        return Some(result);
+                                    }
+                                    break;
                                 }
-                                break;
+                                if case_matches { break; } // only first matching case
                             }
-                            if case_matches { break; } // only first matching case
                         }
                     }
-                    if !skipping { continue; } // switch was handled above
+                    // Still skipping (cursor not this step / handled by recursion):
+                    // move to the next step.
+                    continue;
                 }
-                continue;
             }
 
             let start = Instant::now();
@@ -728,10 +835,41 @@ impl Executor {
                 }
 
                 "http" => {
+                    let ctx = self.ctx(input);
                     let method = step.method.as_deref().unwrap_or("GET").to_uppercase();
-                    let url = step.url.as_deref().unwrap_or("");
+                    let url = resolve_template(step.url.as_deref().unwrap_or(""), &ctx);
                     let max_attempts = step.retry.as_ref().map(|r| r.max_attempts).unwrap_or(1);
                     let backoff = step.retry.as_ref().and_then(|r| r.backoff.as_deref()).unwrap_or("fixed");
+
+                    // Merge step headers (template-resolved values) over the
+                    // auth/tenant headers; a step header wins on key collision.
+                    let mut headers = self.svc_headers();
+                    if let Some(custom) = &step.headers {
+                        for (k, v) in custom {
+                            if k.trim().is_empty() {
+                                continue;
+                            }
+                            let resolved = resolve_template(v, &ctx);
+                            headers.retain(|(hk, _)| !hk.eq_ignore_ascii_case(k));
+                            headers.push((k.clone(), resolved));
+                        }
+                    }
+
+                    // Resolve the body: a string is template-resolved then parsed
+                    // as JSON when possible (designer textarea holds JSON text);
+                    // any other JSON value gets nested templates resolved.
+                    let body: Option<Value> = match &step.body {
+                        Some(Value::String(s)) => {
+                            let resolved = resolve_template(s, &ctx);
+                            if resolved.trim().is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::from_str(&resolved).unwrap_or(Value::String(resolved)))
+                            }
+                        }
+                        Some(Value::Null) | None => None,
+                        Some(other) => Some(resolve_json_templates(other.clone(), &ctx)),
+                    };
 
                     let mut last_err: Option<String> = None;
                     let mut step_out = Value::Null;
@@ -747,8 +885,9 @@ impl Executor {
                             std::thread::sleep(std::time::Duration::from_secs(sleep_secs));
                         }
 
-                        // Use reqwest blocking via a simple approach
-                        let result = make_http_request(&method, url, None);
+                        // Use reqwest blocking via a simple approach.
+                        // Forward auth/tenant headers when present (no-op if absent).
+                        let result = make_http_request_h(&method, &url, body.as_ref(), &headers);
                         match result {
                             Ok(out) => {
                                 step_out = out;
@@ -803,10 +942,21 @@ impl Executor {
                         step.form.clone().unwrap_or(Value::Null),
                         &ctx,
                     );
+                    // SLA duration ("30s"/"5m"/"2h"/"1d"); 0/invalid => no SLA.
+                    let sla_seconds = step.sla.as_deref().and_then(|raw| {
+                        let resolved = if raw.contains("{{") {
+                            resolve_template(raw, &ctx)
+                        } else {
+                            raw.to_string()
+                        };
+                        let secs = parse_duration_secs(&resolved);
+                        if secs > 0 { Some(secs) } else { None }
+                    });
                     self.human_tasks.push(HumanTaskResult {
                         step_id: step.id.clone(),
                         assignee: assignee.clone(),
                         form: form.clone(),
+                        sla_seconds,
                     });
 
                     let dur = start.elapsed().as_millis() as u64;
@@ -815,7 +965,7 @@ impl Executor {
                         step_type: step.step_type.clone(),
                         status: "running".into(),
                         input: step_input,
-                        output: json!({ "queued": true, "assignee": assignee }),
+                        output: json!({ "queued": true, "assignee": assignee, "sla_seconds": sla_seconds }),
                         error: None,
                         duration_ms: dur,
                     });
@@ -824,13 +974,22 @@ impl Executor {
                 }
 
                 "wait" => {
+                    let ctx = self.ctx(input);
+                    let dur_raw = step.duration.as_deref().unwrap_or("0s");
+                    let resolved = if dur_raw.contains("{{") {
+                        resolve_template(dur_raw, &ctx)
+                    } else {
+                        dur_raw.to_string()
+                    };
+                    let wake_secs = parse_duration_secs(&resolved);
+                    self.wake_seconds = Some(wake_secs);
                     let dur = start.elapsed().as_millis() as u64;
                     self.steps.push(StepResult {
                         step_id: step.id.clone(),
                         step_type: step.step_type.clone(),
                         status: "running".into(),
                         input: step_input,
-                        output: json!({ "duration": step.duration }),
+                        output: json!({ "duration": resolved, "wake_seconds": wake_secs }),
                         error: None,
                         duration_ms: dur,
                     });
@@ -838,16 +997,47 @@ impl Executor {
                 }
 
                 "notification" => {
-                    let msg = step.message.as_deref().unwrap_or("");
-                    let resolved_msg = resolve_template(msg, &self.ctx(input));
-                    tracing::info!(step_id = %step.id, message = %resolved_msg, "notification step (no-op in MVP)");
+                    let ctx = self.ctx(input);
+                    let message = resolve_template(step.message.as_deref().unwrap_or(""), &ctx);
+                    let channel = resolve_template(step.channel.as_deref().unwrap_or("in_app"), &ctx);
+                    let kind = resolve_template(step.kind.as_deref().unwrap_or("workflow.notification"), &ctx);
+                    let title = {
+                        let raw = step.title.as_deref().unwrap_or("");
+                        if raw.is_empty() {
+                            "Workflow notification".to_string()
+                        } else {
+                            resolve_template(raw, &ctx)
+                        }
+                    };
+                    // recipient may come from `recipient` or fall back to `assignee`
+                    let recipient_raw = step
+                        .recipient
+                        .as_deref()
+                        .or(step.assignee.as_deref())
+                        .unwrap_or("");
+                    let recipient = if recipient_raw.is_empty() {
+                        None
+                    } else {
+                        let r = resolve_template(recipient_raw, &ctx);
+                        if r.is_empty() { None } else { Some(r) }
+                    };
+
+                    self.notifications.push(NotificationResult {
+                        step_id: step.id.clone(),
+                        channel: channel.clone(),
+                        recipient: recipient.clone(),
+                        message: message.clone(),
+                        kind,
+                        title,
+                    });
+
                     let dur = start.elapsed().as_millis() as u64;
                     self.steps.push(StepResult {
                         step_id: step.id.clone(),
                         step_type: step.step_type.clone(),
                         status: "completed".into(),
                         input: step_input,
-                        output: json!({ "queued": true }),
+                        output: json!({ "queued": true, "channel": channel, "recipient": recipient }),
                         error: None,
                         duration_ms: dur,
                     });
@@ -905,7 +1095,7 @@ impl Executor {
                         .unwrap_or_else(|_| "http://localhost:8083".into());
                     let url = format!("{}/v1/projects/{}/tasks", svc_url, project_id);
                     let dur = start.elapsed().as_millis() as u64;
-                    match make_http_post_json(&url, body) {
+                    match make_http_post_json_h(&url, body, &self.svc_headers()) {
                         Ok(out) => {
                             self.steps.push(StepResult {
                                 step_id: step.id.clone(),
@@ -956,7 +1146,7 @@ impl Executor {
                         .unwrap_or_else(|_| "http://localhost:8084".into());
                     let url = format!("{}/v1/documents", svc_url);
                     let dur = start.elapsed().as_millis() as u64;
-                    match make_http_post_json(&url, body) {
+                    match make_http_post_json_h(&url, body, &self.svc_headers()) {
                         Ok(out) => {
                             self.steps.push(StepResult {
                                 step_id: step.id.clone(),
@@ -983,6 +1173,168 @@ impl Executor {
                     }
                 }
 
+                "request_signature" => {
+                    let ctx = self.ctx(input);
+                    let document_id = resolve_template(
+                        step.document_id.as_deref().unwrap_or(""),
+                        &ctx,
+                    );
+                    let signing_order = {
+                        let raw = step.signing_order.as_deref().unwrap_or("sequential");
+                        let r = resolve_template(raw, &ctx);
+                        if r.is_empty() { "sequential".to_string() } else { r }
+                    };
+                    let title = {
+                        let raw = step.title.as_deref().unwrap_or("");
+                        if raw.is_empty() { None } else { Some(resolve_template(raw, &ctx)) }
+                    };
+
+                    // Resolve signers: either an inline array, or a template
+                    // string that resolves+parses to an array.
+                    let signers: Value = match &step.signers {
+                        Some(Value::String(s)) => {
+                            let resolved = resolve_template(s, &ctx);
+                            serde_json::from_str(&resolved).unwrap_or(Value::Null)
+                        }
+                        Some(Value::Array(_)) => {
+                            resolve_json_templates(step.signers.clone().unwrap(), &ctx)
+                        }
+                        Some(other) => resolve_json_templates(other.clone(), &ctx),
+                        None => Value::Null,
+                    };
+
+                    let mut create_body = json!({
+                        "signing_order": signing_order,
+                        "signers": signers,
+                    });
+                    if let Some(t) = &title {
+                        create_body["title"] = Value::String(t.clone());
+                    }
+
+                    let svc_url = std::env::var("DOCUMENT_SVC_URL")
+                        .unwrap_or_else(|_| "http://localhost:8084".into());
+                    let create_url = format!(
+                        "{}/v1/documents/{}/sign-envelopes",
+                        svc_url, document_id
+                    );
+
+                    let headers = self.svc_headers();
+                    let create_res = make_http_post_json_h(&create_url, create_body, &headers);
+                    let (envelope_id, create_out) = match create_res {
+                        Ok(out) => {
+                            let status = out.get("status").and_then(|s| s.as_u64()).unwrap_or(0);
+                            if !(200..300).contains(&status) {
+                                let dur = start.elapsed().as_millis() as u64;
+                                let err = format!(
+                                    "create sign-envelope returned status {}",
+                                    status
+                                );
+                                self.steps.push(StepResult {
+                                    step_id: step.id.clone(),
+                                    step_type: step.step_type.clone(),
+                                    status: "failed".into(),
+                                    input: step_input,
+                                    output: out,
+                                    error: Some(err.clone()),
+                                    duration_ms: dur,
+                                });
+                                return Some(("failed".into(), None, Some(step.id.clone()), Some(err)));
+                            }
+                            match extract_envelope_id(&out) {
+                                Some(id) => (id, out),
+                                None => {
+                                    let dur = start.elapsed().as_millis() as u64;
+                                    let err = "could not parse envelope id from create response".to_string();
+                                    self.steps.push(StepResult {
+                                        step_id: step.id.clone(),
+                                        step_type: step.step_type.clone(),
+                                        status: "failed".into(),
+                                        input: step_input,
+                                        output: out,
+                                        error: Some(err.clone()),
+                                        duration_ms: dur,
+                                    });
+                                    return Some(("failed".into(), None, Some(step.id.clone()), Some(err)));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let dur = start.elapsed().as_millis() as u64;
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "failed".into(),
+                                input: step_input,
+                                output: Value::Null,
+                                error: Some(e.clone()),
+                                duration_ms: dur,
+                            });
+                            return Some(("failed".into(), None, Some(step.id.clone()), Some(e)));
+                        }
+                    };
+
+                    // Send the envelope.
+                    let send_url = format!(
+                        "{}/v1/sign-envelopes/{}/send",
+                        svc_url, envelope_id
+                    );
+                    let send_res = make_http_post_json_h(&send_url, json!({}), &headers);
+                    match send_res {
+                        Ok(out) => {
+                            let status = out.get("status").and_then(|s| s.as_u64()).unwrap_or(0);
+                            if !(200..300).contains(&status) {
+                                let dur = start.elapsed().as_millis() as u64;
+                                let err = format!("send sign-envelope returned status {}", status);
+                                self.steps.push(StepResult {
+                                    step_id: step.id.clone(),
+                                    step_type: step.step_type.clone(),
+                                    status: "failed".into(),
+                                    input: step_input,
+                                    output: out,
+                                    error: Some(err.clone()),
+                                    duration_ms: dur,
+                                });
+                                return Some(("failed".into(), None, Some(step.id.clone()), Some(err)));
+                            }
+                        }
+                        Err(e) => {
+                            let dur = start.elapsed().as_millis() as u64;
+                            self.steps.push(StepResult {
+                                step_id: step.id.clone(),
+                                step_type: step.step_type.clone(),
+                                status: "failed".into(),
+                                input: step_input,
+                                output: Value::Null,
+                                error: Some(e.clone()),
+                                duration_ms: dur,
+                            });
+                            return Some(("failed".into(), None, Some(step.id.clone()), Some(e)));
+                        }
+                    }
+
+                    // Success: record running + pause for the signature outcome.
+                    self.pending_signature = Some(PendingSignature {
+                        step_id: step.id.clone(),
+                        envelope_id: envelope_id.clone(),
+                        document_id: document_id.clone(),
+                    });
+                    let dur = start.elapsed().as_millis() as u64;
+                    self.steps.push(StepResult {
+                        step_id: step.id.clone(),
+                        step_type: step.step_type.clone(),
+                        status: "running".into(),
+                        input: step_input,
+                        output: json!({
+                            "envelope_id": envelope_id,
+                            "document_id": document_id,
+                            "create_response": create_out,
+                        }),
+                        error: None,
+                        duration_ms: dur,
+                    });
+                    return Some(("paused".into(), None, Some(step.id.clone()), None));
+                }
+
                 unknown => {
                     let dur = start.elapsed().as_millis() as u64;
                     self.steps.push(StepResult {
@@ -1001,6 +1353,55 @@ impl Executor {
 
         None // reached end of step list without explicit end/pause/fail
     }
+}
+
+/// Parse a duration string like "30s", "5m", "2h", "1d", or a bare number
+/// (interpreted as seconds) into a number of seconds. Unknown/invalid input
+/// yields 0 (resume immediately on next poll).
+fn parse_duration_secs(s: &str) -> i64 {
+    let s = s.trim();
+    if s.is_empty() {
+        return 0;
+    }
+    let (num_part, unit): (String, char) = {
+        let last = s.chars().last().unwrap();
+        if last.is_ascii_alphabetic() {
+            (s[..s.len() - last.len_utf8()].to_string(), last.to_ascii_lowercase())
+        } else {
+            (s.to_string(), 's')
+        }
+    };
+    let n: f64 = num_part.trim().parse().unwrap_or(0.0);
+    let mult = match unit {
+        's' => 1.0,
+        'm' => 60.0,
+        'h' => 3600.0,
+        'd' => 86400.0,
+        _ => 1.0,
+    };
+    (n * mult).round() as i64
+}
+
+/// Extract the envelope id from a create-sign-envelope response. The helper
+/// `make_http_post_json_h` wraps the service body under `body`. The service may
+/// return the envelope at the top level or nested under `envelope`, and the id
+/// field may be `id` or `ID`.
+fn extract_envelope_id(out: &Value) -> Option<String> {
+    let body = out.get("body").unwrap_or(out);
+    // Candidate objects: body itself, then body.envelope.
+    let candidates = [body, body.get("envelope").unwrap_or(&Value::Null)];
+    for c in candidates {
+        for key in ["id", "ID"] {
+            if let Some(v) = c.get(key) {
+                if let Some(s) = v.as_str() {
+                    if !s.is_empty() {
+                        return Some(s.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Recursively search for a step ID in a step tree (including switch do-blocks).
@@ -1028,22 +1429,48 @@ fn resolve_json_templates(v: Value, ctx: &ExprContext) -> Value {
     }
 }
 
-fn make_http_request(method: &str, url: &str, _body: Option<&Value>) -> Result<Value, String> {
+/// Issue an HTTP request with an optional JSON body and extra headers
+/// (auth/tenant + step-declared). A `Value::String` body is sent verbatim;
+/// any other JSON value is serialized. Content-Type defaults to
+/// application/json unless the caller already supplied one.
+fn make_http_request_h(
+    method: &str,
+    url: &str,
+    body: Option<&Value>,
+    headers: &[(String, String)],
+) -> Result<Value, String> {
     // Use reqwest blocking in a spawned thread to avoid tokio runtime conflict.
     let url_owned = url.to_owned();
     let method_owned = method.to_owned();
+    let headers_owned = headers.to_vec();
+    let body_owned = body.cloned();
     let result = std::thread::spawn(move || -> Result<Value, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e: reqwest::Error| e.to_string())?;
-        let req = match method_owned.as_str() {
+        let mut req = match method_owned.as_str() {
             "POST" => client.post(&url_owned),
             "PUT" => client.put(&url_owned),
             "DELETE" => client.delete(&url_owned),
             "PATCH" => client.patch(&url_owned),
             _ => client.get(&url_owned),
         };
+        for (k, v) in &headers_owned {
+            req = req.header(k.as_str(), v.as_str());
+        }
+        if let Some(b) = &body_owned {
+            let has_ct = headers_owned
+                .iter()
+                .any(|(k, _)| k.eq_ignore_ascii_case("content-type"));
+            if !has_ct {
+                req = req.header("Content-Type", "application/json");
+            }
+            req = match b {
+                Value::String(s) => req.body(s.clone()),
+                other => req.body(other.to_string()),
+            };
+        }
         let resp = req.send().map_err(|e: reqwest::Error| e.to_string())?;
         let status = resp.status().as_u16();
         let body = resp.text().unwrap_or_default();
@@ -1058,16 +1485,26 @@ fn make_http_request(method: &str, url: &str, _body: Option<&Value>) -> Result<V
     }
 }
 
-fn make_http_post_json(url: &str, body: Value) -> Result<Value, String> {
+/// POST a JSON body with optional extra headers (auth/tenant).
+fn make_http_post_json_h(
+    url: &str,
+    body: Value,
+    headers: &[(String, String)],
+) -> Result<Value, String> {
     let url_owned = url.to_owned();
+    let headers_owned = headers.to_vec();
     let result = std::thread::spawn(move || -> Result<Value, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e: reqwest::Error| e.to_string())?;
-        let resp = client
+        let mut req = client
             .post(&url_owned)
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+        for (k, v) in &headers_owned {
+            req = req.header(k.as_str(), v.as_str());
+        }
+        let resp = req
             .json(&body)
             .send()
             .map_err(|e: reqwest::Error| e.to_string())?;
@@ -1087,6 +1524,9 @@ fn make_http_post_json(url: &str, body: Value) -> Result<Value, String> {
 
 pub fn execute(input: ExecuteInput) -> ExecuteOutput {
     let mut exec = Executor::new(input.variables);
+    exec.auth_token = input.auth_token;
+    exec.tenant_id = input.tenant_id;
+    exec.resume_inclusive = input.resume_inclusive.unwrap_or(true);
     let resume = input.resume_from_step_id.as_deref();
 
     let result = exec.run_steps(&input.dsl.steps, &input.input, resume, false);
@@ -1100,6 +1540,9 @@ pub fn execute(input: ExecuteInput) -> ExecuteOutput {
             error,
             steps: exec.steps,
             human_tasks: exec.human_tasks,
+            notifications: exec.notifications,
+            wake_seconds: exec.wake_seconds,
+            pending_signature: exec.pending_signature,
         },
         None => ExecuteOutput {
             status: "completed".into(),
@@ -1109,6 +1552,9 @@ pub fn execute(input: ExecuteInput) -> ExecuteOutput {
             error: None,
             steps: exec.steps,
             human_tasks: exec.human_tasks,
+            notifications: exec.notifications,
+            wake_seconds: exec.wake_seconds,
+            pending_signature: exec.pending_signature,
         },
     }
 }
@@ -1190,6 +1636,9 @@ mod tests {
             input: json!({"amount": 50}),
             variables: json!({}),
             resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
         });
         assert_eq!(out.status, "completed");
         assert_eq!(out.variables["sum"], json!(150.0));
@@ -1218,6 +1667,9 @@ mod tests {
             input: json!({"amount": 2000}),
             variables: json!({}),
             resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
         });
         assert_eq!(out.status, "paused");
         assert!(!out.human_tasks.is_empty());
@@ -1246,6 +1698,9 @@ mod tests {
             input: json!({"amount": 100}),
             variables: json!({}),
             resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
         });
         assert_eq!(out.status, "completed");
         assert_eq!(out.variables["approved"], Value::Bool(true));
@@ -1267,6 +1722,9 @@ mod tests {
             input: json!({}),
             variables: json!({}),
             resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
         });
         assert_eq!(out.status, "paused");
         assert_eq!(out.cursor.as_deref(), Some("approve"));
@@ -1277,7 +1735,37 @@ mod tests {
         let dsl: Dsl = serde_json::from_value(json!({
             "id": "test",
             "steps": [
-                {"id": "notify", "type": "notification", "message": "Hello"},
+                {"id": "notify", "type": "notification", "message": "Hello {{input.name}}",
+                 "channel": "email", "recipient": "{{input.to}}", "title": "Hi", "kind": "workflow.greeting"},
+                {"id": "end", "type": "end"}
+            ]
+        })).unwrap();
+        let out = execute(ExecuteInput {
+            instance_id: None,
+            dsl,
+            input: json!({"name": "Sam", "to": "u-1"}),
+            variables: json!({}),
+            resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
+        });
+        assert_eq!(out.status, "completed");
+        assert_eq!(out.notifications.len(), 1);
+        let n = &out.notifications[0];
+        assert_eq!(n.message, "Hello Sam");
+        assert_eq!(n.channel, "email");
+        assert_eq!(n.recipient.as_deref(), Some("u-1"));
+        assert_eq!(n.title, "Hi");
+        assert_eq!(n.kind, "workflow.greeting");
+    }
+
+    #[test]
+    fn test_wait_returns_wake_seconds() {
+        let dsl: Dsl = serde_json::from_value(json!({
+            "id": "test",
+            "steps": [
+                {"id": "pause", "type": "wait", "duration": "5m"},
                 {"id": "end", "type": "end"}
             ]
         })).unwrap();
@@ -1287,9 +1775,23 @@ mod tests {
             input: json!({}),
             variables: json!({}),
             resume_from_step_id: None,
+        auth_token: None,
+        tenant_id: None,
+        resume_inclusive: None,
         });
-        assert_eq!(out.status, "completed");
-        assert_eq!(out.steps.len(), 2);
-        assert_eq!(out.steps[0].status, "completed");
+        assert_eq!(out.status, "paused");
+        assert_eq!(out.cursor.as_deref(), Some("pause"));
+        assert_eq!(out.wake_seconds, Some(300));
+    }
+
+    #[test]
+    fn test_parse_duration_secs() {
+        assert_eq!(parse_duration_secs("30s"), 30);
+        assert_eq!(parse_duration_secs("5m"), 300);
+        assert_eq!(parse_duration_secs("2h"), 7200);
+        assert_eq!(parse_duration_secs("1d"), 86400);
+        assert_eq!(parse_duration_secs("45"), 45);
+        assert_eq!(parse_duration_secs(""), 0);
+        assert_eq!(parse_duration_secs("garbage"), 0);
     }
 }

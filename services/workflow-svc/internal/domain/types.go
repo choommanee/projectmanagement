@@ -88,6 +88,12 @@ type WorkflowInstance struct {
 	TriggerKind  TriggerKind     `json:"trigger_kind"`
 	StartedAt    time.Time       `json:"started_at"`
 	EndedAt      *time.Time      `json:"ended_at,omitempty"`
+	WakeAt       *time.Time      `json:"wake_at,omitempty"`
+	// PendingEnvelopeID is set when the instance is paused awaiting a document
+	// signature (the engine returned pending_signature). The signature webhook
+	// (document.sign_completed/declined) correlates back to the instance via
+	// this envelope id and clears it on resume.
+	PendingEnvelopeID *uuid.UUID `json:"pending_envelope_id,omitempty"`
 }
 
 type StepExecution struct {
@@ -128,6 +134,26 @@ type RuntimeRequest struct {
 	Input            json.RawMessage `json:"input"`
 	Variables        json.RawMessage `json:"variables"`
 	ResumeFromStepID *string         `json:"resume_from_step_id,omitempty"`
+	// AuthToken is a service-to-service bearer JWT the engine forwards on every
+	// outgoing cross-service HTTP call (e.g. document-svc). Omitted when no
+	// service token is configured (local dev without auth).
+	AuthToken *string `json:"auth_token,omitempty"`
+	// TenantID is forwarded as X-Tenant-Id on outgoing cross-service calls.
+	TenantID *string `json:"tenant_id,omitempty"`
+	// ResumeInclusive controls resume semantics. nil/true (default) => skip the
+	// cursor step then continue (human_task / wait / signature pauses). false =>
+	// re-execute the cursor step itself (used to retry a FAILED step).
+	ResumeInclusive *bool `json:"resume_inclusive,omitempty"`
+}
+
+// PendingSignature mirrors the Rust PendingSignature: set on ExecuteOutput when
+// the engine paused on a request_signature step. workflow-svc persists the
+// envelope_id so the document-svc signed/declined event can be correlated back
+// to the paused instance.
+type PendingSignature struct {
+	StepID     string `json:"step_id"`
+	EnvelopeID string `json:"envelope_id"`
+	DocumentID string `json:"document_id"`
 }
 
 // RuntimeStepResult mirrors the Rust step result.
@@ -146,17 +172,37 @@ type RuntimeHumanTask struct {
 	StepID   string          `json:"step_id"`
 	Assignee *string         `json:"assignee"`
 	Form     json.RawMessage `json:"form"`
+	// SLASeconds is the parsed SLA duration from the step's `sla` field
+	// ("30s"/"5m"/"2h"/"1d"). Nil when no SLA declared; workflow-svc computes
+	// sla_deadline = now + SLASeconds when present.
+	SLASeconds *int64 `json:"sla_seconds"`
+}
+
+// RuntimeNotification mirrors the Rust NotificationResult. The engine resolves
+// templates and returns these; workflow-svc fans them out via libs/go/notification.
+type RuntimeNotification struct {
+	StepID    string  `json:"step_id"`
+	Channel   string  `json:"channel"`
+	Recipient *string `json:"recipient"`
+	Message   string  `json:"message"`
+	Kind      string  `json:"kind"`
+	Title     string  `json:"title"`
 }
 
 // RuntimeResponse is what the Rust engine returns.
 type RuntimeResponse struct {
-	Status     string               `json:"status"`
-	Variables  json.RawMessage      `json:"variables"`
-	Output     json.RawMessage      `json:"output"`
-	Cursor     *string              `json:"cursor"`
-	Error      *string              `json:"error"`
-	Steps      []RuntimeStepResult  `json:"steps"`
-	HumanTasks []RuntimeHumanTask   `json:"human_tasks"`
+	Status        string                `json:"status"`
+	Variables     json.RawMessage       `json:"variables"`
+	Output        json.RawMessage       `json:"output"`
+	Cursor        *string               `json:"cursor"`
+	Error         *string               `json:"error"`
+	Steps         []RuntimeStepResult   `json:"steps"`
+	HumanTasks    []RuntimeHumanTask    `json:"human_tasks"`
+	Notifications []RuntimeNotification `json:"notifications"`
+	WakeSeconds   *int64                `json:"wake_seconds"`
+	// PendingSignature is set only when the engine just paused on a
+	// request_signature step; nil otherwise.
+	PendingSignature *PendingSignature `json:"pending_signature"`
 }
 
 // ─── Errors ───────────────────────────────────────────────────────────────────

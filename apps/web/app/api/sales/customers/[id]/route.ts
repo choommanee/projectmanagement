@@ -31,7 +31,8 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   const { id } = await ctx.params;
   const h = await makeHeaders();
   if (h instanceof NextResponse) return h;
-  const r = await fetch(`${SALES_URL}/v1/customers/${id}`, { method: "DELETE", headers: h });
+  const qs = new URL(req.url).search;
+  const r = await fetch(`${SALES_URL}/v1/customers/${id}${qs}`, { method: "DELETE", headers: h });
   return new NextResponse(r.status === 204 ? null : await r.text(), {
     status: r.status,
     headers: r.status !== 204 ? { "content-type": "application/json" } : {},

@@ -146,6 +146,38 @@ func (s *JournalEntryStore) List(ctx context.Context, tid uuid.UUID, opts ListJE
 		if rows.Err() != nil {
 			return rows.Err()
 		}
+		// Batch-load lines for all returned entries in a single query so callers
+		// (trial balance, reports, budget actuals) get fully-populated entries
+		// without an N+1 round-trip per entry.
+		if len(items) > 0 {
+			ids := make([]uuid.UUID, len(items))
+			byID := make(map[uuid.UUID]*domain.JournalEntry, len(items))
+			for i, e := range items {
+				ids[i] = e.ID
+				e.Lines = []*domain.JournalLine{}
+				byID[e.ID] = e
+			}
+			lrows, err := tx.Query(ctx, `
+				SELECT id, tenant_id, entry_id, account_id, debit, credit, description, line_no
+				FROM journal_line WHERE entry_id = ANY($1) ORDER BY entry_id, line_no ASC`, ids)
+			if err != nil {
+				return err
+			}
+			defer lrows.Close()
+			for lrows.Next() {
+				var l domain.JournalLine
+				if err := lrows.Scan(&l.ID, &l.TenantID, &l.EntryID, &l.AccountID,
+					&l.Debit, &l.Credit, &l.Description, &l.LineNo); err != nil {
+					return err
+				}
+				if parent := byID[l.EntryID]; parent != nil {
+					parent.Lines = append(parent.Lines, &l)
+				}
+			}
+			if lrows.Err() != nil {
+				return lrows.Err()
+			}
+		}
 		return tx.QueryRow(ctx, "SELECT count(*) FROM journal_entry WHERE "+whereSQL, args...).Scan(&total)
 	})
 	return items, total, err
@@ -195,6 +227,29 @@ func (s *JournalEntryStore) Post(ctx context.Context, tid, id uuid.UUID, version
 	now := time.Now()
 	var e domain.JournalEntry
 	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		// Double-entry integrity: a journal entry may only be posted when it
+		// has at least one line and total debits equal total credits. Aggregate
+		// in SQL (numeric, not float) to avoid rounding drift.
+		var debits, credits float64
+		var lineCount int
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(debit),0), COALESCE(SUM(credit),0), COUNT(*)
+			FROM journal_line WHERE entry_id=$1 AND tenant_id=$2`,
+			id, tid,
+		).Scan(&debits, &credits, &lineCount); err != nil {
+			return err
+		}
+		if lineCount == 0 {
+			return fmt.Errorf("%w: cannot post a journal entry with no lines", domain.ErrInvalidInput)
+		}
+		if debits <= 0 && credits <= 0 {
+			return fmt.Errorf("%w: cannot post a journal entry with zero amounts", domain.ErrInvalidInput)
+		}
+		// numeric(18,4) precision → compare at sub-cent tolerance.
+		if diff := debits - credits; diff > 0.00005 || diff < -0.00005 {
+			return fmt.Errorf("%w: debits (%.4f) must equal credits (%.4f)", domain.ErrInvalidInput, debits, credits)
+		}
+
 		ct, err := tx.Exec(ctx, `
 			UPDATE journal_entry
 			SET status='posted', posted_at=$3, updated_at=$3, version=version+1

@@ -40,7 +40,7 @@ function DeptDialog({
     setError(null);
     try {
       const saved = initial
-        ? await updateDepartment(initial.id, { name: form.name, parent_id: form.parent_id || null, active: form.active })
+        ? await updateDepartment(initial.id, initial.version, { name: form.name, parent_id: form.parent_id || null, active: form.active })
         : await createDepartment({ code: form.code, name: form.name, parent_id: form.parent_id || null, active: form.active });
       onSaved(saved);
     } catch (err) {
@@ -115,7 +115,7 @@ function DeleteDialog({ dept, onClose, onDeleted }: { dept: Department; onClose:
     setLoading(true);
     setErr(null);
     try {
-      await deleteDepartment(dept.id);
+      await deleteDepartment(dept.id, dept.version);
       onDeleted();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");

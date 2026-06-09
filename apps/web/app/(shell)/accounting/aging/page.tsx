@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { listInvoices, type Invoice, type InvType } from "@/lib/api/accounting";
+import { listCustomers, type Customer } from "@/lib/api/sales";
 
 type AgingBucket = "current" | "1-30" | "31-60" | "61-90" | "90+";
 
@@ -19,16 +20,18 @@ function getBucket(dueDate: string): AgingBucket {
 
 const BUCKET_LABELS: AgingBucket[] = ["current", "1-30", "31-60", "61-90", "90+"];
 
+// Severity ramp using design tokens only (no raw Tailwind palette colors).
 const BUCKET_COLORS: Record<AgingBucket, string> = {
-  current: "text-green-600",
-  "1-30": "text-amber-500",
-  "31-60": "text-orange-500",
-  "61-90": "text-red-500",
-  "90+": "text-red-700",
+  current: "text-success",
+  "1-30": "text-info",
+  "31-60": "text-warning",
+  "61-90": "text-danger",
+  "90+": "text-danger",
 };
 
 export default function AgingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [tab, setTab] = useState<InvType>("AR");
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +39,13 @@ export default function AgingPage() {
     Promise.all([
       listInvoices({ type: "AR" }).then(r => r.items),
       listInvoices({ type: "AP" }).then(r => r.items),
-    ]).then(([ar, ap]) => setInvoices([...ar, ...ap]))
+      listCustomers().catch(() => [] as Customer[]),
+    ]).then(([ar, ap, custs]) => { setInvoices([...ar, ...ap]); setCustomers(custs); })
       .finally(() => setLoading(false));
   }, []);
+
+  const cpName = (inv: Invoice) =>
+    inv.counterpartyName || customers.find(c => c.id === inv.counterpartyId)?.name || inv.counterpartyId;
 
   const outstanding = useMemo(() =>
     invoices.filter(inv => inv.invType === tab && (inv.status === "issued" || inv.status === "overdue")),
@@ -48,10 +55,11 @@ export default function AgingPage() {
   const byCounterparty = useMemo(() => {
     const map = new Map<string, Record<AgingBucket, number> & { total: number }>();
     for (const inv of outstanding) {
-      if (!map.has(inv.counterparty)) {
-        map.set(inv.counterparty, { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0, total: 0 });
+      const key = cpName(inv);
+      if (!map.has(key)) {
+        map.set(key, { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0, total: 0 });
       }
-      const row = map.get(inv.counterparty)!;
+      const row = map.get(key)!;
       const bucket = getBucket(inv.dueDate);
       row[bucket] += inv.amount;
       row.total += inv.amount;

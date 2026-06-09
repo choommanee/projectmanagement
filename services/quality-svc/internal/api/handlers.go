@@ -178,6 +178,7 @@ func createAPQP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.apqp.create", "apqp_project", a.ID.String())
 		writeJSON(w, 201, a)
 	}
 }
@@ -310,6 +311,8 @@ func updateAPQP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.apqp.update", "apqp_project", a.ID.String(),
+			map[string]any{"status": string(a.Status)})
 		writeJSON(w, 200, a)
 	}
 }
@@ -338,6 +341,7 @@ func deleteAPQP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.apqp.delete", "apqp_project", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -379,6 +383,7 @@ func createPPAP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.ppap.create", "ppap_submission", sub.ID.String())
 		writeJSON(w, 201, sub)
 	}
 }
@@ -434,7 +439,7 @@ func listPPAP(svc *service.Service) http.HandlerFunc {
 
 type updatePPAPReq struct {
 	Status      domain.PPAPStatus `json:"status,omitempty"`
-	Notes       string            `json:"notes,omitempty"`
+	Notes       *string           `json:"notes,omitempty"`
 	SubmittedAt *string           `json:"submitted_at,omitempty"`
 	DecisionAt  *string           `json:"decision_at,omitempty"`
 	Version     int               `json:"version"`
@@ -474,9 +479,37 @@ func updatePPAP(svc *service.Service) http.HandlerFunc {
 		}
 		if req.Status != "" {
 			in.Status = req.Status
+			// Stamp lifecycle timestamps on status transitions (only when not
+			// already set, so re-saving a submitted/decided PPAP is idempotent).
+			now := time.Now()
+			switch req.Status {
+			case domain.PPAPStatusSubmitted:
+				if in.SubmittedAt == nil {
+					in.SubmittedAt = &now
+				}
+			case domain.PPAPStatusApproved, domain.PPAPStatusRejected:
+				if in.SubmittedAt == nil {
+					in.SubmittedAt = &now
+				}
+				if in.DecisionAt == nil {
+					in.DecisionAt = &now
+				}
+			}
 		}
-		if req.Notes != "" {
-			in.Notes = req.Notes
+		// pointer field distinguishes unset (nil) from clear ("")
+		if req.Notes != nil {
+			in.Notes = *req.Notes
+		}
+		// explicit timestamp overrides from client (RFC3339)
+		if req.SubmittedAt != nil {
+			if t, err := time.Parse(time.RFC3339, *req.SubmittedAt); err == nil {
+				in.SubmittedAt = &t
+			}
+		}
+		if req.DecisionAt != nil {
+			if t, err := time.Parse(time.RFC3339, *req.DecisionAt); err == nil {
+				in.DecisionAt = &t
+			}
 		}
 		sub, err := svc.PPAP.Update(r.Context(), tid, id, in)
 		if err != nil {
@@ -487,6 +520,8 @@ func updatePPAP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.ppap.update", "ppap_submission", sub.ID.String(),
+			map[string]any{"status": string(sub.Status)})
 		writeJSON(w, 200, sub)
 	}
 }
@@ -515,6 +550,7 @@ func deletePPAP(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.ppap.delete", "ppap_submission", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -574,6 +610,8 @@ func updatePPAPElement(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.ppap.update_element", "ppap_element", e.ID.String(),
+			map[string]any{"status": string(e.Status)})
 		writeJSON(w, 200, e)
 	}
 }
@@ -616,6 +654,7 @@ func createFMEA(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.fmea.create", "fmea", f.ID.String())
 		writeJSON(w, 201, f)
 	}
 }
@@ -725,6 +764,8 @@ func updateFMEA(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.fmea.update", "fmea", f.ID.String(),
+			map[string]any{"status": string(f.Status)})
 		writeJSON(w, 200, f)
 	}
 }
@@ -753,6 +794,7 @@ func deleteFMEA(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.fmea.delete", "fmea", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -828,6 +870,7 @@ func addFMEAMode(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.fmea.add_mode", "fmea_mode", m.ID.String())
 		writeJSON(w, 201, m)
 	}
 }
@@ -873,6 +916,7 @@ func updateFMEAMode(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.fmea.update_mode", "fmea_mode", m.ID.String())
 		writeJSON(w, 200, m)
 	}
 }
@@ -896,6 +940,7 @@ func deleteFMEAMode(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.fmea.delete_mode", "fmea_mode", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -935,6 +980,7 @@ func createControlPlan(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.control_plan.create", "control_plan", c.ID.String())
 		writeJSON(w, 201, c)
 	}
 }
@@ -990,7 +1036,7 @@ func listControlPlans(svc *service.Service) http.HandlerFunc {
 type updateCPReq struct {
 	Name    string            `json:"name,omitempty"`
 	Status  domain.APQPStatus `json:"status,omitempty"`
-	Notes   string            `json:"notes,omitempty"`
+	Notes   *string           `json:"notes,omitempty"`
 	Version int               `json:"version"`
 }
 
@@ -1031,8 +1077,9 @@ func updateControlPlan(svc *service.Service) http.HandlerFunc {
 		if req.Status != "" {
 			in.Status = req.Status
 		}
-		if req.Notes != "" {
-			in.Notes = req.Notes
+		// pointer field distinguishes unset (nil) from clear ("")
+		if req.Notes != nil {
+			in.Notes = *req.Notes
 		}
 		c, err := svc.ControlPlan.Update(r.Context(), tid, id, in)
 		if err != nil {
@@ -1043,6 +1090,8 @@ func updateControlPlan(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.control_plan.update", "control_plan", c.ID.String(),
+			map[string]any{"status": string(c.Status)})
 		writeJSON(w, 200, c)
 	}
 }
@@ -1110,6 +1159,7 @@ func addCharacteristic(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.control_plan.add_characteristic", "control_plan_characteristic", c.ID.String())
 		writeJSON(w, 201, c)
 	}
 }
@@ -1130,7 +1180,7 @@ func updateCharacteristic(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		c, err := svc.ControlPlan.UpdateCharacteristic(r.Context(), tid, id, store.UpdateCPCInput{
+		cpc, err := svc.ControlPlan.UpdateCharacteristic(r.Context(), tid, id, store.UpdateCPCInput{
 			No:                req.No,
 			Characteristic:    req.Characteristic,
 			Spec:              req.Spec,
@@ -1148,7 +1198,8 @@ func updateCharacteristic(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, c)
+		auditWrite(svc, r, tid, "quality.control_plan.update_characteristic", "control_plan_characteristic", cpc.ID.String())
+		writeJSON(w, 200, cpc)
 	}
 }
 
@@ -1171,6 +1222,7 @@ func deleteCharacteristic(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.control_plan.delete_characteristic", "control_plan_characteristic", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -1214,6 +1266,8 @@ func createInspection(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.inspection.create", "inspection", i.ID.String(),
+			map[string]any{"result": string(i.Result)})
 		writeJSON(w, 201, i)
 	}
 }
@@ -1314,6 +1368,8 @@ func createNCR(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.ncr.create", "ncr", n.ID.String(),
+			map[string]any{"severity": n.Severity})
 		writeJSON(w, 201, n)
 	}
 }
@@ -1369,7 +1425,9 @@ func listNCRs(svc *service.Service) http.HandlerFunc {
 
 type updateNCRReq struct {
 	Status      domain.NCRStatus `json:"status,omitempty"`
-	Description string           `json:"description,omitempty"`
+	Description *string          `json:"description,omitempty"`
+	Qty         *float64         `json:"qty,omitempty"`
+	Severity    *int             `json:"severity,omitempty"`
 	Version     int              `json:"version"`
 }
 
@@ -1401,13 +1459,22 @@ func updateNCR(svc *service.Service) http.HandlerFunc {
 		in := store.UpdateNCRInput{
 			Status:      cur.Status,
 			Description: cur.Description,
+			Qty:         cur.Qty,
+			Severity:    cur.Severity,
 			Version:     req.Version,
 		}
 		if req.Status != "" {
 			in.Status = req.Status
 		}
-		if req.Description != "" {
-			in.Description = req.Description
+		// pointer fields distinguish unset (nil) from clear ("")
+		if req.Description != nil {
+			in.Description = *req.Description
+		}
+		if req.Qty != nil {
+			in.Qty = *req.Qty
+		}
+		if req.Severity != nil {
+			in.Severity = *req.Severity
 		}
 		n, err := svc.NCR.Update(r.Context(), tid, id, in)
 		if err != nil {
@@ -1418,6 +1485,8 @@ func updateNCR(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.ncr.update", "ncr", n.ID.String(),
+			map[string]any{"status": string(n.Status)})
 		writeJSON(w, 200, n)
 	}
 }
@@ -1463,6 +1532,7 @@ func createCAPA(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "quality.ncr.create_capa", "capa", c.ID.String())
 		writeJSON(w, 201, c)
 	}
 }
@@ -1533,6 +1603,8 @@ func updateCAPA(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "quality.capa.update", "capa", c.ID.String(),
+			map[string]any{"status": string(c.Status)})
 		writeJSON(w, 200, c)
 	}
 }

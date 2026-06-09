@@ -12,14 +12,18 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	natsx "github.com/pmplatform/libs/go/nats"
 	notiflib "github.com/pmplatform/libs/go/notification"
 	libotel "github.com/pmplatform/libs/go/otel"
+	"github.com/pmplatform/libs/go/serviceauth"
 	libpolicy "github.com/pmplatform/libs/policy"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/pmplatform/services/workflow-svc/internal/api"
+	"github.com/pmplatform/services/workflow-svc/internal/docsvc"
+	"github.com/pmplatform/services/workflow-svc/internal/scheduler"
 	"github.com/pmplatform/services/workflow-svc/internal/service"
 	"github.com/pmplatform/services/workflow-svc/internal/store"
 	"github.com/pmplatform/services/workflow-svc/internal/trigger"
@@ -61,19 +65,72 @@ func main() {
 	}
 
 	templatesStore := store.NewTemplates(p)
+	instancesStore := store.NewInstances(p)
 	svc := service.New(
 		store.NewDefinitions(p),
 		store.NewVersions(p),
-		store.NewInstances(p),
+		instancesStore,
 		store.NewHumanTasks(p),
 		runtimeURL,
 	).WithNotifPublisher(notifPub).WithTemplates(templatesStore)
+
+	// Audit trail: direct Postgres writer (no NATS dependency). Every
+	// significant mutation is recorded in audit_log via the api emit helper.
+	svc.WithAudit(audit.NewPgPublisher(p, "workflow-svc"))
+
+	// Service-to-service auth: mint a "workflow-service" bearer token (per tenant)
+	// that the runtime engine forwards to document-svc / project-svc on signature
+	// + task calls. Without SERVICE_TOKEN_SECRET we degrade gracefully — the
+	// runtime still runs, cross-service calls just go unauthenticated (local dev).
+	identityURL := envOr("IDENTITY_URL", "http://localhost:8082")
+	var sa *serviceauth.Client
+	if secret := os.Getenv("SERVICE_TOKEN_SECRET"); secret != "" {
+		sa = serviceauth.New(identityURL, secret, "workflow-svc")
+		svc = svc.WithServiceAuth(sa)
+		log.Info().Str("identity_url", identityURL).Msg("serviceauth enabled — forwarding service token to runtime")
+	} else {
+		log.Warn().Msg("SERVICE_TOKEN_SECRET unset — runtime cross-service calls will be unauthenticated (degraded local dev)")
+	}
 
 	if triggerListener != nil {
 		triggerListener.AttachService(svc)
 		triggerListener.Start(context.Background())
 		defer triggerListener.Stop()
 	}
+
+	// Background timer poller: wakes paused instances whose wait-step timer
+	// (wake_at) has elapsed and resumes them. Interval via WAKE_POLL_INTERVAL.
+	pollInterval := 30 * time.Second
+	if v := os.Getenv("WAKE_POLL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			pollInterval = d
+		}
+	}
+	poller := scheduler.New(svc, instancesStore, pollInterval)
+	poller.Start(context.Background())
+	defer poller.Stop()
+
+	// NATS-free fallback for the request_signature leg: this poller reads each
+	// paused instance's envelope status straight from document-svc and resumes
+	// when terminal. NATS (trigger.Listener) remains the instant path; both
+	// funnel through ResumeBySignature, which is idempotent (see signature_poller.go).
+	// Interval via SIGN_POLL_INTERVAL, falling back to WAKE_POLL_INTERVAL.
+	signInterval := pollInterval
+	if v := os.Getenv("SIGN_POLL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			signInterval = d
+		}
+	}
+	docClient := docsvc.New(envOr("DOCUMENT_SVC_URL", "http://localhost:8084"))
+	// Pass the concrete minter only when configured so a nil *serviceauth.Client
+	// doesn't masquerade as a non-nil interface inside the poller.
+	var signAuth scheduler.SignatureMinter
+	if sa != nil {
+		signAuth = sa
+	}
+	signPoller := scheduler.NewSignaturePoller(svc, instancesStore, docClient, signAuth, signInterval)
+	signPoller.Start(context.Background())
+	defer signPoller.Stop()
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

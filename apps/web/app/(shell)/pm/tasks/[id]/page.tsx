@@ -2,19 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CheckCircle2, Clock, MessageCircle, Pencil, TrendingUp } from "lucide-react";
-import { getTask, updateTask, type Task, type TaskStatus, type TaskPriority } from "@/lib/api/tasks";
+import { CheckCircle2, Clock, MessageCircle, Pencil, TrendingUp, Trash2, Check, X } from "lucide-react";
+import { Button, Input, TextArea } from "@pmplatform/ui-kit";
+import {
+  getTask,
+  updateTask,
+  listComments,
+  createComment,
+  updateComment,
+  deleteComment,
+  type Task,
+  type TaskStatus,
+  type TaskPriority,
+  type TaskType,
+  type TaskComment,
+} from "@/lib/api/tasks";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { RunWorkflowButton } from "@/components/RunWorkflowButton";
+import { WorklogPanel } from "@/components/WorklogPanel";
+import { UserPicker } from "@/components/UserPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Comment {
-  id: string;
-  authorId: string;
-  body: string;
-  createdAt: string;
-}
 
 interface Activity {
   id: string;
@@ -23,6 +31,22 @@ interface Activity {
   oldValue?: string;
   newValue?: string;
   createdAt: string;
+}
+
+interface FormState {
+  title: string;
+  description: string;
+  type: TaskType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeId: string;
+  reviewerId: string;
+  startDate: string;
+  dueDate: string;
+  estimateMd: string;
+  actualMd: string;
+  progressPct: number;
+  tags: string[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,6 +68,26 @@ const priorityColors: Record<TaskPriority, string> = {
 };
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "blocked", "review", "done", "cancelled"];
+const TYPES: TaskType[] = ["task", "subtask", "milestone", "deliverable", "issue", "risk", "bug"];
+const PRIORITIES: TaskPriority[] = ["low", "med", "high", "critical"];
+
+function toForm(t: Task): FormState {
+  return {
+    title: t.title,
+    description: t.description,
+    type: t.type,
+    status: t.status,
+    priority: t.priority,
+    assigneeId: t.assigneeId ?? "",
+    reviewerId: t.reviewerId ?? "",
+    startDate: t.startDate?.slice(0, 10) ?? "",
+    dueDate: t.dueDate?.slice(0, 10) ?? "",
+    estimateMd: String(t.estimateMd),
+    actualMd: String(t.actualMd),
+    progressPct: t.progressPct,
+    tags: t.tags ?? [],
+  };
+}
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -77,7 +121,7 @@ function activityIcon(kind: string) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = "details" | "activity";
+type Tab = "details" | "time" | "activity";
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -87,9 +131,16 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState(false);
   const [tab, setTab] = useState<Tab>("details");
 
-  const [comments, setComments] = useState<Comment[]>([]);
+  // Edit mode
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<FormState | null>(null);
+  const [tagInput, setTagInput] = useState("");
+
+  const [comments, setComments] = useState<TaskComment[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [commentBody, setCommentBody] = useState("");
@@ -97,22 +148,31 @@ export default function TaskDetailPage() {
   const [commentError, setCommentError] = useState<string | null>(null);
   const activityLoaded = useRef(false);
 
+  const reload = useCallback(async () => {
+    if (!id) return;
+    const t = await getTask(id);
+    setTask(t);
+    setForm(toForm(t));
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
-    getTask(id).then(setTask).catch(console.error).finally(() => setLoading(false));
+    getTask(id)
+      .then((t) => { setTask(t); setForm(toForm(t)); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [id]);
 
   const loadActivity = useCallback(async () => {
     if (!id) return;
     setActivityLoading(true);
     try {
-      const [cRes, aRes] = await Promise.all([
-        fetch(`/api/tasks/${id}/comments`),
-        fetch(`/api/tasks/${id}/activity`),
+      const [cmts, aRes] = await Promise.all([
+        listComments(id),
+        fetch(`/api/tasks/${id}/activity`).then((r) => r.json()),
       ]);
-      const [cData, aData] = await Promise.all([cRes.json(), aRes.json()]);
-      setComments((cData.items as Comment[] | null) ?? []);
-      setActivities((aData.items as Activity[] | null) ?? []);
+      setComments(cmts);
+      setActivities((aRes.items as Activity[] | null) ?? []);
     } catch { /* ignore */ }
     finally { setActivityLoading(false); }
   }, [id]);
@@ -124,24 +184,66 @@ export default function TaskDetailPage() {
     }
   }, [tab, loadActivity]);
 
-  async function handleStatus(status: TaskStatus) {
+  function patch(p: Partial<FormState>) {
+    setForm((prev) => (prev ? { ...prev, ...p } : prev));
+    setSaveError(null);
+    setConflictError(false);
+  }
+
+  function commitTag() {
+    if (!tagInput.trim() || !form) return;
+    const newTags = tagInput.split(",").map((t) => t.trim()).filter(Boolean);
+    patch({ tags: [...form.tags, ...newTags].filter((v, i, a) => a.indexOf(v) === i) });
+    setTagInput("");
+  }
+
+  async function handleQuickPatch(p: { status?: TaskStatus; priority?: TaskPriority }) {
     if (!task) return;
     setSaving(true);
+    setSaveError(null);
+    setConflictError(false);
     try {
-      const updated = await updateTask(task.id, { status, version: task.version });
+      const updated = await updateTask(task.id, { ...p, version: task.version });
       setTask(updated);
-      // invalidate activity cache so next visit re-loads
+      setForm(toForm(updated));
       activityLoaded.current = false;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) setConflictError(true);
+      else setSaveError(msg);
     } finally { setSaving(false); }
   }
 
-  async function handlePriority(priority: TaskPriority) {
-    if (!task) return;
+  async function handleSaveEdit() {
+    if (!task || !form) return;
     setSaving(true);
+    setSaveError(null);
+    setConflictError(false);
     try {
-      const updated = await updateTask(task.id, { priority, version: task.version });
+      const updated = await updateTask(task.id, {
+        title: form.title,
+        description: form.description,
+        type: form.type,
+        status: form.status,
+        priority: form.priority,
+        assignee_id: form.assigneeId || null,
+        reviewer_id: form.reviewerId || null,
+        start_date: form.startDate || null,
+        due_date: form.dueDate || null,
+        estimate_md: parseFloat(form.estimateMd) || 0,
+        actual_md: parseFloat(form.actualMd) || 0,
+        progress_pct: form.progressPct,
+        tags: form.tags,
+        version: task.version,
+      });
       setTask(updated);
+      setForm(toForm(updated));
+      setEditing(false);
       activityLoaded.current = false;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) setConflictError(true);
+      else setSaveError(msg);
     } finally { setSaving(false); }
   }
 
@@ -151,12 +253,7 @@ export default function TaskDetailPage() {
     setSubmitting(true);
     setCommentError(null);
     try {
-      const res = await fetch(`/api/tasks/${task.id}/comments`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ body: commentBody.trim(), authorId: user?.id ?? "" }),
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
+      await createComment(task.id, user?.id ?? "", commentBody.trim());
       setCommentBody("");
       await loadActivity();
     } catch (err) {
@@ -165,12 +262,16 @@ export default function TaskDetailPage() {
   }
 
   if (loading) return <div className="p-8 text-ink-3">Loading...</div>;
-  if (!task)   return <div className="p-8 text-danger">Task not found.</div>;
+  if (!task || !form) return <div className="p-8 text-danger">Task not found.</div>;
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "details", label: "Details" },
+    { id: "time", label: "Time" },
     { id: "activity", label: `Activity${comments.length > 0 ? ` (${comments.length})` : ""}` },
   ];
+
+  const fld = "h-9 w-full appearance-none rounded-sm border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+  const lbl = "mb-1.5 block text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3";
 
   return (
     <div className="flex h-full flex-col overflow-auto">
@@ -197,7 +298,12 @@ export default function TaskDetailPage() {
             </div>
             <h1 className="mt-1 text-xl font-semibold text-ink">{task.title}</h1>
           </div>
-          <div className="shrink-0 pt-1">
+          <div className="flex shrink-0 items-center gap-2 pt-1">
+            {!editing && (
+              <Button size="sm" variant="secondary" onClick={() => { setEditing(true); setForm(toForm(task)); }}>
+                <Pencil size={13} /> Edit
+              </Button>
+            )}
             <RunWorkflowButton
               context={{
                 task_id: task.id,
@@ -208,6 +314,18 @@ export default function TaskDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Conflict / error banners */}
+      {saveError && (
+        <div className="border-b border-danger/30 bg-danger/5 px-6 py-2 text-[12px] text-danger">{saveError}</div>
+      )}
+      {conflictError && (
+        <div className="flex items-center gap-3 border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12px] text-ink-2">
+          <span className="font-medium text-warning">Conflict:</span>
+          Someone else modified this task. Reload to see the latest version.
+          <Button variant="ghost" size="sm" onClick={() => { setConflictError(false); void reload(); }}>Reload</Button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-line px-6">
@@ -228,7 +346,7 @@ export default function TaskDetailPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {tab === "details" && (
+        {tab === "details" && !editing && (
           <div className="space-y-4 max-w-3xl">
             {task.description && (
               <div className="rounded-md border border-line bg-paper p-4">
@@ -245,7 +363,7 @@ export default function TaskDetailPage() {
                   <button
                     type="button"
                     key={s}
-                    onClick={() => handleStatus(s)}
+                    onClick={() => handleQuickPatch({ status: s })}
                     disabled={saving}
                     className="rounded border border-line px-3 py-1 text-xs capitalize hover:bg-surface-2 disabled:opacity-50"
                   >
@@ -259,11 +377,11 @@ export default function TaskDetailPage() {
             <div className="rounded-md border border-line bg-paper p-4">
               <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Priority</p>
               <div className="flex flex-wrap gap-2">
-                {(["low", "med", "high", "critical"] as TaskPriority[]).filter((p) => p !== task.priority).map((p) => (
+                {PRIORITIES.filter((p) => p !== task.priority).map((p) => (
                   <button
                     type="button"
                     key={p}
-                    onClick={() => handlePriority(p)}
+                    onClick={() => handleQuickPatch({ priority: p })}
                     disabled={saving}
                     className={`rounded border px-3 py-1 text-xs capitalize disabled:opacity-50 ${priorityColors[p]} hover:bg-surface-2`}
                   >
@@ -278,6 +396,8 @@ export default function TaskDetailPage() {
               {[
                 { label: "Project",  value: task.projectId?.slice(-8) ?? "—" },
                 { label: "Assignee", value: task.assigneeId ? task.assigneeId.slice(-8) : "—" },
+                { label: "Reviewer", value: task.reviewerId ? task.reviewerId.slice(-8) : "—" },
+                { label: "Start Date", value: task.startDate ? String(task.startDate).slice(0, 10) : "—" },
                 { label: "Due Date", value: task.dueDate ? String(task.dueDate).slice(0, 10) : "—" },
                 { label: "Estimate", value: task.estimateMd != null ? `${task.estimateMd} md` : "—" },
                 { label: "Actual",   value: task.actualMd != null ? `${task.actualMd} md` : "—" },
@@ -305,6 +425,111 @@ export default function TaskDetailPage() {
               <p>Created: {task.createdAt ? task.createdAt.slice(0, 10) : "—"}</p>
               <p>Updated: {task.updatedAt ? task.updatedAt.slice(0, 10) : "—"}</p>
             </div>
+          </div>
+        )}
+
+        {tab === "details" && editing && (
+          <div className="max-w-3xl space-y-4">
+            <div className="rounded-md border border-line bg-paper p-4 space-y-3">
+              <div>
+                <span className={lbl}>Title</span>
+                <Input value={form.title} onChange={(e) => patch({ title: e.target.value })} placeholder="Task title" />
+              </div>
+              <div>
+                <span className={lbl}>Description</span>
+                <TextArea value={form.description} onChange={(e) => patch({ description: e.target.value })} rows={4} placeholder="Describe the task…" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="edit-type" className={lbl}>Type</label>
+                  <select id="edit-type" aria-label="Type" className={fld} value={form.type} onChange={(e) => patch({ type: e.target.value as TaskType })}>
+                    {TYPES.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-status" className={lbl}>Status</label>
+                  <select id="edit-status" aria-label="Status" className={fld} value={form.status} onChange={(e) => patch({ status: e.target.value as TaskStatus })}>
+                    {STATUSES.map((v) => <option key={v} value={v}>{v.replace("_", " ")}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-priority" className={lbl}>Priority</label>
+                  <select id="edit-priority" aria-label="Priority" className={fld} value={form.priority} onChange={(e) => patch({ priority: e.target.value as TaskPriority })}>
+                    {PRIORITIES.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-line bg-paper p-4 space-y-3">
+              <div>
+                <span className={lbl}>Assignee</span>
+                <UserPicker value={form.assigneeId} onChange={(uid) => patch({ assigneeId: uid })} placeholder="Search assignee…" />
+              </div>
+              <div>
+                <span className={lbl}>Reviewer</span>
+                <UserPicker value={form.reviewerId} onChange={(uid) => patch({ reviewerId: uid })} placeholder="Search reviewer…" />
+              </div>
+            </div>
+
+            <div className="rounded-md border border-line bg-paper p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="edit-start" className={lbl}>Start Date</label>
+                  <input id="edit-start" type="date" className={fld} value={form.startDate} onChange={(e) => patch({ startDate: e.target.value })} />
+                </div>
+                <div>
+                  <label htmlFor="edit-due" className={lbl}>Due Date</label>
+                  <input id="edit-due" type="date" className={fld} value={form.dueDate} onChange={(e) => patch({ dueDate: e.target.value })} />
+                </div>
+                <div>
+                  <span className={lbl}>Estimate (md)</span>
+                  <Input type="number" step="0.5" min="0" value={form.estimateMd} onChange={(e) => patch({ estimateMd: e.target.value })} className="font-mono" />
+                </div>
+                <div>
+                  <span className={lbl}>Actual (md)</span>
+                  <Input type="number" step="0.5" min="0" value={form.actualMd} onChange={(e) => patch({ actualMd: e.target.value })} className="font-mono" />
+                </div>
+              </div>
+              <div>
+                <span className={lbl}>Progress: {form.progressPct}%</span>
+                <input type="range" min={0} max={100} value={form.progressPct} onChange={(e) => patch({ progressPct: Number(e.target.value) })} className="progress-range w-full" aria-label="Progress percentage" />
+              </div>
+            </div>
+
+            <div className="rounded-md border border-line bg-paper p-4 space-y-2">
+              <span className={lbl}>Tags</span>
+              {form.tags.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {form.tags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 rounded-xs border border-line bg-surface-2 px-2 py-0.5 text-[12px] text-ink-2">
+                      {tag}
+                      <button type="button" aria-label={`Remove ${tag}`} onClick={() => patch({ tags: form.tags.filter((t) => t !== tag) })} className="text-ink-3 hover:text-danger">
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onBlur={commitTag}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commitTag(); } }}
+                placeholder="Add tags (comma-separated)"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => { setEditing(false); setForm(toForm(task)); setSaveError(null); setConflictError(false); }}>Cancel</Button>
+              <Button variant="primary" loading={saving} disabled={saving || !form.title.trim()} onClick={() => void handleSaveEdit()}>Save changes</Button>
+            </div>
+          </div>
+        )}
+
+        {tab === "time" && (
+          <div className="max-w-2xl">
+            <WorklogPanel taskId={task.id} estimateMd={task.estimateMd} actualMd={task.actualMd} />
           </div>
         )}
 
@@ -349,18 +574,12 @@ export default function TaskDetailPage() {
                     <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-ink-3">Comments</p>
                     <div className="divide-y divide-line rounded-md border border-line bg-paper">
                       {comments.map((c) => (
-                        <div key={c.id} className="flex gap-3 px-4 py-3">
-                          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-[10px] text-accent">
-                            {c.authorId.slice(-2).toUpperCase()}
-                          </span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-[10px] text-ink-3">{c.authorId.slice(-8)}</span>
-                              <span className="text-[10px] text-ink-3">{relTime(c.createdAt)}</span>
-                            </div>
-                            <p className="mt-0.5 text-sm text-ink">{c.body}</p>
-                          </div>
-                        </div>
+                        <CommentRow
+                          key={c.id}
+                          comment={c}
+                          canManage={!!user?.id && c.authorId === user.id}
+                          onChanged={loadActivity}
+                        />
                       ))}
                     </div>
                   </div>
@@ -393,6 +612,98 @@ export default function TaskDetailPage() {
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Comment row (inline edit + delete) ────────────────────────────────────────
+
+function CommentRow({ comment, canManage, onChanged }: { comment: TaskComment; canManage: boolean; onChanged(): Promise<void> | void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.body);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  async function save() {
+    if (!draft.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateComment(comment.id, draft.trim(), comment.version);
+      setEditing(false);
+      await onChanged();
+    } catch (e) {
+      const msg = (e as Error).message;
+      setErr(msg.includes("409") || msg.toLowerCase().includes("conflict")
+        ? "This comment changed elsewhere — refresh and retry."
+        : msg);
+    } finally { setBusy(false); }
+  }
+
+  async function del() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await deleteComment(comment.id, comment.version);
+      await onChanged();
+    } catch (e) {
+      const msg = (e as Error).message;
+      setErr(msg.includes("409") || msg.toLowerCase().includes("conflict")
+        ? "This comment changed elsewhere — refresh and retry."
+        : msg);
+      setBusy(false);
+      setConfirmDel(false);
+    }
+  }
+
+  return (
+    <div className="flex gap-3 px-4 py-3">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-[10px] text-accent">
+        {comment.authorId.slice(-2).toUpperCase()}
+      </span>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-ink-3">{comment.authorId.slice(-8)}</span>
+          <span className="text-[10px] text-ink-3">{relTime(comment.createdAt)}</span>
+          {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
+            <span className="text-[10px] italic text-ink-3">edited</span>
+          )}
+          {canManage && !editing && (
+            <span className="ml-auto flex items-center gap-1">
+              <button type="button" aria-label="Edit comment" onClick={() => { setEditing(true); setDraft(comment.body); setErr(null); }} className="rounded-sm p-1 text-ink-3 hover:bg-surface-2 hover:text-ink">
+                <Pencil size={12} />
+              </button>
+              {confirmDel ? (
+                <>
+                  <button type="button" disabled={busy} onClick={() => void del()} className="rounded-sm px-1.5 py-0.5 text-[11px] font-semibold text-danger hover:bg-danger/10 disabled:opacity-40">Delete</button>
+                  <button type="button" onClick={() => setConfirmDel(false)} className="rounded-sm px-1.5 py-0.5 text-[11px] text-ink-3 hover:bg-surface-2">Cancel</button>
+                </>
+              ) : (
+                <button type="button" aria-label="Delete comment" onClick={() => setConfirmDel(true)} className="rounded-sm p-1 text-ink-3 hover:bg-danger/10 hover:text-danger">
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </span>
+          )}
+        </div>
+        {editing ? (
+          <div className="mt-1 space-y-2">
+            <TextArea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} />
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={busy || !draft.trim()} onClick={() => void save()} className="inline-flex items-center gap-1 rounded bg-accent px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                <Check size={12} /> Save
+              </button>
+              <button type="button" onClick={() => { setEditing(false); setErr(null); }} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-ink-3 hover:bg-surface-2">
+                <X size={12} /> Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-0.5 text-sm text-ink">{comment.body}</p>
+        )}
+        {err && <p className="mt-1 text-[11px] text-danger">{err}</p>}
       </div>
     </div>
   );

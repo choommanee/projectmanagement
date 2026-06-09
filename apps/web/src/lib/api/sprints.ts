@@ -17,24 +17,21 @@ export interface Sprint {
   version: number;
 }
 
-function get(raw: Record<string, unknown>, k: string) {
-  return raw[k] ?? raw[k[0].toUpperCase() + k.slice(1)];
-}
-
+// Backend is canonical snake_case — map once, cleanly.
 export function normSprint(raw: Record<string, unknown>): Sprint {
   return {
-    id:          String(get(raw, "id") ?? raw["ID"] ?? ""),
-    tenantId:    String(get(raw, "tenantId") ?? raw["TenantID"] ?? raw["tenant_id"] ?? ""),
-    projectId:   String(get(raw, "projectId") ?? raw["ProjectID"] ?? raw["project_id"] ?? ""),
-    name:        String(get(raw, "name") ?? ""),
-    goal:        String(get(raw, "goal") ?? ""),
-    status:      (get(raw, "status") ?? "planning") as SprintStatus,
-    startDate:   (get(raw, "startDate") ?? raw["StartDate"] ?? raw["start_date"]) as string | null | undefined,
-    endDate:     (get(raw, "endDate") ?? raw["EndDate"] ?? raw["end_date"]) as string | null | undefined,
-    capacityPts: Number(get(raw, "capacityPts") ?? raw["CapacityPts"] ?? raw["capacity_pts"] ?? 0),
-    createdAt:   String(get(raw, "createdAt") ?? raw["CreatedAt"] ?? ""),
-    updatedAt:   String(get(raw, "updatedAt") ?? raw["UpdatedAt"] ?? ""),
-    version:     Number(get(raw, "version") ?? 1),
+    id:          String(raw["id"] ?? ""),
+    tenantId:    String(raw["tenant_id"] ?? ""),
+    projectId:   String(raw["project_id"] ?? ""),
+    name:        String(raw["name"] ?? ""),
+    goal:        String(raw["goal"] ?? ""),
+    status:      (raw["status"] ?? "planning") as SprintStatus,
+    startDate:   (raw["start_date"] ?? null) as string | null,
+    endDate:     (raw["end_date"] ?? null) as string | null,
+    capacityPts: Number(raw["capacity_pts"] ?? 0),
+    createdAt:   String(raw["created_at"] ?? ""),
+    updatedAt:   String(raw["updated_at"] ?? ""),
+    version:     Number(raw["version"] ?? 1),
   };
 }
 
@@ -106,8 +103,9 @@ export async function listSprintTasks(sprintId: string): Promise<TaskT[]> {
   return (items ?? []).map((x) => normTask(x as Record<string, unknown>));
 }
 
-export async function deleteSprint(id: string): Promise<void> {
-  const r = await fetch(`/api/sprints/${id}`, { method: "DELETE" });
+// Soft-delete, version-guarded: DELETE /v1/sprints/{id}?version=N (409 on mismatch).
+export async function deleteSprint(id: string, version: number): Promise<void> {
+  const r = await fetch(`/api/sprints/${id}?version=${version}`, { method: "DELETE" });
   if (!r.ok) {
     const e = await r.json().catch(() => ({})) as Record<string, string>;
     throw new Error(e.error ?? `delete sprint failed: ${r.status}`);

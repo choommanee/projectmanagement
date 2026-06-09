@@ -3,10 +3,15 @@ package service
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 
+	notiflib "github.com/pmplatform/libs/go/notification"
+
+	"github.com/pmplatform/services/document-svc/internal/cert"
 	"github.com/pmplatform/services/document-svc/internal/domain"
+	"github.com/pmplatform/services/document-svc/internal/keyprov"
 	"github.com/pmplatform/services/document-svc/internal/store"
 )
 
@@ -17,6 +22,25 @@ type Service struct {
 	Comments   *store.Comments
 	Templates  *store.Templates
 	Signatures *store.Signatures
+	// VerifyLinks backs the public-verification share links (publicverify.go).
+	VerifyLinks *store.VerifyLinks
+	Notif       notiflib.Publisher
+	Events      EventEmitter
+	audit       AuditPublisher
+	// certifier embeds a PAdES-style signature into certificate PDFs
+	// (service/trust.go; nil = unsigned certificates, legacy behavior). Held in
+	// an atomic.Pointer so the admin sign-cert endpoint can hot-swap the active
+	// signing identity without a restart (mirrors identity-svc's DynamicSigner).
+	certifier atomic.Pointer[cert.Signer]
+	// certImporter installs operator-provided certificates; nil disables the
+	// admin import endpoint (returns 503).
+	certImporter CertImporter
+}
+
+// CertImporter validates and atomically installs an operator-provided X.509
+// document-signing certificate. Implemented by keyprov.CertManager.
+type CertImporter interface {
+	Import(ctx context.Context, certPEM, keyPEM, chainPEM []byte) (*keyprov.CertKey, error)
 }
 
 func New(w *store.Workspaces, d *store.Documents, c *store.Comments, t *store.Templates) *Service {
@@ -166,4 +190,55 @@ func (svc *Service) CreateTemplate(ctx context.Context, in CreateTemplateInput) 
 		return nil, err
 	}
 	return t, nil
+}
+
+// UpdateTemplateInput holds params for a template edit. Type/Name/Body are
+// applied over the existing row; is_system and created_at are immutable.
+type UpdateTemplateInput struct {
+	TenantID uuid.UUID
+	ID       uuid.UUID
+	Type     domain.DocumentType
+	Name     string
+	Body     map[string]any
+}
+
+// UpdateTemplate validates and persists changes to an existing template.
+// System templates (is_system=true) are read-only and rejected with
+// ErrForbidden.
+func (svc *Service) UpdateTemplate(ctx context.Context, in UpdateTemplateInput) (*domain.Template, error) {
+	existing, err := svc.Templates.GetByID(ctx, in.TenantID, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.IsSystem {
+		return nil, domain.ErrForbidden
+	}
+	if !in.Type.Valid() {
+		return nil, domain.ErrInvalidInput
+	}
+	if strings.TrimSpace(in.Name) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	existing.Type = in.Type
+	existing.Name = in.Name
+	if in.Body != nil {
+		existing.Body = in.Body
+	}
+	if err := svc.Templates.Update(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+// DeleteTemplate removes a template. System templates are protected and
+// rejected with ErrForbidden.
+func (svc *Service) DeleteTemplate(ctx context.Context, tid, id uuid.UUID) error {
+	existing, err := svc.Templates.GetByID(ctx, tid, id)
+	if err != nil {
+		return err
+	}
+	if existing.IsSystem {
+		return domain.ErrForbidden
+	}
+	return svc.Templates.Delete(ctx, tid, id)
 }

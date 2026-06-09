@@ -141,6 +141,8 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<StockBalance | null>(null);
   const [itemName, setItemName] = useState("");
+  // Global Receive/Issue panel (no pre-selected item — user picks one).
+  const [globalTxn, setGlobalTxn] = useState<"receive" | "issue" | null>(null);
 
   // Item cache: itemId → Item
   const [itemCache, setItemCache] = useState<Map<string, Item>>(new Map());
@@ -228,13 +230,13 @@ export default function InventoryPage() {
             id: "receive",
             label: "Receive",
             icon: <ArrowDownToLine size={14} />,
-            onClick: () => {},
+            onClick: () => setGlobalTxn("receive"),
           },
           {
             id: "issue",
             label: "Issue",
             icon: <ArrowUpFromLine size={14} />,
-            onClick: () => {},
+            onClick: () => setGlobalTxn("issue"),
           },
           {
             id: "refresh",
@@ -328,6 +330,13 @@ export default function InventoryPage() {
           itemId={selected.itemId}
           itemName={itemName}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {globalTxn && (
+        <StockTransactionPanel
+          initialTxnType={globalTxn}
+          onClose={() => setGlobalTxn(null)}
         />
       )}
 

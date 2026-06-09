@@ -159,3 +159,20 @@ func (s *OpportunityStore) Update(ctx context.Context, tid, id uuid.UUID, in Upd
 	}
 	return &o, nil
 }
+
+// Delete hard-deletes an opportunity. Returns ErrNotFound when absent.
+func (s *OpportunityStore) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`DELETE FROM opportunity WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}

@@ -143,6 +143,8 @@ func update(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		emitAudit(svc, r, "tenant.update", "tenant", id.String(), nil,
+			map[string]any{"name": t.Name, "tier": t.Tier, "status": t.Status})
 		writeJSON(w, 200, t)
 	}
 }
@@ -168,6 +170,7 @@ func del(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		emitAudit(svc, r, "tenant.delete", "tenant", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -198,6 +201,8 @@ func create(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		emitAudit(svc, r, "tenant.create", "tenant", t.ID.String(), nil,
+			map[string]any{"slug": t.Slug, "name": t.Name, "tier": t.Tier})
 		writeJSON(w, http.StatusCreated, t)
 	}
 }
@@ -306,6 +311,8 @@ func createCustomField(svc *service.Service) http.HandlerFunc {
 			writeErr(w, http.StatusInternalServerError, err)
 			return
 		}
+		emitAudit(svc, r, "tenant.custom_field.create", "custom_field", f.ID.String(), nil,
+			map[string]any{"entity_type": req.EntityType, "field_key": req.FieldKey, "field_type": req.FieldType})
 		writeJSON(w, http.StatusCreated, f)
 	}
 }
@@ -331,6 +338,7 @@ func deleteCustomField(svc *service.Service) http.HandlerFunc {
 			writeErr(w, http.StatusInternalServerError, err)
 			return
 		}
+		emitAudit(svc, r, "tenant.custom_field.delete", "custom_field", id.String(), nil, nil)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

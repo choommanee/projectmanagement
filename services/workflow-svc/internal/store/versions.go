@@ -21,11 +21,14 @@ func (s *Versions) withTenant(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx
 
 func (s *Versions) Create(ctx context.Context, v *domain.WorkflowVersion) error {
 	return s.withTenant(ctx, v.TenantID, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `
+		// RETURNING populates the DB-assigned timestamp so the create response
+		// carries the real created_at (not the zero value).
+		return tx.QueryRow(ctx, `
 			INSERT INTO workflow_version(id, tenant_id, definition_id, rev, dsl, created_by, notes)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			v.ID, v.TenantID, v.DefinitionID, v.Rev, v.DSL, v.CreatedBy, v.Notes)
-		return err
+			VALUES ($1,$2,$3,$4,$5,$6,$7)
+			RETURNING created_at`,
+			v.ID, v.TenantID, v.DefinitionID, v.Rev, v.DSL, v.CreatedBy, v.Notes).
+			Scan(&v.CreatedAt)
 	})
 }
 

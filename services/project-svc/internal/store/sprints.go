@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -46,7 +47,7 @@ func (s *Sprints) GetByID(ctx context.Context, tid, id uuid.UUID) (*domain.Sprin
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx, `
 			SELECT id, tenant_id, project_id, name, COALESCE(goal,''), status, start_date, end_date, capacity_pts, created_at, updated_at, version
-			FROM sprint WHERE id = $1`, id)
+			FROM sprint WHERE id = $1 AND deleted_at IS NULL`, id)
 		var startDate, endDate *time.Time
 		if err := row.Scan(&sp.ID, &sp.TenantID, &sp.ProjectID, &sp.Name, &sp.Goal, &sp.Status,
 			&startDate, &endDate, &sp.CapacityPts, &sp.CreatedAt, &sp.UpdatedAt, &sp.Version); err != nil {
@@ -56,6 +57,9 @@ func (s *Sprints) GetByID(ctx context.Context, tid, id uuid.UUID) (*domain.Sprin
 		sp.EndDate = endDate
 		return nil
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +71,7 @@ func (s *Sprints) List(ctx context.Context, tid, projectID uuid.UUID) ([]*domain
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, `
 			SELECT id, tenant_id, project_id, name, COALESCE(goal,''), status, start_date, end_date, capacity_pts, created_at, updated_at, version
-			FROM sprint WHERE project_id = $1 ORDER BY start_date DESC NULLS LAST`, projectID)
+			FROM sprint WHERE project_id = $1 AND deleted_at IS NULL ORDER BY start_date DESC NULLS LAST`, projectID)
 		if err != nil {
 			return err
 		}
@@ -93,7 +97,7 @@ func (s *Sprints) Update(ctx context.Context, sp *domain.Sprint) error {
 		ct, err := tx.Exec(ctx, `
 			UPDATE sprint SET name=$3, goal=$4, status=$5, start_date=$6, end_date=$7, capacity_pts=$8,
 			  updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$9`,
+			WHERE id=$1 AND tenant_id=$2 AND version=$9 AND deleted_at IS NULL`,
 			sp.ID, sp.TenantID, sp.Name, sp.Goal, sp.Status, sp.StartDate, sp.EndDate, sp.CapacityPts, sp.Version)
 		if err != nil {
 			return err
@@ -106,14 +110,16 @@ func (s *Sprints) Update(ctx context.Context, sp *domain.Sprint) error {
 	})
 }
 
-func (s *Sprints) Delete(ctx context.Context, tid, id uuid.UUID) error {
+func (s *Sprints) Delete(ctx context.Context, tid, id uuid.UUID, version int) error {
 	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
-		ct, err := tx.Exec(ctx, `DELETE FROM sprint WHERE id=$1 AND tenant_id=$2`, id, tid)
+		ct, err := tx.Exec(ctx, `
+			UPDATE sprint SET deleted_at=now(), updated_at=now(), version=version+1
+			WHERE id=$1 AND tenant_id=$2 AND version=$3 AND deleted_at IS NULL`, id, tid, version)
 		if err != nil {
 			return err
 		}
 		if ct.RowsAffected() == 0 {
-			return domain.ErrNotFound
+			return domain.ErrConflict
 		}
 		return nil
 	})

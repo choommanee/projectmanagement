@@ -29,12 +29,12 @@ function getWOWeek(wo: WorkOrder): string | null {
 }
 
 const STATUS_COLORS: Record<WOStatus, string> = {
-  planned:     "bg-zinc-200 text-zinc-700",
-  released:    "bg-blue-200 text-blue-800",
-  in_progress: "bg-amber-200 text-amber-800",
-  completed:   "bg-green-200 text-green-800",
-  closed:      "bg-zinc-300 text-zinc-600",
-  cancelled:   "bg-red-100 text-red-600",
+  planned:     "bg-surface-2 text-ink-2",
+  released:    "bg-accent/10 text-accent",
+  in_progress: "bg-warning/10 text-warning",
+  completed:   "bg-success/10 text-success",
+  closed:      "bg-surface-2 text-ink-3",
+  cancelled:   "bg-danger/10 text-danger",
 };
 
 export default function ProductionCalendarPage() {

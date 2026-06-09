@@ -69,7 +69,7 @@ func main() {
 	)
 
 	router := service.NewRouter(prefStore, channels...)
-	svc := service.New(st)
+	svc := service.New(st).WithPreferences(prefStore)
 	h := api.NewRouter(svc, authz)
 
 	// Soft-attach JWT verifier: parses the incoming Authorization: Bearer

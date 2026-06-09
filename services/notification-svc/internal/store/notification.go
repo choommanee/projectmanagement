@@ -139,6 +139,21 @@ func (s *Store) List(ctx context.Context, tid, uid uuid.UUID, opts ListOpts) ([]
 	return out, nil
 }
 
+// Count returns the total number of notifications for one user, honoring the
+// UnreadOnly filter. Used so the API can return an accurate total rather than
+// the (page-capped) length of the returned slice.
+func (s *Store) Count(ctx context.Context, tid, uid uuid.UUID, opts ListOpts) (int, error) {
+	var n int
+	err := withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		q := `SELECT count(*) FROM notification WHERE user_id = $1::uuid`
+		if opts.UnreadOnly {
+			q += ` AND read_at IS NULL`
+		}
+		return tx.QueryRow(ctx, q, uid.String()).Scan(&n)
+	})
+	return n, err
+}
+
 // MarkRead marks one notification (for the given user) as read.
 // Returns pgx.ErrNoRows if it doesn't exist for that user/tenant.
 func (s *Store) MarkRead(ctx context.Context, tid, uid uuid.UUID, id string) error {

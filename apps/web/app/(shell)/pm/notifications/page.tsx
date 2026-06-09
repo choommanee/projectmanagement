@@ -29,8 +29,11 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "mention":                "Mention (@)",
 };
 
-// Channels supported in the backend (notification_preference table)
-const CHANNELS = ["in_app", "email"] as const;
+// Channels supported in the backend (notification_preference table).
+// These MUST match the channel Name() values in notification-svc
+// (InAppChannel → "inapp", EmailChannel → "email"); the delivery Router
+// matches preferences against those exact strings.
+const CHANNELS = ["inapp", "email"] as const;
 type Channel = (typeof CHANNELS)[number];
 
 // Default preferences when API is unavailable
@@ -62,7 +65,7 @@ function fromApiPrefs(apiPrefs: ApiPref[]): KindPref[] {
       return {
         id: def.id,
         label: EVENT_KIND_LABELS[def.id] ?? def.id,
-        inApp: found.channels.includes("in_app"),
+        inApp: found.channels.includes("inapp"),
         email: found.channels.includes("email"),
       };
     }
@@ -74,7 +77,7 @@ function fromApiPrefs(apiPrefs: ApiPref[]): KindPref[] {
 function toApiPrefs(prefs: KindPref[]): ApiPref[] {
   return prefs.map((p) => {
     const channels: Channel[] = [];
-    if (p.inApp) channels.push("in_app");
+    if (p.inApp) channels.push("inapp");
     if (p.email) channels.push("email");
     return { kind: p.id, channels };
   });

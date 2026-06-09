@@ -208,11 +208,15 @@ export default function MrpPage() {
     setCreating(true);
     setCreateErr(null);
     try {
-      const run = await createMrpRun({ name: newRunName.trim() });
+      const created = await createMrpRun({ name: newRunName.trim() });
       setNewRunName("");
       setShowNewRun(false);
-      await loadRuns();
-      setSelectedRun(run);
+      // The create response carries no demand/supply/action counts. Re-fetch the
+      // list (which is enriched with summary counts) and select the matching
+      // entry so the detail header shows real counts immediately.
+      const list = await listMrpRuns({ limit: 50 });
+      setRuns(list);
+      setSelectedRun(list.find((r) => r.id === created.id) ?? created);
     } catch (err) {
       setCreateErr(err instanceof Error ? err.message : "Failed to create run");
     } finally {

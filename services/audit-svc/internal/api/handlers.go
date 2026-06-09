@@ -68,7 +68,7 @@ func listAudit(svc *service.Service) http.HandlerFunc {
 			Result:     q.Get("result"),
 			Q:          q.Get("q"),
 			From:       service.ParseTime(q.Get("from")),
-			To:         service.ParseTime(q.Get("to")),
+			To:         service.ParseTimeUpper(q.Get("to")),
 			Limit:      atoiOr(q.Get("limit"), 50),
 			Offset:     atoiOr(q.Get("offset"), 0),
 		}

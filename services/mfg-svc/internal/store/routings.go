@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -76,6 +77,55 @@ func (s *Routings) ListByItem(ctx context.Context, tid, itemID uuid.UUID) ([]*do
 	var list []*domain.RoutingHeader
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, routingHeaderSelect+" WHERE tenant_id = $1 AND item_id = $2 ORDER BY version", tid, itemID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var h domain.RoutingHeader
+			if err := scanRoutingHeader(rows, &h); err != nil {
+				return err
+			}
+			list = append(list, &h)
+		}
+		return rows.Err()
+	})
+	return list, err
+}
+
+// ListRoutingsOpts filters the tenant-wide routing listing.
+type ListRoutingsOpts struct {
+	ItemID *uuid.UUID
+	Status string
+	Limit  int
+	Offset int
+}
+
+// List returns routing headers across the tenant with optional item_id/status filters.
+func (s *Routings) List(ctx context.Context, tid uuid.UUID, opts ListRoutingsOpts) ([]*domain.RoutingHeader, error) {
+	if opts.Limit <= 0 || opts.Limit > 500 {
+		opts.Limit = 100
+	}
+	where := []string{"tenant_id = $1"}
+	args := []any{tid}
+	idx := 2
+	if opts.ItemID != nil {
+		where = append(where, fmt.Sprintf("item_id = $%d", idx))
+		args = append(args, *opts.ItemID)
+		idx++
+	}
+	if opts.Status != "" {
+		where = append(where, fmt.Sprintf("status = $%d", idx))
+		args = append(args, opts.Status)
+		idx++
+	}
+	whereSQL := strings.Join(where, " AND ")
+	var list []*domain.RoutingHeader
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			routingHeaderSelect+" WHERE "+whereSQL+
+				fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1),
+			append(args, opts.Limit, opts.Offset)...)
 		if err != nil {
 			return err
 		}

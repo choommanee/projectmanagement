@@ -51,16 +51,20 @@ function NewInvoiceDialog({
   onCreated: (inv: SalesInvoice) => void;
 }) {
   const today = new Date().toISOString().split("T")[0];
-  const [form, setForm] = useState({ customer_id: "", issue_date: today, due_date: "", notes: "" });
+  const [form, setForm] = useState({ customer_id: "", issue_date: today, due_date: "", notes: "", subtotal: "0", tax: "0" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setForm({ customer_id: customers[0]?.id ?? "", issue_date: today, due_date: "", notes: "" });
+      setForm({ customer_id: customers[0]?.id ?? "", issue_date: today, due_date: "", notes: "", subtotal: "0", tax: "0" });
       setError(null);
     }
   }, [open, customers, today]);
+
+  const subtotalNum = Number(form.subtotal) || 0;
+  const taxNum = Number(form.tax) || 0;
+  const totalNum = subtotalNum + taxNum;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +79,8 @@ function NewInvoiceDialog({
         issue_date: form.issue_date,
         due_date: form.due_date || undefined,
         notes: form.notes || undefined,
+        subtotal: subtotalNum,
+        tax: taxNum,
       });
       onCreated(inv);
     } catch (err) {
@@ -119,6 +125,28 @@ function NewInvoiceDialog({
             onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
           />
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Subtotal</span>
+            <Input
+              type="number" min="0" step="0.01"
+              value={form.subtotal}
+              onChange={(e) => setForm((f) => ({ ...f, subtotal: e.target.value }))}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Tax</span>
+            <Input
+              type="number" min="0" step="0.01"
+              value={form.tax}
+              onChange={(e) => setForm((f) => ({ ...f, tax: e.target.value }))}
+            />
+          </label>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="font-medium text-ink-2">Total</span>
+          <span className="font-mono font-semibold">{totalNum.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+        </div>
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Notes</span>
           <Input

@@ -28,6 +28,7 @@ export interface Department {
   parentId: string | null;
   parentName?: string;
   active: boolean;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,11 +41,12 @@ export interface Position {
   departmentId: string | null;
   departmentName?: string;
   active: boolean;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export type EmpStatus = "active" | "inactive" | "terminated" | "on_leave";
+export type EmpStatus = "active" | "probation" | "resigned" | "terminated";
 
 export interface Employee {
   id: string;
@@ -60,6 +62,7 @@ export interface Employee {
   status: EmpStatus;
   hireDate: string;
   terminationDate?: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +78,7 @@ function normalizeDept(r: Record<string, unknown>): Department {
     parentId: (gid(r, "parentId", "parent_id") as string | null) ?? null,
     parentName: r.parent_name ? String(r.parent_name) : r.parentName ? String(r.parentName) : undefined,
     active: Boolean(g(r, "active") ?? true),
+    version: Number(g(r, "version") ?? 0),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -89,6 +93,7 @@ function normalizePosition(r: Record<string, unknown>): Position {
     departmentId: (gid(r, "departmentId", "department_id") as string | null) ?? null,
     departmentName: r.department_name ? String(r.department_name) : r.departmentName ? String(r.departmentName) : undefined,
     active: Boolean(g(r, "active") ?? true),
+    version: Number(g(r, "version") ?? 0),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -109,6 +114,7 @@ function normalizeEmployee(r: Record<string, unknown>): Employee {
     status: (g(r, "status") ?? "active") as EmpStatus,
     hireDate: String(gid(r, "hireDate", "hire_date") ?? ""),
     terminationDate: (gid(r, "terminationDate", "termination_date") as string | null) ?? null,
+    version: Number(g(r, "version") ?? 0),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -141,7 +147,7 @@ export async function createDepartment(input: {
   return normalizeDept(await r.json() as Record<string, unknown>);
 }
 
-export async function updateDepartment(id: string, patch: Partial<{
+export async function updateDepartment(id: string, version: number, patch: Partial<{
   name: string;
   parent_id: string | null;
   active: boolean;
@@ -149,14 +155,14 @@ export async function updateDepartment(id: string, patch: Partial<{
   const r = await apiFetch(`${SVC}/departments/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ ...patch, version }),
   });
   if (!r.ok) throw new Error(`updateDepartment: ${r.status}`);
   return normalizeDept(await r.json() as Record<string, unknown>);
 }
 
-export async function deleteDepartment(id: string): Promise<void> {
-  const r = await apiFetch(`${SVC}/departments/${id}`, { method: "DELETE" });
+export async function deleteDepartment(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/departments/${id}?version=${version}`, { method: "DELETE" });
   if (!r.ok && r.status !== 204) throw new Error(`deleteDepartment: ${r.status}`);
 }
 
@@ -193,22 +199,23 @@ export async function createPosition(input: {
   return normalizePosition(await r.json() as Record<string, unknown>);
 }
 
-export async function updatePosition(id: string, patch: Partial<{
+export async function updatePosition(id: string, version: number, patch: Partial<{
   name: string;
+  grade: string;
   department_id: string | null;
   active: boolean;
 }>): Promise<Position> {
   const r = await apiFetch(`${SVC}/positions/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ ...patch, version }),
   });
   if (!r.ok) throw new Error(`updatePosition: ${r.status}`);
   return normalizePosition(await r.json() as Record<string, unknown>);
 }
 
-export async function deletePosition(id: string): Promise<void> {
-  const r = await apiFetch(`${SVC}/positions/${id}`, { method: "DELETE" });
+export async function deletePosition(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/positions/${id}?version=${version}`, { method: "DELETE" });
   if (!r.ok && r.status !== 204) throw new Error(`deletePosition: ${r.status}`);
 }
 
@@ -262,7 +269,7 @@ export async function getEmployee(id: string): Promise<Employee> {
   return normalizeEmployee(await r.json() as Record<string, unknown>);
 }
 
-export async function updateEmployee(id: string, patch: Partial<{
+export async function updateEmployee(id: string, version: number, patch: Partial<{
   first_name: string;
   last_name: string;
   email: string;
@@ -273,17 +280,17 @@ export async function updateEmployee(id: string, patch: Partial<{
   const r = await apiFetch(`${SVC}/employees/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ ...patch, version }),
   });
   if (!r.ok) throw new Error(`updateEmployee: ${r.status}`);
   return normalizeEmployee(await r.json() as Record<string, unknown>);
 }
 
-export async function terminateEmployee(id: string, termination_date: string): Promise<Employee> {
+export async function terminateEmployee(id: string, version: number, termination_date: string): Promise<Employee> {
   const r = await apiFetch(`${SVC}/employees/${id}/terminate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ termination_date }),
+    body: JSON.stringify({ termination_date, version }),
   });
   if (!r.ok) throw new Error(`terminateEmployee: ${r.status}`);
   return normalizeEmployee(await r.json() as Record<string, unknown>);

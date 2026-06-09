@@ -104,14 +104,20 @@ export default function ProfilePage() {
     setPwSaving(true);
     setPwError(null);
     try {
-      const res = await fetch(`/api/identity/users/${user!.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/identity/users/${user!.id}/password`, {
+        method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ current_password: pwForm.current, password: pwForm.next }),
       });
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `HTTP ${res.status}`);
+        let msg = `HTTP ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {
+          // non-JSON body — keep the status message
+        }
+        throw new Error(msg);
       }
       setPwForm({ current: "", next: "", confirm: "" });
       setPwOpen(false);

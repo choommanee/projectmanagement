@@ -16,11 +16,16 @@ const (
 	StatusSuspended Status = "suspended"
 )
 
-// UserSummary is a read-only view for pickers — no sensitive fields.
+// UserSummary is a read-only view for pickers and the admin user list — no
+// sensitive fields (password hash etc.). Roles/Status/CreatedAt let the admin
+// pm/users table render the roles, status, and joined columns.
 type UserSummary struct {
 	ID          uuid.UUID `json:"id"`
 	DisplayName string    `json:"display_name"`
 	Email       string    `json:"email"`
+	Status      Status    `json:"status"`
+	Roles       []string  `json:"roles"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type User struct {

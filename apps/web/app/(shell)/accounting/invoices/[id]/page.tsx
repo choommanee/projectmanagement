@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { getInvoice, updateInvoice, type Invoice, type InvStatus, type InvType } from "@/lib/api/accounting";
+import { getCustomer } from "@/lib/api/sales";
 
 const STATUS_FLOW_AR: InvStatus[] = ["draft", "issued", "paid"];
 const STATUS_FLOW_AP: InvStatus[] = ["draft", "issued", "paid"];
@@ -22,12 +23,21 @@ export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [counterpartyLabel, setCounterpartyLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    getInvoice(id).then(setInvoice).finally(() => setLoading(false));
+    getInvoice(id).then((inv) => {
+      setInvoice(inv);
+      if (inv.counterpartyName) {
+        setCounterpartyLabel(inv.counterpartyName);
+      } else if (inv.counterpartyId) {
+        setCounterpartyLabel(inv.counterpartyId);
+        getCustomer(inv.counterpartyId).then(c => setCounterpartyLabel(c.name)).catch(() => {});
+      }
+    }).finally(() => setLoading(false));
   }, [id]);
 
   async function advance() {
@@ -36,7 +46,7 @@ export default function InvoiceDetailPage() {
     const idx = flow.indexOf(invoice.status);
     if (idx < 0 || idx >= flow.length - 1) return;
     setSaving(true);
-    const updated = await updateInvoice(invoice.id, { status: flow[idx + 1] }).catch(() => null);
+    const updated = await updateInvoice(invoice.id, { status: flow[idx + 1], version: invoice.version }).catch(() => null);
     if (updated) setInvoice(updated);
     setSaving(false);
   }
@@ -44,7 +54,7 @@ export default function InvoiceDetailPage() {
   async function cancel() {
     if (!invoice) return;
     setSaving(true);
-    const updated = await updateInvoice(invoice.id, { status: "cancelled" }).catch(() => null);
+    const updated = await updateInvoice(invoice.id, { status: "cancelled", version: invoice.version }).catch(() => null);
     if (updated) setInvoice(updated);
     setSaving(false);
   }
@@ -73,7 +83,7 @@ export default function InvoiceDetailPage() {
             </span>
           </div>
           <div className="text-sm text-ink-3 space-y-0.5">
-            <div className="font-medium text-foreground">{invoice.counterparty}</div>
+            <div className="font-medium text-foreground">{counterpartyLabel}</div>
             <div>Issued: {invoice.issueDate?.slice(0, 10)}</div>
             {invoice.dueDate && <div className={isOverdue ? "text-red-600 font-medium" : ""}>Due: {invoice.dueDate.slice(0, 10)}</div>}
             {invoice.notes && <div className="text-xs mt-1">{invoice.notes}</div>}
@@ -117,7 +127,7 @@ export default function InvoiceDetailPage() {
       {/* Details */}
       <div className="rounded-lg border border-line bg-surface p-5 grid grid-cols-2 gap-4 text-sm">
         <div><span className="text-ink-3">Invoice #:</span> <span className="font-mono">{invoice.invNo}</span></div>
-        <div><span className="text-ink-3">Counterparty:</span> {invoice.counterparty}</div>
+        <div><span className="text-ink-3">Counterparty:</span> {counterpartyLabel}</div>
         <div><span className="text-ink-3">Issue Date:</span> {invoice.issueDate?.slice(0, 10)}</div>
         <div><span className="text-ink-3">Due Date:</span> <span className={isOverdue ? "text-red-600 font-medium" : ""}>{invoice.dueDate?.slice(0, 10) ?? "—"}</span></div>
         <div><span className="text-ink-3">Currency:</span> {invoice.currency}</div>

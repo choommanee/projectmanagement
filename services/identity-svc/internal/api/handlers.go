@@ -364,9 +364,61 @@ func WithUserList(h http.Handler, jwtStore *sjwt.Store, issuer string, users *st
 		pr.Get("/v1/users", listUsers(users))
 		pr.Post("/v1/users", inviteUser(users))
 		pr.Patch("/v1/users/{id}", updateUser(users))
+		pr.Post("/v1/users/{id}/password", changePassword(users))
 		pr.Delete("/v1/users/{id}", deactivateUser(users))
 	})
 	return mux
+}
+
+// WithServiceToken mounts POST /v1/internal/service-token onto an existing
+// router. The endpoint is anonymous at the JWT layer — the X-Service-Secret
+// header IS the credential — so it is wired separately from the bearer-gated
+// groups. When st is nil or disabled (no SERVICE_TOKEN_SECRET) the route is
+// NOT mounted at all, so an unconfigured deployment returns 404 and can never
+// mint a token with an empty secret. Called from main.go.
+func WithServiceToken(h http.Handler, st *service.ServiceToken) http.Handler {
+	if st == nil || !st.Enabled() {
+		return h
+	}
+	mux := h.(*chi.Mux)
+	mux.Post("/v1/internal/service-token", serviceTokenHandler(st))
+	return mux
+}
+
+type serviceTokenReq struct {
+	Service  string `json:"service"`
+	TenantID string `json:"tenant_id"`
+}
+
+// serviceTokenHandler mints a short-lived service-to-service token. The
+// X-Service-Secret header is verified in constant time inside the service
+// layer; on mismatch we return 403 without distinguishing it from other
+// failures beyond the status code.
+func serviceTokenHandler(st *service.ServiceToken) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		secret := r.Header.Get("X-Service-Secret")
+		var in serviceTokenReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad request body"))
+			return
+		}
+		tp, err := st.Mint(r.Context(), secret, service.ServiceTokenInput{
+			Service:  in.Service,
+			TenantID: in.TenantID,
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, service.ErrServiceTokenDisabled):
+				writeErr(w, http.StatusServiceUnavailable, err)
+			case errors.Is(err, service.ErrServiceTokenForbidden):
+				writeErr(w, http.StatusForbidden, errors.New("forbidden"))
+			default:
+				writeErr(w, http.StatusBadRequest, err)
+			}
+			return
+		}
+		writeJSON(w, http.StatusOK, tp)
+	}
 }
 
 func listUsers(users *store.Users) http.HandlerFunc {
@@ -498,16 +550,17 @@ type updateUserReq struct {
 
 // updateUser handles PATCH /v1/users/:id. Updates display_name and/or roles
 // for the user identified by {id}. The target user must be in the same tenant
-// as the caller. Requires tenant-admin or platform-admin role.
+// as the caller.
+//
+// Authorization: tenant-admin / platform-admin may edit any user in the tenant.
+// A non-admin may edit ONLY their own row (claims.Subject == {id}) and ONLY
+// their display_name — role changes always require an admin (self-elevation
+// would be a privilege-escalation hole).
 func updateUser(users *store.Users) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := libauth.FromCtx(r.Context())
 		if !ok {
 			writeErr(w, http.StatusUnauthorized, errors.New("unauthenticated"))
-			return
-		}
-		if !isTenantAdmin(claims.Roles) {
-			writeErr(w, http.StatusForbidden, errors.New("tenant-admin role required"))
 			return
 		}
 		tid, err := uuid.Parse(claims.TenantID)
@@ -520,9 +573,20 @@ func updateUser(users *store.Users) http.HandlerFunc {
 			writeErr(w, http.StatusBadRequest, errors.New("bad user id"))
 			return
 		}
+		admin := isTenantAdmin(claims.Roles)
+		isSelf := claims.Subject == uid.String()
+		if !admin && !isSelf {
+			writeErr(w, http.StatusForbidden, errors.New("tenant-admin role required"))
+			return
+		}
 		var in updateUserReq
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		// Non-admins may not change roles (privilege escalation guard).
+		if in.Roles != nil && !admin {
+			writeErr(w, http.StatusForbidden, errors.New("only tenant-admin may change roles"))
 			return
 		}
 		if in.DisplayName != nil && *in.DisplayName != "" {
@@ -578,6 +642,84 @@ func deactivateUser(users *store.Users) http.HandlerFunc {
 			return
 		}
 		if err := users.Deactivate(r.Context(), tid, uid); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, http.StatusNotFound, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+type changePasswordReq struct {
+	CurrentPassword string `json:"current_password"`
+	Password        string `json:"password"`
+}
+
+// changePassword handles POST /v1/users/:id/password. A user changes their OWN
+// password: the caller must be authenticated, {id} must equal their subject,
+// and current_password must verify against the stored bcrypt hash before the
+// new hash is written. This is the authenticated self-service path — admin
+// resets go through the password-reset token flow. Returns 204 on success,
+// 403 when {id} is not the caller, 400 on a wrong current password or a weak
+// new password.
+func changePassword(users *store.Users) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := libauth.FromCtx(r.Context())
+		if !ok {
+			writeErr(w, http.StatusUnauthorized, errors.New("unauthenticated"))
+			return
+		}
+		tid, err := uuid.Parse(claims.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad tenant in claims"))
+			return
+		}
+		uid, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("bad user id"))
+			return
+		}
+		// Self-service only: a user may change only their own password.
+		if claims.Subject != uid.String() {
+			writeErr(w, http.StatusForbidden, errors.New("can only change your own password"))
+			return
+		}
+		var in changePasswordReq
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeErr(w, http.StatusBadRequest, err)
+			return
+		}
+		if in.CurrentPassword == "" || in.Password == "" {
+			writeErr(w, http.StatusBadRequest, errors.New("current_password and password required"))
+			return
+		}
+		u, err := users.FindByID(r.Context(), tid, uid)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, http.StatusNotFound, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		// Verify the current password before allowing the change.
+		if err := domain.CheckPassword(u.PasswordHash, in.CurrentPassword); err != nil {
+			writeErr(w, http.StatusBadRequest, errors.New("current password is incorrect"))
+			return
+		}
+		hash, err := domain.HashPassword(in.Password)
+		if err != nil {
+			if errors.Is(err, domain.ErrPasswordWeak) {
+				writeErr(w, http.StatusBadRequest, err)
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
+		if err := users.UpdatePassword(r.Context(), tid, uid, hash); err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
 				writeErr(w, http.StatusNotFound, err)
 				return

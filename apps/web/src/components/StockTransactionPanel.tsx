@@ -5,29 +5,46 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { Button, Input } from "@pmplatform/ui-kit";
 import { postTransaction } from "@/lib/api/inventory";
+import { listItems, type Item } from "@/lib/api/mfg";
 import { useAuth } from "@/lib/auth/AuthProvider";
 
 interface Props {
-  itemId: string;
-  itemName: string;
+  /** Pre-selected item. When omitted the panel renders an item picker. */
+  itemId?: string;
+  itemName?: string;
+  /** Optional preset transaction type (used by the global Receive/Issue actions). */
+  initialTxnType?: TxnType;
   onClose: () => void;
 }
 
 type TxnType = "receive" | "issue" | "adjust";
 
-export function StockTransactionPanel({ itemId, itemName, onClose }: Props) {
+export function StockTransactionPanel({ itemId, itemName, initialTxnType, onClose }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [txnType, setTxnType] = useState<TxnType>("receive");
+  const [txnType, setTxnType] = useState<TxnType>(initialTxnType ?? "receive");
   const [qty, setQty] = useState("");
   const [lotNumber, setLotNumber] = useState("");
   const [location, setLocation] = useState("default");
   const [note, setNote] = useState("");
 
+  // Item picker (only used when no itemId was passed in).
+  const [pickedItemId, setPickedItemId] = useState("");
+  const [pickedItemName, setPickedItemName] = useState("");
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemResults, setItemResults] = useState<Item[]>([]);
+
+  const effectiveItemId = itemId ?? pickedItemId;
+
+  async function searchItem(q: string) {
+    if (!q.trim()) { setItemResults([]); return; }
+    try { const r = await listItems({ q, limit: 10 }); setItemResults(r.items); } catch { /* noop */ }
+  }
+
   const mutation = useMutation({
     mutationFn: () =>
       postTransaction({
-        itemId,
+        itemId: effectiveItemId,
         lotNumber,
         location,
         note,
@@ -53,7 +70,7 @@ export function StockTransactionPanel({ itemId, itemName, onClose }: Props) {
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
           <p className="text-sm font-semibold">Stock Transaction</p>
-          <p className="text-xs text-fgMuted">{itemName}</p>
+          <p className="text-xs text-fgMuted">{itemName ?? pickedItemName ?? "Select an item"}</p>
         </div>
         <button onClick={onClose} className="text-fgMuted hover:text-fg">
           <X size={18} />
@@ -62,6 +79,38 @@ export function StockTransactionPanel({ itemId, itemName, onClose }: Props) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Item picker (only when no item was pre-selected) */}
+        {!itemId && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-fgMuted">Item *</label>
+            <div className="relative">
+              <Input
+                placeholder="Search item code or name…"
+                value={itemQuery}
+                onChange={(e) => { setItemQuery(e.target.value); void searchItem(e.target.value); }}
+              />
+              {itemResults.length > 0 && (
+                <ul className="absolute left-0 top-full z-30 mt-1 w-full rounded-sm border border-line bg-surface shadow-pop">
+                  {itemResults.map((it) => (
+                    <li
+                      key={it.id}
+                      className="cursor-pointer px-3 py-1.5 text-xs hover:bg-surface-2"
+                      onClick={() => {
+                        setPickedItemId(it.id);
+                        setPickedItemName(`${it.code} — ${it.name}`);
+                        setItemQuery(`${it.code} — ${it.name}`);
+                        setItemResults([]);
+                      }}
+                    >
+                      <span className="font-mono">{it.code}</span> — {it.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Transaction type */}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-fgMuted uppercase tracking-wide">
@@ -133,7 +182,7 @@ export function StockTransactionPanel({ itemId, itemName, onClose }: Props) {
         <Button
           variant="primary"
           disabled={
-            !qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0 || mutation.isPending
+            !effectiveItemId || !qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0 || mutation.isPending
           }
           onClick={() => mutation.mutate()}
         >

@@ -36,34 +36,41 @@ export interface Dependency {
   lagDays: number;
 }
 
-function get(raw: Record<string, unknown>, k: string) {
-  return raw[k] ?? raw[k[0].toUpperCase() + k.slice(1)];
-}
-
+// Backend is canonical snake_case — map once, cleanly.
 export function normTask(raw: Record<string, unknown>): Task {
   return {
-    id:           String(get(raw, "id") ?? raw["ID"] ?? ""),
-    tenantId:     String(get(raw, "tenantId") ?? raw["TenantID"] ?? raw["tenant_id"] ?? ""),
-    projectId:    String(get(raw, "projectId") ?? raw["ProjectID"] ?? raw["project_id"] ?? ""),
-    parentId:     (get(raw, "parentId") ?? raw["ParentID"] ?? raw["parent_id"]) as string | null | undefined,
-    code:         String(get(raw, "code")),
-    title:        String(get(raw, "title")),
-    description:  String(get(raw, "description") ?? ""),
-    type:         (get(raw, "type") ?? "task") as TaskType,
-    status:       (get(raw, "status") ?? "todo") as TaskStatus,
-    priority:     (get(raw, "priority") ?? "med") as TaskPriority,
-    assigneeId:   (get(raw, "assigneeId") ?? raw["AssigneeID"] ?? raw["assignee_id"]) as string | null | undefined,
-    reviewerId:   (get(raw, "reviewerId") ?? raw["ReviewerID"] ?? raw["reviewer_id"]) as string | null | undefined,
-    estimateMd:   Number(get(raw, "estimateMd") ?? raw["EstimateMd"] ?? raw["estimate_md"] ?? 0),
-    actualMd:     Number(get(raw, "actualMd")   ?? raw["ActualMd"]   ?? raw["actual_md"]   ?? 0),
-    progressPct:  Number(get(raw, "progressPct") ?? raw["ProgressPct"] ?? raw["progress_pct"] ?? 0),
-    startDate:    (get(raw, "startDate") ?? raw["StartDate"] ?? raw["start_date"]) as string | null | undefined,
-    dueDate:      (get(raw, "dueDate")   ?? raw["DueDate"]   ?? raw["due_date"])   as string | null | undefined,
-    sortOrder:    Number(get(raw, "sortOrder") ?? raw["SortOrder"] ?? raw["sort_order"] ?? 0),
-    tags:         (get(raw, "tags") ?? []) as string[],
-    createdAt:    String(get(raw, "createdAt") ?? raw["CreatedAt"] ?? ""),
-    updatedAt:    String(get(raw, "updatedAt") ?? raw["UpdatedAt"] ?? ""),
-    version:      Number(get(raw, "version") ?? 1),
+    id:          String(raw["id"] ?? ""),
+    tenantId:    String(raw["tenant_id"] ?? ""),
+    projectId:   String(raw["project_id"] ?? ""),
+    parentId:    (raw["parent_id"] ?? null) as string | null,
+    code:        String(raw["code"] ?? ""),
+    title:       String(raw["title"] ?? ""),
+    description: String(raw["description"] ?? ""),
+    type:        (raw["type"] ?? "task") as TaskType,
+    status:      (raw["status"] ?? "todo") as TaskStatus,
+    priority:    (raw["priority"] ?? "med") as TaskPriority,
+    assigneeId:  (raw["assignee_id"] ?? null) as string | null,
+    reviewerId:  (raw["reviewer_id"] ?? null) as string | null,
+    estimateMd:  Number(raw["estimate_md"] ?? 0),
+    actualMd:    Number(raw["actual_md"] ?? 0),
+    progressPct: Number(raw["progress_pct"] ?? 0),
+    startDate:   (raw["start_date"] ?? null) as string | null,
+    dueDate:     (raw["due_date"] ?? null) as string | null,
+    sortOrder:   Number(raw["sort_order"] ?? 0),
+    tags:        (raw["tags"] as string[] | null) ?? [],
+    createdAt:   String(raw["created_at"] ?? ""),
+    updatedAt:   String(raw["updated_at"] ?? ""),
+    version:     Number(raw["version"] ?? 1),
+  };
+}
+
+function normDep(raw: Record<string, unknown>): Dependency {
+  return {
+    id:            String(raw["id"] ?? ""),
+    predecessorId: String(raw["predecessor_id"] ?? ""),
+    successorId:   String(raw["successor_id"] ?? ""),
+    type:          (raw["type"] ?? "fs") as DepType,
+    lagDays:       Number(raw["lag_days"] ?? 0),
   };
 }
 
@@ -161,36 +168,104 @@ export async function deleteTask(id: string, version: number): Promise<void> {
   }
 }
 
+// ─── Dependencies ───────────────────────────────────────────────────────────────
+// POST /v1/tasks/{successorId}/dependencies  body {predecessor_id, type, lag_days}
+
 export interface CreateDependencyInput { predecessor_id: string; type?: DepType; lag_days?: number; }
-export async function addDependency(taskId: string, input: CreateDependencyInput): Promise<Dependency> {
-  const r = await fetch(`/api/tasks/${taskId}/dependencies`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+
+export async function addDependency(successorTaskId: string, input: CreateDependencyInput): Promise<Dependency> {
+  const r = await fetch(`/api/tasks/${successorTaskId}/dependencies`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ predecessor_id: input.predecessor_id, type: input.type ?? "fs", lag_days: input.lag_days ?? 0 }),
+  });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error((e as Record<string, string>).error ?? `dep add failed: ${r.status}`);
   }
-  const raw = await r.json() as Record<string, unknown>;
-  return {
-    id: String(raw["id"] ?? raw["ID"]),
-    predecessorId: String(raw["predecessorId"] ?? raw["PredecessorID"] ?? raw["predecessor_id"]),
-    successorId: String(raw["successorId"] ?? raw["SuccessorID"] ?? raw["successor_id"]),
-    type: (raw["type"] ?? raw["Type"]) as DepType,
-    lagDays: Number(raw["lagDays"] ?? raw["LagDays"] ?? raw["lag_days"] ?? 0),
-  };
+  return normDep(await r.json() as Record<string, unknown>);
 }
+
 export async function removeDependency(depId: string): Promise<void> {
   const r = await fetch(`/api/dependencies/${depId}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(`dep remove failed: ${r.status}`);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e as Record<string, string>).error ?? `dep remove failed: ${r.status}`);
+  }
 }
 
 export async function listDepsForProject(projectId: string): Promise<Dependency[]> {
   const r = await fetch(`/api/projects/${projectId}/task-dependencies`);
   if (!r.ok) return [];
-  const raw = await r.json() as Record<string, unknown>[];
-  return (raw ?? []).map(d => ({
-    id:            String(d["id"] ?? ""),
-    predecessorId: String(d["predecessorId"] ?? ""),
-    successorId:   String(d["successorId"] ?? ""),
-    type:          (d["type"] ?? "fs") as DepType,
-    lagDays:       Number(d["lagDays"] ?? 0),
-  }));
+  const body = await r.json();
+  const arr = (body.items ?? body) as Record<string, unknown>[] | null;
+  return (arr ?? []).map(normDep);
+}
+
+// ─── Task comments ──────────────────────────────────────────────────────────────
+// GET/POST /v1/tasks/{id}/comments ; PATCH/DELETE /v1/comments/{id}
+
+export interface TaskComment {
+  id: string;
+  tenantId: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function normComment(raw: Record<string, unknown>): TaskComment {
+  return {
+    id:        String(raw["id"] ?? ""),
+    tenantId:  String(raw["tenant_id"] ?? ""),
+    taskId:    String(raw["task_id"] ?? ""),
+    authorId:  String(raw["author_id"] ?? ""),
+    body:      String(raw["body"] ?? ""),
+    version:   Number(raw["version"] ?? 1),
+    createdAt: String(raw["created_at"] ?? ""),
+    updatedAt: String(raw["updated_at"] ?? ""),
+  };
+}
+
+export async function listComments(taskId: string): Promise<TaskComment[]> {
+  const r = await fetch(`/api/tasks/${taskId}/comments`);
+  if (!r.ok) throw new Error(`list comments failed: ${r.status}`);
+  const body = await r.json();
+  return ((body.items as Record<string, unknown>[] | null) ?? []).map(normComment);
+}
+
+export async function createComment(taskId: string, authorId: string, body: string): Promise<TaskComment> {
+  const r = await fetch(`/api/tasks/${taskId}/comments`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body, author_id: authorId }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e as Record<string, string>).error ?? `create comment failed: ${r.status}`);
+  }
+  return normComment(await r.json());
+}
+
+export async function updateComment(commentId: string, body: string, version: number): Promise<TaskComment> {
+  const r = await fetch(`/api/pm/comments/${commentId}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body, version }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e as Record<string, string>).error ?? `update comment failed: ${r.status}`);
+  }
+  return normComment(await r.json());
+}
+
+export async function deleteComment(commentId: string, version: number): Promise<void> {
+  const r = await fetch(`/api/pm/comments/${commentId}?version=${version}`, { method: "DELETE" });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error((e as Record<string, string>).error ?? `delete comment failed: ${r.status}`);
+  }
 }

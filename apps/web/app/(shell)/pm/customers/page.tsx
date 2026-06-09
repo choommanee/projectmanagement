@@ -65,6 +65,7 @@ function CustomerDialog({
             phone: form.phone,
             billing_address: form.billing_address,
             active: form.active,
+            version: initial.version,
           })
         : await createCustomer({
             code: form.code,
@@ -160,7 +161,7 @@ function DeleteDialog({ customer, onClose, onDeleted }: { customer: Customer; on
     setLoading(true);
     setErr(null);
     try {
-      await deleteCustomer(customer.id);
+      await deleteCustomer(customer.id, customer.version);
       onDeleted();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");

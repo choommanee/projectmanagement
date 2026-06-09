@@ -58,6 +58,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 	r.Route("/v1", func(r chi.Router) {
 		// UOMs
 		r.Get("/uoms", listUOMs(svc))
+		r.With(libauth.RequireAction(authz, "mfg.uom.delete", "*")).Delete("/uoms/{id}", deleteUOM(svc))
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "mfg.uom.create", "*")).Post("/uoms", createUOM(svc))
 		r.Get("/uoms/{id}", getUOM(svc))
@@ -101,7 +102,9 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		r.With(libauth.RequireActionScoped(authz, "mfg.bom.delete_line", "BOMLine::{:id}", loaderOpts...)).Delete("/bom-lines/{id}", deleteBOMLine(svc))
 
 		// Routings standalone
+		r.Get("/routings", listAllRoutings(svc))
 		r.Get("/routings/{id}", getRouting(svc))
+		r.Get("/routings/{id}/operations", listRoutingOps(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.routing.update", "Routing::{:id}", loaderOpts...)).Patch("/routings/{id}", updateRouting(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.routing.add_operation", "Routing::{:id}", loaderOpts...)).Post("/routings/{id}/operations", addRoutingOp(svc))
 
@@ -122,9 +125,13 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 
 		// Lots standalone
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
+		r.Get("/lots", listAllLots(svc))
 		r.With(libauth.RequireAction(authz, "mfg.lot.create", "*")).Post("/lots", createLot(svc))
+		r.Get("/lots/{id}", getLot(svc))
+		r.With(libauth.RequireActionScoped(authz, "mfg.lot.update_status", "Lot::{:id}", loaderOpts...)).Patch("/lots/{id}", updateLot(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.lot.delete", "Lot::{:id}", loaderOpts...)).Delete("/lots/{id}", deleteLot(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.lot.update_status", "Lot::{:id}", loaderOpts...)).Patch("/lots/{id}/status", updateLotStatus(svc))
+		r.Get("/lots/{id}/genealogy", listLotGenealogy(svc))
 		r.With(libauth.RequireActionScoped(authz, "mfg.lot.add_genealogy", "Lot::{:id}", loaderOpts...)).Post("/lots/{id}/genealogy", addLotGenealogy(svc))
 		r.Get("/lots/{id}/trace", traceLot(svc))
 
@@ -207,6 +214,7 @@ func createUOM(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.uom.create", "uom", u.ID.String())
 		writeJSON(w, 201, u)
 	}
 }
@@ -247,6 +255,30 @@ func listUOMs(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
+	}
+}
+
+func deleteUOM(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Items.DeleteUOM(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		auditWrite(svc, r, tid, "mfg.uom.delete", "uom", id.String())
+		w.WriteHeader(204)
 	}
 }
 
@@ -295,6 +327,7 @@ func createItem(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.item.create", "item", it.ID.String())
 		writeJSON(w, 201, it)
 	}
 }
@@ -416,6 +449,7 @@ func updateItem(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.item.update", "item", it.ID.String())
 		writeJSON(w, 200, it)
 	}
 }
@@ -444,6 +478,7 @@ func deleteItem(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.item.delete", "item", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -455,6 +490,7 @@ type createWCReq struct {
 	Name              string         `json:"name"`
 	Type              domain.WCType  `json:"type,omitempty"`
 	CapacityPerDayHrs float64        `json:"capacity_per_day_hrs,omitempty"`
+	MachineCount      int            `json:"machine_count,omitempty"`
 }
 
 func createWorkCenter(svc *service.Service) http.HandlerFunc {
@@ -474,6 +510,7 @@ func createWorkCenter(svc *service.Service) http.HandlerFunc {
 			Name:              req.Name,
 			Type:              req.Type,
 			CapacityPerDayHrs: req.CapacityPerDayHrs,
+			MachineCount:      req.MachineCount,
 		})
 		if err != nil {
 			if errors.Is(err, domain.ErrInvalidInput) {
@@ -483,6 +520,7 @@ func createWorkCenter(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.work_center.create", "work_center", wc.ID.String())
 		writeJSON(w, 201, wc)
 	}
 }
@@ -530,6 +568,7 @@ type updateWCReq struct {
 	Name              string            `json:"name,omitempty"`
 	Type              domain.WCType     `json:"type,omitempty"`
 	CapacityPerDayHrs *float64          `json:"capacity_per_day_hrs,omitempty"`
+	MachineCount      *int              `json:"machine_count,omitempty"`
 	Status            domain.ItemStatus `json:"status,omitempty"`
 	Version           int               `json:"version"`
 }
@@ -568,6 +607,9 @@ func updateWorkCenter(svc *service.Service) http.HandlerFunc {
 		if req.CapacityPerDayHrs != nil {
 			wc.CapacityPerDayHrs = *req.CapacityPerDayHrs
 		}
+		if req.MachineCount != nil {
+			wc.MachineCount = *req.MachineCount
+		}
 		if req.Status != "" {
 			wc.Status = req.Status
 		}
@@ -580,6 +622,7 @@ func updateWorkCenter(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.work_center.update", "work_center", wc.ID.String())
 		writeJSON(w, 200, wc)
 	}
 }
@@ -603,6 +646,7 @@ func deleteWorkCenter(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.work_center.delete", "work_center", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -637,6 +681,7 @@ func createBOM(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.bom.create", "bom", h.ID.String())
 		writeJSON(w, 201, h)
 	}
 }
@@ -686,7 +731,7 @@ func listBOMs(svc *service.Service) http.HandlerFunc {
 }
 
 type updateBOMReq struct {
-	IsDefault bool              `json:"is_default,omitempty"`
+	IsDefault *bool             `json:"is_default,omitempty"`
 	Status    domain.BOMStatus  `json:"status,omitempty"`
 	Notes     string            `json:"notes,omitempty"`
 }
@@ -722,10 +767,15 @@ func updateBOM(svc *service.Service) http.HandlerFunc {
 		if req.Status != "" {
 			h.Status = req.Status
 		}
+		if req.IsDefault != nil {
+			h.IsDefault = *req.IsDefault
+		}
 		if err := svc.BOMs.UpdateHeader(r.Context(), h); err != nil {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.bom.update", "bom", h.ID.String(),
+			map[string]any{"status": string(h.Status)})
 		writeJSON(w, 200, h)
 	}
 }
@@ -749,6 +799,7 @@ func activateBOM(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.bom.activate", "bom", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -796,6 +847,7 @@ func addBOMLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.bom.add_line", "bom_line", l.ID.String())
 		writeJSON(w, 201, l)
 	}
 }
@@ -835,6 +887,7 @@ func updateBOMLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.bom.update_line", "bom_line", l.ID.String())
 		writeJSON(w, 200, l)
 	}
 }
@@ -858,6 +911,7 @@ func deleteBOMLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.bom.delete_line", "bom_line", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -918,6 +972,7 @@ func createRouting(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.routing.create", "routing", h.ID.String())
 		writeJSON(w, 201, h)
 	}
 }
@@ -943,6 +998,51 @@ func getRouting(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, h)
+	}
+}
+
+// listAllRoutings serves GET /v1/routings (tenant-wide, optional item_id/status filter).
+func listAllRoutings(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		opts := store.ListRoutingsOpts{Status: r.URL.Query().Get("status")}
+		if v := r.URL.Query().Get("item_id"); v != "" {
+			if iid, err := uuid.Parse(v); err == nil {
+				opts.ItemID = &iid
+			}
+		}
+		opts.Limit, _ = strconv.Atoi(r.URL.Query().Get("limit"))
+		opts.Offset, _ = strconv.Atoi(r.URL.Query().Get("offset"))
+		headers, err := svc.Routings.List(r.Context(), tid, opts)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": headers, "total": len(headers)})
+	}
+}
+
+// listRoutingOps serves GET /v1/routings/{id}/operations.
+func listRoutingOps(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		ops, err := svc.Routings.ListByRouting(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": ops, "total": len(ops)})
 	}
 }
 
@@ -1006,6 +1106,8 @@ func updateRouting(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.routing.update", "routing", h.ID.String(),
+			map[string]any{"status": string(h.Status)})
 		writeJSON(w, 200, h)
 	}
 }
@@ -1047,6 +1149,7 @@ func addRoutingOp(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.routing.add_operation", "routing_operation", op.ID.String())
 		writeJSON(w, 201, op)
 	}
 }
@@ -1084,6 +1187,7 @@ func updateRoutingOp(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.routing.update_operation", "routing_operation", op.ID.String())
 		writeJSON(w, 200, op)
 	}
 }
@@ -1107,6 +1211,7 @@ func deleteRoutingOp(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.routing.delete_operation", "routing_operation", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -1121,6 +1226,7 @@ type createWOReq struct {
 	Priority      domain.WOPriority `json:"priority,omitempty"`
 	DueDate       *string           `json:"due_date,omitempty"` // "YYYY-MM-DD"
 	WorkCenterID  *uuid.UUID        `json:"work_center_id,omitempty"`
+	SourceSoID    *uuid.UUID        `json:"source_so_id,omitempty"`
 	Notes         string            `json:"notes,omitempty"`
 }
 
@@ -1154,6 +1260,7 @@ func createWorkOrder(svc *service.Service) http.HandlerFunc {
 			Status:       req.Status,
 			Priority:     req.Priority,
 			WorkCenterID: req.WorkCenterID,
+			SourceSoID:   req.SourceSoID,
 			Notes:        req.Notes,
 			Version:      1,
 		}
@@ -1167,6 +1274,8 @@ func createWorkOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.work_order.create", "work_order", wo.ID.String(),
+			map[string]any{"status": string(wo.Status), "code": wo.Code})
 		writeJSON(w, 201, wo)
 	}
 }
@@ -1211,8 +1320,14 @@ func listWorkOrders(svc *service.Service) http.HandlerFunc {
 				itemID = &id
 			}
 		}
+		var sourceSoID *uuid.UUID
+		if sStr := r.URL.Query().Get("source_so_id"); sStr != "" {
+			if id, err := uuid.Parse(sStr); err == nil {
+				sourceSoID = &id
+			}
+		}
 		items, total, err := svc.WorkOrders.List(r.Context(), tid, store.ListWOOpts{
-			Status: status, Q: q, ItemID: itemID, Limit: limit, Offset: offset,
+			Status: status, Q: q, ItemID: itemID, SourceSoID: sourceSoID, Limit: limit, Offset: offset,
 		})
 		if err != nil {
 			writeErr(w, 500, err)
@@ -1227,8 +1342,10 @@ type updateWOReq struct {
 	Priority     domain.WOPriority `json:"priority,omitempty"`
 	DueDate      *string           `json:"due_date,omitempty"`
 	Notes        string            `json:"notes,omitempty"`
-	// WorkCenterID uses json.RawMessage so we can distinguish null (clear) from absent (keep).
+	// WorkCenterID/SourceSoID use json.RawMessage so we can distinguish
+	// null (clear) from absent (keep).
 	WorkCenterID json.RawMessage   `json:"work_center_id,omitempty"`
+	SourceSoID   json.RawMessage   `json:"source_so_id,omitempty"`
 	Version      int               `json:"version"`
 }
 
@@ -1283,6 +1400,17 @@ func updateWorkOrder(svc *service.Service) http.HandlerFunc {
 				}
 			}
 		}
+		if len(req.SourceSoID) > 0 {
+			// "null" → clear; "\"<uuid>\"" → set; "\"\"" → clear
+			var soRaw *string
+			if jerr := json.Unmarshal(req.SourceSoID, &soRaw); jerr == nil {
+				if soRaw == nil || *soRaw == "" {
+					wo.SourceSoID = nil
+				} else if soID, perr := uuid.Parse(*soRaw); perr == nil {
+					wo.SourceSoID = &soID
+				}
+			}
+		}
 		wo.Version = req.Version
 		if err := svc.WorkOrders.Update(r.Context(), wo); err != nil {
 			if errors.Is(err, domain.ErrConflict) {
@@ -1292,6 +1420,8 @@ func updateWorkOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.work_order.update", "work_order", wo.ID.String(),
+			map[string]any{"status": string(wo.Status)})
 		writeJSON(w, 200, wo)
 	}
 }
@@ -1320,6 +1450,7 @@ func deleteWorkOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.work_order.delete", "work_order", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -1362,6 +1493,8 @@ func releaseWorkOrder(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.work_order.release", "work_order", wo.ID.String(),
+			map[string]any{"status": string(wo.Status)})
 		writeJSON(w, 200, wo)
 	}
 }
@@ -1414,6 +1547,7 @@ type createLotReq struct {
 	QtyOnHand   float64          `json:"qty_on_hand"`
 	Status      domain.LotStatus `json:"status,omitempty"`
 	SourceWOID  *uuid.UUID       `json:"source_wo_id,omitempty"`
+	Notes       string           `json:"notes,omitempty"`
 }
 
 func createLot(svc *service.Service) http.HandlerFunc {
@@ -1437,11 +1571,13 @@ func createLot(svc *service.Service) http.HandlerFunc {
 			QtyOnHand:  req.QtyOnHand,
 			Status:     req.Status,
 			SourceWOID: req.SourceWOID,
+			Notes:      req.Notes,
 		}
 		if err := svc.WorkOrders.CreateLot(r.Context(), lot); err != nil {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.lot.create", "lot", lot.ID.String())
 		writeJSON(w, 201, lot)
 	}
 }
@@ -1463,6 +1599,131 @@ func listLots(svc *service.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"items": lots, "total": len(lots)})
+	}
+}
+
+// listAllLots serves GET /v1/lots (tenant-wide, optional item_id/status filter).
+func listAllLots(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		opts := store.ListLotsOpts{Status: r.URL.Query().Get("status")}
+		if v := r.URL.Query().Get("item_id"); v != "" {
+			if iid, err := uuid.Parse(v); err == nil {
+				opts.ItemID = &iid
+			}
+		}
+		opts.Limit, _ = strconv.Atoi(r.URL.Query().Get("limit"))
+		opts.Offset, _ = strconv.Atoi(r.URL.Query().Get("offset"))
+		lots, err := svc.WorkOrders.ListLots(r.Context(), tid, opts)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"items": lots, "total": len(lots)})
+	}
+}
+
+func getLot(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		lot, err := svc.WorkOrders.GetLot(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, lot)
+	}
+}
+
+type updateLotReq struct {
+	Status    *domain.LotStatus `json:"status,omitempty"`
+	Notes     *string           `json:"notes,omitempty"`
+	QtyOnHand *float64          `json:"qty_on_hand,omitempty"`
+}
+
+// updateLot serves PATCH /v1/lots/{id} — mutates status, notes, and/or qty_on_hand.
+func updateLot(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req updateLotReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		lot, err := svc.WorkOrders.GetLot(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		if req.Status != nil {
+			lot.Status = *req.Status
+		}
+		if req.Notes != nil {
+			lot.Notes = *req.Notes
+		}
+		if req.QtyOnHand != nil {
+			lot.QtyOnHand = *req.QtyOnHand
+		}
+		if err := svc.WorkOrders.UpdateLot(r.Context(), lot); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		auditWriteMeta(svc, r, tid, "mfg.lot.update_status", "lot", lot.ID.String(),
+			map[string]any{"status": string(lot.Status)})
+		writeJSON(w, 200, lot)
+	}
+}
+
+// listLotGenealogy serves GET /v1/lots/{id}/genealogy — the component (parent)
+// lots that compose the given lot.
+func listLotGenealogy(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		comps, err := svc.Genealogy.ListComponents(r.Context(), tid, id)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"components": comps, "total": len(comps)})
 	}
 }
 
@@ -1489,6 +1750,7 @@ func deleteLot(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.lot.delete", "lot", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -1517,6 +1779,8 @@ func updateLotStatus(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.lot.update_status", "lot", id.String(),
+			map[string]any{"status": string(req.Status)})
 		w.WriteHeader(204)
 	}
 }
@@ -1546,6 +1810,7 @@ func createMRPRun(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.mrp.run", "mrp_run", run.ID.String())
 		writeJSON(w, 201, run)
 	}
 }
@@ -1703,6 +1968,8 @@ func addLotGenealogy(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.lot.add_genealogy", "lot", childID.String(),
+			map[string]any{"parent_lot_id": req.ParentLotID.String()})
 		writeJSON(w, 201, map[string]string{"status": "ok"})
 	}
 }

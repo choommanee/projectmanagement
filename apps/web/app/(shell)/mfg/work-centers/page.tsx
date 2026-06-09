@@ -330,8 +330,8 @@ export default function WorkCentersPage() {
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => setDialogWC(wc)}>Edit</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(wc)}>Delete</Button>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDialogWC(wc); }}>Edit</Button>
+                          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteTarget(wc); }}>Delete</Button>
                         </div>
                       </td>
                     </tr>

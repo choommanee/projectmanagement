@@ -33,6 +33,10 @@ func policyReloadPool(t *testing.T) *pgxpool.Pool {
 		p.Close()
 		t.Skipf("postgres ping failed: %v", err)
 	}
+	// Close registered FIRST so it runs AFTER per-test signing_key cleanups
+	// (t.Cleanup is LIFO). A `defer p.Close()` at the call site closed the pool
+	// before the cleanups ran, silently leaking test keys into the shared DB.
+	t.Cleanup(p.Close)
 	return p
 }
 
@@ -96,7 +100,7 @@ when { context.roles.contains("platform-admin") };
 
 func TestPolicyReload_AllowsPlatformAdmin(t *testing.T) {
 	p := policyReloadPool(t)
-	defer p.Close()
+	lockSigningKeys(t, p)
 	ensurePolicyBundleTable(t, p)
 	seedReloadBundle(t, p, "pmplatform-reload-allow", reloadBundleBody, 42)
 
@@ -170,7 +174,7 @@ func TestPolicyReload_AllowsPlatformAdmin(t *testing.T) {
 
 func TestPolicyReload_Denies403WithoutAdminRole(t *testing.T) {
 	p := policyReloadPool(t)
-	defer p.Close()
+	lockSigningKeys(t, p)
 	ensurePolicyBundleTable(t, p)
 	seedReloadBundle(t, p, "pmplatform-reload-deny", reloadBundleBody, 1)
 

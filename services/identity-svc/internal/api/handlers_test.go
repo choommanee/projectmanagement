@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -208,6 +209,146 @@ func TestLoginPopulatesRolesClaim(t *testing.T) {
 		t.Fatalf("expected roles to contain platform-admin, got %#v", rolesAny)
 	}
 	t.Logf("decoded JWT roles claim: %v", rolesAny)
+}
+
+// seedUser inserts an app_user with the given password and returns its id+email.
+func seedUser(t *testing.T, p *pgxpool.Pool, tid uuid.UUID, password string) (uuid.UUID, string) {
+	t.Helper()
+	ctx := context.Background()
+	pw, _ := domain.HashPassword(password)
+	uid := uuid.New()
+	email := "su-" + uuid.NewString()[:6] + "@test.com"
+	tx, _ := p.Begin(ctx)
+	_, _ = tx.Exec(ctx, "SET LOCAL app.current_tenant = '"+tid.String()+"'")
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO app_user(id, tenant_id, email, display_name, status, password_hash, version)
+         VALUES ($1,$2,$3,'Orig','active',$4,1)`, uid, tid, email, pw); err != nil {
+		tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return uid, email
+}
+
+// userRouter mounts the user-management routes with claims injected on every
+// request, so we can exercise the self-edit / change-password authz logic.
+func userRouter(users *store.Users, claims *libauth.ParsedClaims) http.Handler {
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req.WithContext(libauth.WithClaims(req.Context(), claims)))
+		})
+	})
+	r.Patch("/v1/users/{id}", updateUser(users))
+	r.Post("/v1/users/{id}/password", changePassword(users))
+	return r
+}
+
+func TestSelfEditDisplayNameNonAdmin(t *testing.T) {
+	_, p, tid, cleanup := setup(t)
+	defer cleanup()
+	users := store.NewUsers(p)
+	uid, _ := seedUser(t, p, tid, "VeryStrong#1")
+
+	// non-admin claims (no roles) editing OWN display_name -> allowed
+	claims := &libauth.ParsedClaims{Subject: uid.String(), TenantID: tid.String()}
+	h := userRouter(users, claims)
+
+	body, _ := json.Marshal(map[string]any{"display_name": "Renamed"})
+	req := httptest.NewRequest("PATCH", "/v1/users/"+uid.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("self display_name edit: want 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var name string
+	_ = p.QueryRow(context.Background(), "SELECT display_name FROM app_user WHERE id=$1", uid).Scan(&name)
+	if name != "Renamed" {
+		t.Fatalf("display_name not persisted, got %q", name)
+	}
+}
+
+func TestNonAdminCannotEditOthersOrRoles(t *testing.T) {
+	_, p, tid, cleanup := setup(t)
+	defer cleanup()
+	users := store.NewUsers(p)
+	uid, _ := seedUser(t, p, tid, "VeryStrong#1")
+	other, _ := seedUser(t, p, tid, "VeryStrong#2")
+
+	claims := &libauth.ParsedClaims{Subject: uid.String(), TenantID: tid.String()}
+	h := userRouter(users, claims)
+
+	// editing a different user -> 403
+	body, _ := json.Marshal(map[string]any{"display_name": "Hacked"})
+	req := httptest.NewRequest("PATCH", "/v1/users/"+other.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 403 {
+		t.Fatalf("cross-user edit: want 403 got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// self role change by non-admin -> 403 (privilege escalation guard)
+	body2, _ := json.Marshal(map[string]any{"roles": []string{"platform-admin"}})
+	req2 := httptest.NewRequest("PATCH", "/v1/users/"+uid.String(), bytes.NewReader(body2))
+	req2.Header.Set("Content-Type", "application/json")
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req2)
+	if rec2.Code != 403 {
+		t.Fatalf("self role change: want 403 got %d: %s", rec2.Code, rec2.Body.String())
+	}
+}
+
+func TestChangePasswordSelf(t *testing.T) {
+	_, p, tid, cleanup := setup(t)
+	defer cleanup()
+	users := store.NewUsers(p)
+	uid, _ := seedUser(t, p, tid, "VeryStrong#1")
+	other, _ := seedUser(t, p, tid, "VeryStrong#2")
+
+	claims := &libauth.ParsedClaims{Subject: uid.String(), TenantID: tid.String()}
+	h := userRouter(users, claims)
+
+	// wrong current password -> 400
+	b1, _ := json.Marshal(map[string]string{"current_password": "WRONG-pass-1", "password": "NewStrong#123"})
+	r1 := httptest.NewRequest("POST", "/v1/users/"+uid.String()+"/password", bytes.NewReader(b1))
+	r1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, r1)
+	if w1.Code != 400 {
+		t.Fatalf("wrong current: want 400 got %d: %s", w1.Code, w1.Body.String())
+	}
+
+	// correct current password -> 204
+	b2, _ := json.Marshal(map[string]string{"current_password": "VeryStrong#1", "password": "NewStrong#123"})
+	r2 := httptest.NewRequest("POST", "/v1/users/"+uid.String()+"/password", bytes.NewReader(b2))
+	r2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, r2)
+	if w2.Code != 204 {
+		t.Fatalf("change password: want 204 got %d: %s", w2.Code, w2.Body.String())
+	}
+	// new hash must verify
+	u, err := users.FindByID(context.Background(), tid, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := domain.CheckPassword(u.PasswordHash, "NewStrong#123"); err != nil {
+		t.Fatalf("new password does not verify: %v", err)
+	}
+
+	// changing another user's password -> 403
+	b3, _ := json.Marshal(map[string]string{"current_password": "VeryStrong#2", "password": "NewStrong#999"})
+	r3 := httptest.NewRequest("POST", "/v1/users/"+other.String()+"/password", bytes.NewReader(b3))
+	r3.Header.Set("Content-Type", "application/json")
+	w3 := httptest.NewRecorder()
+	h.ServeHTTP(w3, r3)
+	if w3.Code != 403 {
+		t.Fatalf("cross-user password: want 403 got %d: %s", w3.Code, w3.Body.String())
+	}
 }
 
 func TestJWKSEndpoint(t *testing.T) {

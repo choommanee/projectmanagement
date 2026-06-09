@@ -2,6 +2,9 @@ export interface UserSummary {
   id: string;
   display_name: string;
   email: string;
+  status?: string;
+  roles?: string[];
+  created_at?: string;
 }
 
 export interface IdentityUser {

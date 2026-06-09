@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"time"
 
@@ -13,6 +14,12 @@ import (
 	"github.com/pmplatform/services/sales-svc/internal/service"
 	"github.com/pmplatform/services/sales-svc/internal/store"
 )
+
+// vatRate is the default tax rate applied when deriving invoice totals from a
+// sales order's lines (Thai VAT, 7%).
+const vatRate = 0.07
+
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 type createInvoiceReq struct {
 	Code       string                `json:"code"`
@@ -42,15 +49,39 @@ func createInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, errors.New("customer_id required"))
 			return
 		}
+		subtotal, tax, total := req.Subtotal, req.Tax, req.Total
+		if req.SOID != nil {
+			// Derive amounts from the source sales order's lines.
+			so, err := svc.SalesOrders.GetByID(r.Context(), tid, *req.SOID)
+			if err != nil {
+				if errors.Is(err, domain.ErrNotFound) {
+					writeErr(w, 400, errors.New("so_id references unknown sales order"))
+					return
+				}
+				writeErr(w, 500, err)
+				return
+			}
+			subtotal = 0
+			for _, l := range so.Lines {
+				subtotal += l.QtyOrdered * l.UnitPrice
+			}
+			tax = round2(subtotal * vatRate)
+			total = round2(subtotal + tax)
+		} else {
+			// Standalone invoice: accept request amounts; derive total when omitted.
+			if total == 0 {
+				total = round2(subtotal + tax)
+			}
+		}
 		inv := &domain.SalesInvoice{
 			TenantID:   tid,
 			Code:       req.Code,
 			SOID:       req.SOID,
 			CustomerID: req.CustomerID,
 			Status:     req.Status,
-			Subtotal:   req.Subtotal,
-			Tax:        req.Tax,
-			Total:      req.Total,
+			Subtotal:   subtotal,
+			Tax:        tax,
+			Total:      total,
 			Notes:      req.Notes,
 		}
 		if req.IssueDate != nil {
@@ -67,6 +98,8 @@ func createInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.invoice.create", "sales_invoice", inv.ID.String(), nil,
+			map[string]any{"code": inv.Code, "status": inv.Status, "total": inv.Total})
 		writeJSON(w, 201, inv)
 	}
 }
@@ -193,6 +226,37 @@ func updateInvoice(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		action := "sales.invoice.update"
+		if req.Status != "" && req.Status != cur.Status {
+			action = "sales.invoice.status"
+		}
+		emitAudit(svc, r, action, "sales_invoice", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": inv.Status})
 		writeJSON(w, 200, inv)
+	}
+}
+
+func deleteInvoice(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Invoices.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.invoice.delete", "sales_invoice", id.String(), nil, nil)
+		w.WriteHeader(204)
 	}
 }

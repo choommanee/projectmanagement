@@ -27,15 +27,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   return new NextResponse(await r.text(), { status: r.status, headers: { "content-type": "application/json" } });
 }
 
-export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const h = await makeHeaders();
   if (h instanceof NextResponse) return h;
-  // Backend has no hard-delete for opportunities; mark as lost
-  h.set("content-type", "application/json");
-  const r = await fetch(`${SALES_URL}/v1/opportunities/${id}`, {
-    method: "PATCH", headers: h,
-    body: JSON.stringify({ stage: "lost" }),
+  const qs = new URL(req.url).search;
+  const r = await fetch(`${SALES_URL}/v1/opportunities/${id}${qs}`, { method: "DELETE", headers: h });
+  return new NextResponse(r.status === 204 ? null : await r.text(), {
+    status: r.status,
+    headers: r.status !== 204 ? { "content-type": "application/json" } : {},
   });
-  return new NextResponse(r.status === 204 ? null : await r.text(), { status: r.status === 200 ? 204 : r.status });
 }

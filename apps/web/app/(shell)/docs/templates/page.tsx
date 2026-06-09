@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag } from "@pmplatform/ui-kit";
+import { Button, Tag } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { listTemplates, type Template, type DocumentType } from "@/lib/api/documents";
+import { TemplateEditorDialog } from "./TemplateEditorDialog";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   project_charter: "Project Charter", status_report: "Status Report",
@@ -50,10 +51,11 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noApi, setNoApi] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
-  useEffect(() => {
+  function reload() {
     listTemplates()
-      .then(setTemplates)
+      .then((t) => { setTemplates(t); setNoApi(false); setError(null); })
       .catch((e: unknown) => {
         const msg = (e as Error).message ?? "";
         // 404 / not implemented → show coming-soon placeholder
@@ -64,16 +66,21 @@ export default function TemplatesPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { reload(); }, []);
 
   return (
     <div className="flex h-full flex-col">
       <Breadcrumb items={[{ label: "Document Hub", href: "/docs/home" }, { label: "Templates" }]} />
 
       <div className="flex-1 overflow-auto p-6">
-        <div className="mb-5">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-ink-3">Content</p>
-          <h1 className="mt-0.5 text-xl font-semibold text-ink">Templates</h1>
+        <div className="mb-5 flex items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-ink-3">Content</p>
+            <h1 className="mt-0.5 text-xl font-semibold text-ink">Templates</h1>
+          </div>
+          <Button variant="primary" onClick={() => setShowCreate(true)}>New Template</Button>
         </div>
 
         {error && (
@@ -86,13 +93,21 @@ export default function TemplatesPage() {
               <div key={n} className="h-10 animate-pulse rounded-xs bg-surface-2" />
             ))}
           </div>
-        ) : noApi || templates.length === 0 ? (
+        ) : noApi ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed border-line py-24 text-center">
             <span className="font-mono text-[10px] uppercase tracking-wider text-ink-3">Coming Soon</span>
             <p className="max-w-sm text-sm text-ink-3">
               Templates are not yet available. Once document-svc exposes the templates API,
               system-provided and custom templates will appear here for one-click document creation.
             </p>
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed border-line py-24 text-center">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-ink-3">No Templates Yet</span>
+            <p className="max-w-sm text-sm text-ink-3">
+              Create a reusable template once, then spin up new documents from it with one click.
+            </p>
+            <Button variant="primary" onClick={() => setShowCreate(true)}>New Template</Button>
           </div>
         ) : (
           <div className="rounded-sm border border-line bg-surface shadow-xs overflow-hidden">
@@ -140,6 +155,13 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
+
+      <TemplateEditorDialog
+        open={showCreate}
+        mode="create"
+        onClose={() => setShowCreate(false)}
+        onSaved={(t) => { setShowCreate(false); router.push("/docs/templates/" + t.id); }}
+      />
     </div>
   );
 }

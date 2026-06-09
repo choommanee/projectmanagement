@@ -38,14 +38,14 @@ func (s *PurchaseOrders) withTenant(ctx context.Context, tid uuid.UUID, fn func(
 
 const poSelect = `
     SELECT id, tenant_id, po_number, supplier_id, status,
-           order_date, expected_date, notes, created_by,
+           order_date, expected_date, source_so_id, notes, created_by,
            created_at, updated_at, version
     FROM purchase_order`
 
 func scanPO(row interface{ Scan(...any) error }, po *domain.PurchaseOrder) error {
 	return row.Scan(
 		&po.ID, &po.TenantID, &po.PONumber, &po.SupplierID, &po.Status,
-		&po.OrderDate, &po.ExpectedDate, &po.Notes, &po.CreatedBy,
+		&po.OrderDate, &po.ExpectedDate, &po.SourceSoID, &po.Notes, &po.CreatedBy,
 		&po.CreatedAt, &po.UpdatedAt, &po.Version,
 	)
 }
@@ -56,10 +56,10 @@ func (s *PurchaseOrders) Create(ctx context.Context, po *domain.PurchaseOrder) e
 		_, err := tx.Exec(ctx, `
 			INSERT INTO purchase_order(
 			    id, tenant_id, po_number, supplier_id, status,
-			    order_date, expected_date, notes, created_by, version)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			    order_date, expected_date, source_so_id, notes, created_by, version)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
 			po.ID, po.TenantID, po.PONumber, po.SupplierID, po.Status,
-			po.OrderDate, po.ExpectedDate, po.Notes, po.CreatedBy, po.Version,
+			po.OrderDate, po.ExpectedDate, po.SourceSoID, po.Notes, po.CreatedBy, po.Version,
 		)
 		return err
 	})
@@ -95,6 +95,7 @@ func (s *PurchaseOrders) GetByID(ctx context.Context, tid, id uuid.UUID) (*domai
 type ListPOOpts struct {
 	Status     string
 	SupplierID *uuid.UUID
+	SourceSoID *uuid.UUID
 	Q          string
 	Limit      int
 	Offset     int
@@ -118,6 +119,11 @@ func (s *PurchaseOrders) List(ctx context.Context, tid uuid.UUID, opts ListPOOpt
 	if opts.SupplierID != nil {
 		where = append(where, fmt.Sprintf("supplier_id = $%d", idx))
 		args = append(args, *opts.SupplierID)
+		idx++
+	}
+	if opts.SourceSoID != nil {
+		where = append(where, fmt.Sprintf("source_so_id = $%d", idx))
+		args = append(args, *opts.SourceSoID)
 		idx++
 	}
 	if opts.Q != "" {
@@ -160,12 +166,12 @@ func (s *PurchaseOrders) Update(ctx context.Context, po *domain.PurchaseOrder) e
 		ct, err := tx.Exec(ctx, `
 			UPDATE purchase_order
 			SET supplier_id=$3, status=$4::po_status, order_date=$5,
-			    expected_date=$6, notes=$7,
+			    expected_date=$6, source_so_id=$7, notes=$8,
 			    updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$8`,
+			WHERE id=$1 AND tenant_id=$2 AND version=$9`,
 			po.ID, po.TenantID,
 			po.SupplierID, po.Status, po.OrderDate,
-			po.ExpectedDate, po.Notes,
+			po.ExpectedDate, po.SourceSoID, po.Notes,
 			po.Version,
 		)
 		if err != nil {

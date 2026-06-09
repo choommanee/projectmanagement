@@ -6,13 +6,12 @@ import { Button, Input, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-
 import { listUoms, createUom, deleteUom, type UOM } from "@/lib/api/mfg";
 
 function NewUOMDialog({
-  uoms, onClose, onCreated,
-}: { uoms: UOM[]; onClose: () => void; onCreated: () => void }) {
+  onClose, onCreated,
+}: { onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
     code: "",
     name: "",
     ratio_to_base: "1",
-    base_uom_id: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,30 +73,17 @@ function NewUOMDialog({
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-2">Base UoM (optional)</label>
-            <select
-              aria-label="Base UoM"
-              value={form.base_uom_id}
-              onChange={(e) => setForm(f => ({ ...f, base_uom_id: e.target.value }))}
-              className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none"
-            >
-              <option value="">— none (this is a base unit) —</option>
-              {uoms.map(u => <option key={u.id} value={u.id}>{u.code} — {u.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-2">Conversion Factor</label>
-            <Input
-              type="number"
-              min="0.000001"
-              step="any"
-              value={form.ratio_to_base}
-              onChange={(e) => setForm(f => ({ ...f, ratio_to_base: e.target.value }))}
-              placeholder="1"
-            />
-          </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Conversion Factor (ratio to base)</label>
+          <Input
+            type="number"
+            min="0.000001"
+            step="any"
+            value={form.ratio_to_base}
+            onChange={(e) => setForm(f => ({ ...f, ratio_to_base: e.target.value }))}
+            placeholder="1"
+          />
+          <p className="mt-1 text-[11px] text-ink-3">1 = a base unit; e.g. 1000 if this unit equals 1000 base units.</p>
         </div>
       </form>
     </Dialog>
@@ -162,8 +148,6 @@ export default function UOMsPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-
-  const uomMap = useMemo(() => new Map(uoms.map(u => [u.id, u])), [uoms]);
 
   const filtered = useMemo(
     () => uoms.filter(u =>
@@ -264,9 +248,6 @@ export default function UOMsPage() {
                   {filtered.map((uom) => {
                     // ratioToBase === 1 → this is a base unit; otherwise display ratio
                     const isBase = uom.ratioToBase === 1;
-                    // The UOM type doesn't carry baseUomId from the backend yet — display ratio only
-                    const baseUom = !isBase ? uomMap.get("") : undefined;
-                    void baseUom; // suppress unused variable
                     return (
                       <tr key={uom.id} className="border-b border-line/60 last:border-0 hover:bg-paper">
                         <td className="px-4 py-2 font-mono text-xs font-semibold uppercase text-ink">{uom.code}</td>
@@ -290,7 +271,6 @@ export default function UOMsPage() {
 
       {showNew && (
         <NewUOMDialog
-          uoms={uoms}
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); void load(); }}
         />

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -48,7 +49,8 @@ func setupRouter(t *testing.T) (http.Handler, *store.Store, uuid.UUID, uuid.UUID
 		_, _ = p.Exec(context.Background(), `DELETE FROM tenant WHERE id = $1`, tid)
 	})
 	st := store.New(p)
-	return api.NewRouter(service.New(st), nil), st, tid, uid
+	svc := service.New(st).WithPreferences(store.NewPreference(p))
+	return api.NewRouter(svc, nil), st, tid, uid
 }
 
 // withClaims injects a fake JWT principal into the request context so the
@@ -166,5 +168,110 @@ func TestMarkRead_InvalidID(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != 400 {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestListReturnsTotal(t *testing.T) {
+	handler, st, tid, uid := setupRouter(t)
+	for i := 0; i < 3; i++ {
+		_, _ = st.Insert(context.Background(), store.InsertParams{
+			TenantID: tid, UserID: uid, Kind: "k", Title: fmt.Sprintf("n%d", i),
+		})
+	}
+	// limit=1 → 1 item but total must reflect all 3.
+	req := withClaims(httptest.NewRequest("GET", "/v1/notifications?limit=1", nil), tid, uid)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("list: %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Items []map[string]any `json:"items"`
+		Total int              `json:"total"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 item (limit), got %d", len(resp.Items))
+	}
+	if resp.Total != 3 {
+		t.Fatalf("expected total 3, got %d", resp.Total)
+	}
+}
+
+func TestPreferences_RoundTrip(t *testing.T) {
+	handler, _, tid, uid := setupRouter(t)
+
+	// Initially empty.
+	req := withClaims(httptest.NewRequest("GET", "/v1/notification-preferences", nil), tid, uid)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("get prefs: %d: %s", w.Code, w.Body.String())
+	}
+	var empty struct {
+		Preferences []map[string]any `json:"preferences"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &empty)
+	if len(empty.Preferences) != 0 {
+		t.Fatalf("expected 0 prefs, got %d", len(empty.Preferences))
+	}
+
+	// PUT a bare array.
+	body := `[{"kind":"task.assigned","channels":["inapp","email"]},{"kind":"task.blocked","channels":["inapp"]}]`
+	req2 := withClaims(httptest.NewRequest("PUT", "/v1/notification-preferences", strings.NewReader(body)), tid, uid)
+	req2.Header.Set("content-type", "application/json")
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, req2)
+	if w2.Code != 200 {
+		t.Fatalf("put prefs: %d: %s", w2.Code, w2.Body.String())
+	}
+
+	// GET reflects the saved set.
+	req3 := withClaims(httptest.NewRequest("GET", "/v1/notification-preferences", nil), tid, uid)
+	w3 := httptest.NewRecorder()
+	handler.ServeHTTP(w3, req3)
+	var got struct {
+		Preferences []struct {
+			Kind     string   `json:"kind"`
+			Channels []string `json:"channels"`
+		} `json:"preferences"`
+	}
+	if err := json.Unmarshal(w3.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode prefs: %v", err)
+	}
+	if len(got.Preferences) != 2 {
+		t.Fatalf("expected 2 prefs, got %d: %s", len(got.Preferences), w3.Body.String())
+	}
+	byKind := map[string][]string{}
+	for _, p := range got.Preferences {
+		byKind[p.Kind] = p.Channels
+	}
+	if got := byKind["task.assigned"]; len(got) != 2 {
+		t.Fatalf("task.assigned channels = %v, want 2", got)
+	}
+	if got := byKind["task.blocked"]; len(got) != 1 || got[0] != "inapp" {
+		t.Fatalf("task.blocked channels = %v, want [inapp]", got)
+	}
+
+	// PUT again with updated channels → idempotent upsert.
+	body2 := `{"preferences":[{"kind":"task.assigned","channels":["email"]}]}`
+	req4 := withClaims(httptest.NewRequest("PUT", "/v1/notification-preferences", strings.NewReader(body2)), tid, uid)
+	req4.Header.Set("content-type", "application/json")
+	w4 := httptest.NewRecorder()
+	handler.ServeHTTP(w4, req4)
+	if w4.Code != 200 {
+		t.Fatalf("put prefs (wrapped): %d: %s", w4.Code, w4.Body.String())
+	}
+}
+
+func TestPreferences_MissingClaims(t *testing.T) {
+	handler, _, _, _ := setupRouter(t)
+	req := httptest.NewRequest("GET", "/v1/notification-preferences", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 401 {
+		t.Fatalf("expected 401 without claims, got %d", w.Code)
 	}
 }

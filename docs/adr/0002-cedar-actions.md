@@ -59,6 +59,7 @@ The following role names appear (or will appear) in `bundle.cedar`. The
 | `quality-engineer` | APQP/PPAP/FMEA/control-plan authoring, NCR/CAPA closure.                         |
 | `workflow-author`  | Designs and publishes workflow definitions; starts/cancels instances.            |
 | `bi-author`        | Creates and edits BI dashboards and report widgets.                              |
+| `workflow-service` | Service-to-service principal. Minted by identity-svc's `POST /v1/internal/service-token` for the Rust workflow runtime (via workflow-svc) so it can create documents/signature envelopes and project tasks as side effects of a running workflow. NOT a human role. Granted only `document.create`, `document.sign.envelope.create`, `document.sign.send`, `project.task.create`, `project.task.update`. |
 
 `dashboard-viewer` / `dashboard-editor` exist in the current bundle as
 placeholders and will be folded into the `bi-author` / `tenant-admin` roles
@@ -127,6 +128,11 @@ Route base: `/v1`.
 | PATCH  | `/v1/sprints/{id}`                         | `project.sprint.update`         | `Sprint::"<id>"`  | WRITE_GUARD |
 | POST   | `/v1/sprints/{id}/tasks/{taskId}`          | `project.sprint.assign_task`    | `Sprint::"<id>"`  | WRITE_GUARD |
 | DELETE | `/v1/sprints/{id}/tasks/{taskId}`          | `project.sprint.unassign_task`  | `Sprint::"<id>"`  | WRITE_GUARD |
+| DELETE | `/v1/sprints/{id}`                         | `project.sprint.delete`         | `Sprint::"<id>"`  | WRITE_GUARD |
+| PATCH  | `/v1/comments/{id}`                        | `project.task.comment.update`   | `Comment::"<id>"`    | WRITE_GUARD |
+| DELETE | `/v1/comments/{id}`                        | `project.task.comment.delete`   | `Comment::"<id>"`    | WRITE_GUARD |
+| PATCH  | `/v1/worklogs/{id}`                        | `project.task.worklog.update`   | `Worklog::"<id>"`    | WRITE_GUARD |
+| DELETE | `/v1/worklogs/{id}`                        | `project.task.worklog.delete`   | `Worklog::"<id>"`    | WRITE_GUARD |
 | GET    | `/v1/projects`                             | `project.list`                  | `Tenant::"*"`     | READ_ONLY   |
 | GET    | `/v1/projects/{id}`                        | `project.read`                  | `Project::"<id>"` | READ_ONLY   |
 | GET    | `/v1/projects/{id}/tasks`                  | `project.task.list`             | `Project::"<id>"` | READ_ONLY   |
@@ -151,6 +157,27 @@ Route base: `/v1`.
 | PATCH  | `/v1/comments/{id}/resolve`                | `document.comment.resolve`      | `Comment::"<id>"`    | WRITE_GUARD |
 | DELETE | `/v1/comments/{id}`                        | `document.comment.delete`       | `Comment::"<id>"`    | WRITE_GUARD |
 | POST   | `/v1/templates`                            | `document.template.create`      | `Tenant::"*"`        | WRITE_GUARD |
+| PATCH  | `/v1/templates/{id}`                       | `document.template.update`      | `Template::"<id>"`   | WRITE_GUARD (system templates are read-only → 403) |
+| DELETE | `/v1/templates/{id}`                       | `document.template.delete`      | `Template::"<id>"`   | WRITE_GUARD (system templates cannot be deleted → 403) |
+| POST   | `/v1/documents/{id}/sign-envelopes`        | `document.sign.envelope.create` | `Document::"<id>"`   | WRITE_GUARD |
+| POST   | `/v1/sign-envelopes/{id}/send`             | `document.sign.send`            | `SignEnvelope::"<id>"` | WRITE_GUARD |
+| POST   | `/v1/sign-envelopes/{id}/void`             | `document.sign.void`            | `SignEnvelope::"<id>"` | WRITE_GUARD |
+| POST   | `/v1/sign-envelopes/{id}/signers/{signerId}/view`    | `document.sign.view`    | `SignEnvelope::"<id>"` | WRITE_GUARD (any authenticated) |
+| POST   | `/v1/sign-envelopes/{id}/signers/{signerId}/sign`    | `document.sign.sign`    | `SignEnvelope::"<id>"` | WRITE_GUARD (any authenticated) |
+| POST   | `/v1/sign-envelopes/{id}/signers/{signerId}/decline` | `document.sign.decline` | `SignEnvelope::"<id>"` | WRITE_GUARD (any authenticated) |
+| POST   | `/v1/sign-envelopes/{id}/signers/{signerId}/otp/request` | `document.sign.otp.request` | `SignEnvelope::"<id>"` | WRITE_GUARD (any authenticated; service enforces actor == signer row, issues email-OTP challenge) |
+| GET    | `/v1/sign-envelopes/{id}`                  | (READ: auth.Require + RLS)      | `SignEnvelope::"<id>"` | READ_ONLY   |
+| GET    | `/v1/documents/{id}/sign-envelopes`        | (READ: auth.Require + RLS)      | `Document::"<id>"`   | READ_ONLY   |
+| GET    | `/v1/sign-envelopes/{id}/verify`           | (READ: auth.Require + RLS)      | `SignEnvelope::"<id>"` | READ_ONLY   |
+| GET    | `/v1/sign-envelopes/{id}/audit`            | (READ: auth.Require + RLS)      | `SignEnvelope::"<id>"` | READ_ONLY   |
+| GET    | `/v1/sign-envelopes/{id}/certificate`      | (READ: auth.Require + RLS)      | `SignEnvelope::"<id>"` | READ_ONLY   |
+| POST   | `/v1/sign-envelopes/{id}/verify-links`     | `document.sign.verify_link.create` | `SignEnvelope::"<id>"` | WRITE_GUARD |
+| DELETE | `/v1/sign-envelopes/{id}/verify-links/{linkId}` | `document.sign.verify_link.create` | `SignEnvelope::"<id>"` | WRITE_GUARD (revoke shares the create action) |
+| GET    | `/v1/sign-envelopes/{id}/verify-links`     | (READ: auth.Require + RLS)      | `SignEnvelope::"<id>"` | READ_ONLY   |
+| GET    | `/public/verify/{token}`                   | (PUBLIC: 256-bit token is the credential; no Cedar) | — | PUBLIC      |
+| GET    | `/public/verify/{token}/certificate`       | (PUBLIC: 256-bit token is the credential; no Cedar) | — | PUBLIC      |
+| GET    | `/v1/documents/{id}/sign-audit`            | (READ: auth.Require + RLS)      | `Document::"<id>"`   | READ_ONLY   |
+| GET    | `/v1/documents/{id}/sign-certificate`      | (READ: auth.Require + RLS)      | `Document::"<id>"`   | READ_ONLY   |
 | GET    | `/v1/workspaces`                           | `document.workspace.list`       | `Tenant::"*"`        | READ_ONLY   |
 | GET    | `/v1/documents`                            | `document.list`                 | `Tenant::"*"`        | READ_ONLY   |
 | GET    | `/v1/documents/{id}`                       | `document.read`                 | `Document::"<id>"`   | READ_ONLY   |
@@ -159,6 +186,8 @@ Route base: `/v1`.
 | GET    | `/v1/documents/{id}/comments`              | `document.comment.list`         | `Document::"<id>"`   | READ_ONLY   |
 | GET    | `/v1/templates`                            | `document.template.list`        | `Tenant::"*"`        | READ_ONLY   |
 | GET    | `/v1/templates/{id}`                       | `document.template.read`        | `Template::"<id>"`   | READ_ONLY   |
+| POST   | `/v1/admin/sign-cert`                      | `document.sign.cert.import`     | `Tenant::"*"`        | WRITE_GUARD (platform-admin only; imports an operator-provided X.509 document-signing cert and atomically swaps the active PAdES signing identity) |
+| GET    | `/v1/admin/sign-cert`                      | `document.sign.cert.import`     | `Tenant::"*"`        | READ_ONLY (platform-admin only; returns active signing-cert metadata) |
 
 ### mfg-svc (`services/mfg-svc`)
 
@@ -167,6 +196,7 @@ Route base: `/v1`.
 | Method | Path                                              | Action                              | Resource              | Guard       |
 | ------ | ------------------------------------------------- | ----------------------------------- | --------------------- | ----------- |
 | POST   | `/v1/uoms`                                        | `mfg.uom.create`                    | `Tenant::"*"`         | WRITE_GUARD |
+| DELETE | `/v1/uoms/{id}`                                   | `mfg.uom.delete`                    | `Tenant::"*"`         | WRITE_GUARD |
 | POST   | `/v1/items`                                       | `mfg.item.create`                   | `Tenant::"*"`         | WRITE_GUARD |
 | PATCH  | `/v1/items/{id}`                                  | `mfg.item.update`                   | `Item::"<id>"`        | WRITE_GUARD |
 | DELETE | `/v1/items/{id}`                                  | `mfg.item.delete`                   | `Item::"<id>"`        | WRITE_GUARD |
@@ -279,6 +309,7 @@ Route base: `/v1`.
 | POST   | `/v1/workflows/{id}/publish`               | `workflow.publish`                  | `Workflow::"<id>"`        | WRITE_GUARD |
 | POST   | `/v1/workflows/{id}/start`                 | `workflow.instance.start`           | `Workflow::"<id>"`        | WRITE_GUARD |
 | POST   | `/v1/instances/{id}/resume`                | `workflow.instance.resume`          | `Instance::"<id>"`        | WRITE_GUARD |
+| POST   | `/v1/instances/{id}/retry`                 | `workflow.instance.retry`           | `Instance::"<id>"`        | WRITE_GUARD |
 | POST   | `/v1/instances/{id}/cancel`                | `workflow.instance.cancel`          | `Instance::"<id>"`        | WRITE_GUARD |
 | POST   | `/v1/human-tasks/{id}/complete`            | `workflow.human_task.complete`      | `HumanTask::"<id>"`       | WRITE_GUARD |
 | GET    | `/v1/workflows`                            | `workflow.list`                     | `Tenant::"*"`             | READ_ONLY   |
@@ -339,6 +370,7 @@ Documented here for completeness; identity-svc already uses Cedar for
 | GET    | `/v1/admin/sso/configs`                       | `tenant.sso.configure`   | `Tenant::"*"`    | WRITE_GUARD (Plan #6 Task 5) |
 | GET    | `/v1/auth/oidc/{tenant_slug}/start`           | n/a                      | n/a              | unguarded (public; signed-state JWT is the credential) |
 | GET    | `/v1/auth/oidc/{tenant_slug}/callback`        | n/a                      | n/a              | unguarded (public; IdP ID-token is the credential) |
+| POST   | `/v1/internal/service-token`                  | n/a (secret-gated)       | n/a              | `X-Service-Secret` header (constant-time vs `SERVICE_TOKEN_SECRET`); endpoint UNMOUNTED when secret unset. Mints a ~10m JWT with `sub=svc:<service>`, explicit `tid`, `roles=["workflow-service"]`. |
 
 ## Notes
 
@@ -380,3 +412,85 @@ Actions use ABAC per-user scoping: `notif.read` and `notif.mark_read` require th
 | GET | `/v1/notifications` | `notif.read` | `Notification::{:id}` | READ_ONLY (ABAC: own only) |
 | POST | `/v1/notifications/{id}/read` | `notif.mark_read` | `Notification::{:id}` | WRITE_GUARD (ABAC: own only) |
 | POST | `/v1/notifications/read-all` | `notif.mark_all_read` | `Notification::"*"` | WRITE_GUARD (any authenticated user) |
+
+## sales-svc (`services/sales-svc`)
+
+Route base: `/v1`. Write actions are granted to `project-manager` and
+`tenant-admin` (plus `platform-admin` via the super-permit). The cross-tenant
+`forbid` layer applies to customer/order mutations.
+
+| Method | Path | Action | Resource | Guard |
+| ------ | ---- | ------ | -------- | ----- |
+| POST   | `/v1/customers`                  | `sales.customer.create`     | `*` | WRITE_GUARD |
+| PATCH  | `/v1/customers/{id}`             | `sales.customer.update`     | `*` | WRITE_GUARD |
+| DELETE | `/v1/customers/{id}`             | `sales.customer.delete`     | `*` | WRITE_GUARD |
+| POST   | `/v1/sales-orders`               | `sales.order.create`        | `*` | WRITE_GUARD |
+| PATCH  | `/v1/sales-orders/{id}`          | `sales.order.update`        | `*` | WRITE_GUARD |
+| DELETE | `/v1/sales-orders/{id}`          | `sales.order.delete`        | `*` | WRITE_GUARD |
+| POST   | `/v1/sales-orders/{id}/lines`    | `sales.order.update`        | `*` | WRITE_GUARD |
+| PATCH  | `/v1/sales-orders/{id}/lines/{lineId}` | `sales.order.update`  | `*` | WRITE_GUARD |
+| DELETE | `/v1/sales-orders/{id}/lines/{lineId}` | `sales.order.update`  | `*` | WRITE_GUARD |
+| POST   | `/v1/quotations`                 | `sales.quotation.create`    | `*` | WRITE_GUARD |
+| PATCH  | `/v1/quotations/{id}`            | `sales.quotation.update`    | `*` | WRITE_GUARD |
+| DELETE | `/v1/quotations/{id}`            | `sales.quotation.delete`    | `*` | WRITE_GUARD |
+| POST   | `/v1/quotations/{id}/convert`    | `sales.order.create`        | `*` | WRITE_GUARD |
+| POST   | `/v1/invoices`                   | `sales.invoice.create`      | `*` | WRITE_GUARD |
+| PATCH  | `/v1/invoices/{id}`              | `sales.invoice.update`      | `*` | WRITE_GUARD |
+| DELETE | `/v1/invoices/{id}`              | `sales.invoice.delete`      | `*` | WRITE_GUARD |
+| POST   | `/v1/shipments`                  | `sales.shipment.create`     | `*` | WRITE_GUARD |
+| PATCH  | `/v1/shipments/{id}`             | `sales.shipment.update`     | `*` | WRITE_GUARD |
+| PATCH  | `/v1/shipments/{id}/status`      | `sales.shipment.update`     | `*` | WRITE_GUARD |
+| DELETE | `/v1/shipments/{id}`             | `sales.shipment.delete`     | `*` | WRITE_GUARD |
+| POST   | `/v1/opportunities`              | `sales.opportunity.create`  | `*` | WRITE_GUARD |
+| PATCH  | `/v1/opportunities/{id}`         | `sales.opportunity.update`  | `*` | WRITE_GUARD |
+| DELETE | `/v1/opportunities/{id}`         | `sales.opportunity.delete`  | `*` | WRITE_GUARD |
+
+## accounting-svc (`services/accounting-svc`)
+
+Route base: `/v1`. Write actions are granted to `tenant-admin` and
+`project-manager` (plus `platform-admin` via the super-permit).
+
+| Method | Path | Action | Resource | Guard |
+| ------ | ---- | ------ | -------- | ----- |
+| POST   | `/v1/accounts`                       | `accounting.account.create` | `*` | WRITE_GUARD |
+| PATCH  | `/v1/accounts/{id}`                  | `accounting.account.update` | `*` | WRITE_GUARD |
+| DELETE | `/v1/accounts/{id}`                  | `accounting.account.delete` | `*` | WRITE_GUARD |
+| POST   | `/v1/journal-entries`                | `accounting.je.create`      | `*` | WRITE_GUARD |
+| PATCH  | `/v1/journal-entries/{id}`           | `accounting.je.update`      | `*` | WRITE_GUARD |
+| POST   | `/v1/journal-entries/{id}/post`      | `accounting.je.post`        | `*` | WRITE_GUARD |
+| POST   | `/v1/journal-entries/{id}/lines`     | `accounting.je.update`      | `*` | WRITE_GUARD |
+| PATCH  | `/v1/journal-entries/{id}/lines/{lineId}` | `accounting.je.update` | `*` | WRITE_GUARD |
+| DELETE | `/v1/journal-entries/{id}/lines/{lineId}` | `accounting.je.update` | `*` | WRITE_GUARD |
+| POST   | `/v1/invoices`                       | `accounting.invoice.create` | `*` | WRITE_GUARD |
+| PATCH  | `/v1/invoices/{id}`                  | `accounting.invoice.update` | `*` | WRITE_GUARD |
+| DELETE | `/v1/invoices/{id}`                  | `accounting.invoice.delete` | `*` | WRITE_GUARD |
+| POST   | `/v1/budgets`                        | `accounting.budget.set`     | `*` | WRITE_GUARD |
+| PATCH  | `/v1/budgets/{accountId}`            | `accounting.budget.set`     | `*` | WRITE_GUARD |
+
+`GET /v1/budgets` is unguarded (read). Posting a journal entry
+(`/v1/journal-entries/{id}/post`) additionally enforces a domain invariant:
+the entry must have at least one line and total debits must equal total credits,
+else the service returns `400` (`ErrInvalidInput`) — independent of Cedar.
+
+## Service-to-service: `workflow-service` role
+
+The Rust workflow runtime (brokered through workflow-svc) calls document-svc
+and project-svc to materialize the side effects of a running workflow. It
+authenticates with a short-lived JWT minted by identity-svc's
+`POST /v1/internal/service-token` (see the identity-svc table above), which
+carries `roles=["workflow-service"]` and an explicit `tid`. The bundle grants
+that role exactly the actions below — the same Cedar permits already used by
+human roles, so no new endpoints are introduced and the cross-tenant `forbid`
+layer still applies.
+
+| Caller         | Target service | Action                          | Engine node action          |
+| -------------- | -------------- | ------------------------------- | --------------------------- |
+| workflow-svc   | document-svc   | `document.create`               | `create_document`           |
+| workflow-svc   | document-svc   | `document.sign.envelope.create` | `request_signature`         |
+| workflow-svc   | document-svc   | `document.sign.send`            | `request_signature`         |
+| workflow-svc   | project-svc    | `project.task.create`           | `create_task`               |
+| workflow-svc   | project-svc    | `project.task.update`           | `update_task_status`        |
+
+Explicitly NOT granted (regression-tested in `libs/policy/bundle_test.go`):
+`project.delete`, `document.delete`, `mfg.work_order.release`, `jwt.rotate`,
+and every other action. The role is least-privilege by construction.

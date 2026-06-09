@@ -9,6 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	libauth "github.com/pmplatform/libs/go/auth"
+
 	"github.com/pmplatform/services/sales-svc/internal/domain"
 	"github.com/pmplatform/services/sales-svc/internal/service"
 	"github.com/pmplatform/services/sales-svc/internal/store"
@@ -57,6 +59,8 @@ func createQuotation(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.quotation.create", "quotation", q.ID.String(), nil,
+			map[string]any{"code": q.Code, "title": q.Title, "status": q.Status})
 		writeJSON(w, 201, q)
 	}
 }
@@ -178,6 +182,109 @@ func updateQuotation(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.quotation.update", "quotation", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": q.Status})
 		writeJSON(w, 200, q)
+	}
+}
+
+func deleteQuotation(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Quotations.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.quotation.delete", "quotation", id.String(), nil, nil)
+		w.WriteHeader(204)
+	}
+}
+
+// convertQuotation creates a sales order from an existing quotation. The new
+// order carries a single line derived from the quotation total so downstream
+// invoices have non-zero amounts, and the source quotation is marked accepted.
+func convertQuotation(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var createdBy uuid.UUID
+		if claims, has := libauth.FromCtx(r.Context()); has && claims != nil && claims.Subject != "" {
+			if uid, perr := uuid.Parse(claims.Subject); perr == nil {
+				createdBy = uid
+			}
+		}
+		q, err := svc.Quotations.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		so := &domain.SalesOrder{
+			TenantID:   tid,
+			CustomerID: q.CustomerID,
+			Status:     domain.SOStatusConfirmed,
+			OrderDate:  time.Now(),
+			Notes:      "Converted from quotation " + q.Code,
+			CreatedBy:  createdBy,
+		}
+		if err := svc.SalesOrders.Create(r.Context(), so); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.order.create", "sales_order", so.ID.String(), nil,
+			map[string]any{"status": so.Status, "converted_from_quotation": id.String()})
+		if q.TotalAmount > 0 {
+			line := &domain.SOLine{
+				TenantID:   tid,
+				SOID:       so.ID,
+				ItemDesc:   q.Title,
+				LineNo:     1,
+				QtyOrdered: 1,
+				UnitPrice:  q.TotalAmount,
+			}
+			if err := svc.SalesOrders.AddLine(r.Context(), line); err != nil {
+				writeErr(w, 500, err)
+				return
+			}
+		}
+		// Mark the quotation accepted (best-effort optimistic update).
+		_, _ = svc.Quotations.Update(r.Context(), tid, id, store.UpdateQuotationInput{
+			Title:       q.Title,
+			ValidUntil:  q.ValidUntil,
+			Status:      domain.QuotationAccepted,
+			TotalAmount: q.TotalAmount,
+			Notes:       q.Notes,
+			Version:     q.Version,
+		})
+		// Reload the order with its lines for the response.
+		full, err := svc.SalesOrders.GetByID(r.Context(), tid, so.ID)
+		if err != nil {
+			writeJSON(w, 201, so)
+			return
+		}
+		writeJSON(w, 201, full)
 	}
 }

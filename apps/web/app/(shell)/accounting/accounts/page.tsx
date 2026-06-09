@@ -57,7 +57,7 @@ function AccountDialog({
     setError(null);
     try {
       const saved = initial
-        ? await updateAccount(initial.id, { name: form.name, type: form.type, currency: form.currency, active: form.active })
+        ? await updateAccount(initial.id, { name: form.name, type: form.type, currency: form.currency, active: form.active, version: initial.version })
         : await createAccount({ code: form.code, name: form.name, type: form.type, currency: form.currency, active: form.active });
       onSaved(saved);
     } catch (err) {
@@ -137,7 +137,7 @@ function DeleteDialog({ account, onClose, onDeleted }: { account: ChartOfAccount
     setLoading(true);
     setErr(null);
     try {
-      await deleteAccount(account.id);
+      await deleteAccount(account.id, account.version);
       onDeleted();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");

@@ -36,5 +36,8 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   if (confirmHeader) h.set("X-Confirm-Destructive", confirmHeader);
   const url = new URL(req.url);
   const r = await fetch(`${SVC}/v1/projects/${id}?${url.searchParams}`, { method: "DELETE", headers: h });
-  return new NextResponse(null, { status: r.status });
+  return new NextResponse(r.status === 204 ? null : await r.text(), {
+    status: r.status,
+    headers: r.status !== 204 ? { "content-type": "application/json" } : {},
+  });
 }

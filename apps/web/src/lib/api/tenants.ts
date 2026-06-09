@@ -53,7 +53,10 @@ export async function updateTenant(
 }
 
 export async function deleteTenant(id: string, version: number): Promise<void> {
-  const r = await fetch(`/api/tenants/${id}?version=${version}`, { method: "DELETE" });
+  const r = await fetch(`/api/tenants/${id}?version=${version}`, {
+    method: "DELETE",
+    headers: { "X-Confirm-Destructive": "true" },
+  });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw new Error(e.error ?? `delete failed: ${r.status}`);

@@ -47,7 +47,7 @@ function PositionDialog({
     setError(null);
     try {
       const saved = initial
-        ? await updatePosition(initial.id, {
+        ? await updatePosition(initial.id, initial.version, {
             name: form.name,
             department_id: form.department_id || null,
             active: form.active,
@@ -129,7 +129,7 @@ function DeleteDialog({ position, onClose, onDeleted }: { position: Position; on
     setLoading(true);
     setErr(null);
     try {
-      await deletePosition(position.id);
+      await deletePosition(position.id, position.version);
       onDeleted();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed");

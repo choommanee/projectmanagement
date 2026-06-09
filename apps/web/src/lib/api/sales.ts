@@ -28,6 +28,7 @@ export interface Customer {
   phone: string;
   billingAddress: string;
   active: boolean;
+  version: number;
 }
 
 export type SOStatus = "draft" | "confirmed" | "shipped" | "invoiced" | "cancelled";
@@ -66,6 +67,7 @@ function normCustomer(r: Record<string, unknown>): Customer {
     phone: String(g(r, "phone") ?? ""),
     billingAddress: String(gid(r, "billingAddress", "billing_address") ?? r["BillingAddress"] ?? ""),
     active: Boolean(g(r, "active") ?? true),
+    version: Number(g(r, "version") ?? 1),
   };
 }
 
@@ -116,14 +118,14 @@ export async function getCustomer(id: string): Promise<Customer> {
   return normCustomer(await r.json());
 }
 
-export async function updateCustomer(id: string, patch: Partial<{ name: string; contact: string; email: string; phone: string; billing_address: string; active: boolean }>): Promise<Customer> {
+export async function updateCustomer(id: string, patch: Partial<{ name: string; contact: string; email: string; phone: string; billing_address: string; active: boolean }> & { version: number }): Promise<Customer> {
   const r = await apiFetch(`${SVC}/customers/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateCustomer failed: ${r.status}`); }
   return normCustomer(await r.json());
 }
 
-export async function deleteCustomer(id: string): Promise<void> {
-  const r = await apiFetch(`${SVC}/customers/${id}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
+export async function deleteCustomer(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/customers/${id}?version=${version}`, { method: "DELETE", headers: { "X-Confirm-Destructive": "true" } });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `deleteCustomer failed: ${r.status}`); }
 }
 
@@ -331,6 +333,11 @@ export async function createSalesInvoice(body: {
   issue_date: string;
   due_date?: string;
   notes?: string;
+  // For standalone invoices the caller supplies amounts; when so_id is set the
+  // backend derives subtotal/tax/total from the sales order's lines.
+  subtotal?: number;
+  tax?: number;
+  total?: number;
 }): Promise<SalesInvoice> {
   const r = await apiFetch("/api/sales/invoices", {
     method: "POST",
@@ -338,7 +345,7 @@ export async function createSalesInvoice(body: {
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return normInvoice(await r.json());
 }
 
 export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
@@ -357,7 +364,7 @@ export async function updateInvoice(id: string, patch: Partial<{ status: Invoice
     body: JSON.stringify(patch),
   });
   if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  return normInvoice(await r.json());
 }
 
 export async function deleteSalesInvoice(id: string): Promise<void> {
@@ -368,7 +375,7 @@ export async function deleteSalesInvoice(id: string): Promise<void> {
 export async function getSalesInvoice(id: string): Promise<SalesInvoice> {
   const r = await apiFetch(`${SVC}/invoices/${id}`);
   if (!r.ok) throw new Error(`getSalesInvoice: ${r.status}`);
-  return r.json();
+  return normInvoice(await r.json());
 }
 
 // ─── Shipments ─────────────────────────────────────────────────────────────

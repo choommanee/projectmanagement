@@ -43,6 +43,13 @@ func (s *SalesInvoiceStore) Create(ctx context.Context, inv *domain.SalesInvoice
 		inv.IssueDate = time.Now()
 	}
 	return withTenant(ctx, s.p, inv.TenantID, func(tx pgx.Tx) error {
+		if inv.Code == "" {
+			code, err := nextCode(ctx, tx, inv.TenantID, "sales_invoice", "INV")
+			if err != nil {
+				return err
+			}
+			inv.Code = code
+		}
 		_, err := tx.Exec(ctx, `
 			INSERT INTO sales_invoice(id, tenant_id, code, so_id, customer_id, issue_date,
 			                          due_date, status, subtotal, tax, total, notes, version)
@@ -156,4 +163,21 @@ func (s *SalesInvoiceStore) Update(ctx context.Context, tid, id uuid.UUID, in Up
 		return nil, err
 	}
 	return &inv, nil
+}
+
+// Delete hard-deletes a sales invoice. Returns ErrNotFound when absent.
+func (s *SalesInvoiceStore) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`DELETE FROM sales_invoice WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
 }

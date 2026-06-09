@@ -174,6 +174,15 @@ export default function TraceabilityPage() {
     setTraceNodes([]);
     try {
       const root = await traceForLot(lot.id, dir);
+      if (root) {
+        // The backend omits the queried (depth-0) lot; enrich the synthesized
+        // root with the lot we already have so it renders with real data.
+        root.lot_no = root.lot_no || lot.lotNo;
+        root.item_id = root.item_id || lot.itemId;
+        root.item_code = root.item_code || selectedItem?.code || "";
+        root.qty = root.qty || lot.qtyOnHand;
+        root.status = lot.status;
+      }
       if (root && (root.lot_id || root.lot_no)) {
         setTraceNodes(flattenTree(root));
       } else {

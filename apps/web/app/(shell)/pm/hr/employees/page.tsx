@@ -12,15 +12,15 @@ import {
 const EMP_STATUSES: { value: EmpStatus | ""; label: string }[] = [
   { value: "", label: "All" },
   { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "on_leave", label: "On Leave" },
+  { value: "probation", label: "Probation" },
+  { value: "resigned", label: "Resigned" },
   { value: "terminated", label: "Terminated" },
 ];
 
 function statusTone(s: EmpStatus): "neutral" | "info" | "accent" | "success" | "warning" | "danger" {
   if (s === "active")     return "success";
-  if (s === "inactive")   return "neutral";
-  if (s === "on_leave")   return "warning";
+  if (s === "probation")  return "warning";
+  if (s === "resigned")   return "neutral";
   if (s === "terminated") return "danger";
   return "neutral";
 }
@@ -82,7 +82,7 @@ function EmployeeDialog({
     setError(null);
     try {
       const saved = initial
-        ? await updateEmployee(initial.id, {
+        ? await updateEmployee(initial.id, initial.version, {
             first_name: form.first_name,
             last_name: form.last_name,
             email: form.email,
@@ -195,7 +195,7 @@ function TerminateDialog({
     setLoading(true);
     setErr(null);
     try {
-      const updated = await terminateEmployee(employee.id, date);
+      const updated = await terminateEmployee(employee.id, employee.version, date);
       onTerminated(updated);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to terminate employee");

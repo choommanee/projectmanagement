@@ -7,7 +7,7 @@ import { Breadcrumb } from "@/shell/Breadcrumb";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { listAllTasks, type Task } from "@/lib/api/tasks";
 import { listProjects, type Project } from "@/lib/api/projects";
-import { listWorklogs, createWorklog, type WorklogEntry } from "@/lib/api/worklog";
+import { listWorklogs, createWorklog, updateWorklog, deleteWorklog, type WorklogEntry } from "@/lib/api/worklog";
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -116,6 +116,8 @@ export default function TimesheetPage() {
 
   // ── Load data ───────────────────────────────────────────────────────────────
 
+  const userId = user?.id ?? "";
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -137,11 +139,13 @@ export default function TimesheetPage() {
 
       setTasks(active);
       setProjects(projMap);
-      setLogs(allLogs.flat());
+      // The grid is *my* timesheet — only show the current user's entries,
+      // otherwise other people's hours render (and get overwritten) here.
+      setLogs(allLogs.flat().filter(l => l.userId === userId));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -186,8 +190,22 @@ export default function TimesheetPage() {
     const raw = editing[key];
     if (raw === undefined) return;
 
-    const md = parseFloat(raw);
+    // An emptied cell means "remove this entry" — treat as 0.
+    const md = raw.trim() === "" ? 0 : parseFloat(raw);
     if (isNaN(md) || md < 0) {
+      setEditing(e => { const n = { ...e }; delete n[key]; return n; });
+      return;
+    }
+
+    const existing = logMap.get(key);
+
+    // Nothing existed and nothing entered — clear the edit and bail.
+    if (!existing && md === 0) {
+      setEditing(e => { const n = { ...e }; delete n[key]; return n; });
+      return;
+    }
+    // Value unchanged — no write needed.
+    if (existing && existing.loggedMd === md && notes[key] === undefined) {
       setEditing(e => { const n = { ...e }; delete n[key]; return n; });
       return;
     }
@@ -196,16 +214,30 @@ export default function TimesheetPage() {
     setSaveError(e => { const n = { ...e }; delete n[key]; return n; });
 
     try {
-      const entry = await createWorklog(task.id, {
-        userId:    user?.id ?? "",
-        loggedMd:  md,
-        workDate:  date,
-        note:      notes[key] ?? noteMap.get(key) ?? "",
-      });
-      setLogs(prev => {
-        const filtered = prev.filter(l => !(l.taskId === task.id && l.workDate.slice(0, 10) === date));
-        return [...filtered, entry];
-      });
+      if (existing && md === 0) {
+        // Cleared an existing entry → delete it (backend rejects logged_md = 0).
+        await deleteWorklog(existing.id, existing.version);
+        setLogs(prev => prev.filter(l => l.id !== existing.id));
+      } else if (existing) {
+        // Same (task, date) cell → update in place instead of creating a duplicate row.
+        const entry = await updateWorklog(existing.id, {
+          loggedMd: md,
+          note:     notes[key] ?? noteMap.get(key) ?? "",
+          version:  existing.version,
+        });
+        setLogs(prev => prev.map(l => (l.id === existing.id ? entry : l)));
+      } else {
+        const entry = await createWorklog(task.id, {
+          userId:    user?.id ?? "",
+          loggedMd:  md,
+          workDate:  date,
+          note:      notes[key] ?? noteMap.get(key) ?? "",
+        });
+        setLogs(prev => {
+          const filtered = prev.filter(l => !(l.taskId === task.id && l.workDate.slice(0, 10) === date));
+          return [...filtered, entry];
+        });
+      }
       setSaved(s => { const n = new Set(s); n.add(key); return n; });
       setTimeout(() => setSaved(s => { const n = new Set(s); n.delete(key); return n; }), 1500);
     } catch (e) {

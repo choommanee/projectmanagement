@@ -152,6 +152,8 @@ func createDepartment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.department.create", "department", d.ID.String(), nil,
+			map[string]any{"code": d.Code, "name": d.Name})
 		writeJSON(w, 201, d)
 	}
 }
@@ -256,6 +258,9 @@ func updateDepartment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.department.update", "department", id.String(),
+			map[string]any{"name": cur.Name, "active": cur.Active},
+			map[string]any{"name": d.Name, "active": d.Active})
 		writeJSON(w, 200, d)
 	}
 }
@@ -284,6 +289,7 @@ func deleteDepartment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.department.delete", "department", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -327,6 +333,8 @@ func createPosition(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.position.create", "position", pos.ID.String(), nil,
+			map[string]any{"code": pos.Code, "name": pos.Name})
 		writeJSON(w, 201, pos)
 	}
 }
@@ -431,6 +439,9 @@ func updatePosition(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.position.update", "position", id.String(),
+			map[string]any{"name": cur.Name, "active": cur.Active},
+			map[string]any{"name": pos.Name, "active": pos.Active})
 		writeJSON(w, 200, pos)
 	}
 }
@@ -459,6 +470,7 @@ func deletePosition(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.position.delete", "position", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -516,6 +528,8 @@ func createEmployee(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.employee.create", "employee", e.ID.String(), nil,
+			map[string]any{"emp_no": e.EmpNo, "status": e.Status})
 		writeJSON(w, 201, e)
 	}
 }
@@ -646,6 +660,9 @@ func updateEmployee(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.employee.update", "employee", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": e.Status})
 		writeJSON(w, 200, e)
 	}
 }
@@ -694,6 +711,8 @@ func terminateEmployee(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.employee.terminate", "employee", id.String(), nil,
+			map[string]any{"status": e.Status, "termination_date": terminationDate.Format("2006-01-02")})
 		writeJSON(w, 200, e)
 	}
 }
@@ -750,6 +769,8 @@ func createPayslip(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.payslip.create", "payslip", ps.ID.String(), nil,
+			map[string]any{"employee_id": empID.String(), "period_start": req.PeriodStart, "period_end": req.PeriodEnd})
 		writeJSON(w, 201, ps)
 	}
 }
@@ -831,6 +852,8 @@ func approvePayslip(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.payslip.approve", "payslip", id.String(), nil,
+			map[string]any{"status": domain.PayslipApproved})
 		ps, err := svc.Payslips.GetByID(r.Context(), tid, id)
 		if err != nil {
 			writeErr(w, 500, err)
@@ -859,6 +882,8 @@ func markPayslipPaid(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.payslip.pay", "payslip", id.String(), nil,
+			map[string]any{"status": domain.PayslipPaid})
 		ps, err := svc.Payslips.GetByID(r.Context(), tid, id)
 		if err != nil {
 			writeErr(w, 500, err)
@@ -920,6 +945,8 @@ func createLeaveRequest(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.leave.create", "leave_request", lr.ID.String(), nil,
+			map[string]any{"employee_id": empID.String(), "leave_type": req.LeaveType, "start_date": req.StartDate, "end_date": req.EndDate})
 		writeJSON(w, 201, lr)
 	}
 }
@@ -1001,6 +1028,8 @@ func approveLeaveRequest(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.leave.approve", "leave_request", id.String(), nil,
+			map[string]any{"status": domain.LeaveApproved})
 		lr, err := svc.LeaveRequests.GetByID(r.Context(), tid, id)
 		if err != nil {
 			writeErr(w, 500, err)
@@ -1038,6 +1067,8 @@ func rejectLeaveRequest(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "hr.leave.reject", "leave_request", id.String(), nil,
+			map[string]any{"status": domain.LeaveRejected, "reason": req.Reason})
 		lr, err := svc.LeaveRequests.GetByID(r.Context(), tid, id)
 		if err != nil {
 			writeErr(w, 500, err)

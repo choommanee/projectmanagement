@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,7 +32,63 @@ func rotateTestPool(t *testing.T) *pgxpool.Pool {
 		p.Close()
 		t.Skipf("postgres ping failed: %v", err)
 	}
+	// Close registered FIRST so it runs AFTER per-test signing_key cleanups
+	// (t.Cleanup is LIFO). A `defer p.Close()` at the call site closed the pool
+	// before the cleanups ran, silently leaking test keys into the shared DB.
+	t.Cleanup(p.Close)
 	return p
+}
+
+// lockSigningKeys serializes signing_key tests ACROSS test binaries: `go test
+// ./...` runs packages in parallel against the same shared dev Postgres, so a
+// Rotate in one package can demote rows another package's test just seeded.
+// A session-scoped advisory lock (held on a dedicated pooled conn for the
+// test's duration) makes table-wide active-flag scenarios deterministic.
+// Registered FIRST so the unlock cleanup runs LAST (after restores/deletes).
+func lockSigningKeys(t *testing.T, p *pgxpool.Pool) {
+	t.Helper()
+	conn, err := p.Acquire(context.Background())
+	if err != nil {
+		t.Fatalf("acquire conn for advisory lock: %v", err)
+	}
+	if _, err := conn.Exec(context.Background(),
+		"SELECT pg_advisory_lock(hashtext('signing_key_test'))"); err != nil {
+		conn.Release()
+		t.Fatalf("pg_advisory_lock: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = conn.Exec(context.Background(),
+			"SELECT pg_advisory_unlock(hashtext('signing_key_test'))")
+		conn.Release()
+	})
+}
+
+// restoreActivesAfter snapshots the kids that are active right now and
+// re-activates them when the test finishes. Tests that trigger Rotate demote
+// every active row table-wide; without this, a test run left the live
+// identity-svc's signing key demoted in the shared dev DB.
+func restoreActivesAfter(t *testing.T, p *pgxpool.Pool) {
+	t.Helper()
+	rows, err := p.Query(context.Background(), "SELECT kid FROM signing_key WHERE active")
+	if err != nil {
+		t.Fatalf("snapshot actives: %v", err)
+	}
+	var saved []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			rows.Close()
+			t.Fatalf("scan kid: %v", err)
+		}
+		saved = append(saved, k)
+	}
+	rows.Close()
+	t.Cleanup(func() {
+		for _, k := range saved {
+			_, _ = p.Exec(context.Background(),
+				"UPDATE signing_key SET active=true WHERE kid=$1", k)
+		}
+	})
 }
 
 // newSignedToken builds a JWT against the live Store (so it lands in the
@@ -58,7 +115,8 @@ func newSignedToken(t *testing.T, store *sjwt.Store, issuer string, roles []stri
 
 func TestCedarGatesRotate_AllowsPlatformAdmin(t *testing.T) {
 	p := rotateTestPool(t)
-	defer p.Close()
+	lockSigningKeys(t, p)
+	restoreActivesAfter(t, p)
 
 	ctx := context.Background()
 	kid := "cedar-allow-" + time.Now().Format("150405.000000")
@@ -84,7 +142,12 @@ func TestCedarGatesRotate_AllowsPlatformAdmin(t *testing.T) {
 
 	tok := newSignedToken(t, ks, issuer, []string{"platform-admin"})
 
-	req := httptest.NewRequest("POST", "/v1/admin/keys/rotate", nil)
+	// Pass an explicit kid that the cleanup pattern above covers. Without a
+	// body the handler defaults to "kid-<unixnano>", which the cleanup missed
+	// — those rows leaked into the shared dev DB on every test run.
+	req := httptest.NewRequest("POST", "/v1/admin/keys/rotate",
+		strings.NewReader(`{"kid":"cedar-allow-rot-`+time.Now().Format("150405.000000")+`"}`))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+tok)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -96,7 +159,7 @@ func TestCedarGatesRotate_AllowsPlatformAdmin(t *testing.T) {
 
 func TestCedarGatesRotate_Denies403WithoutAdminRole(t *testing.T) {
 	p := rotateTestPool(t)
-	defer p.Close()
+	lockSigningKeys(t, p)
 
 	ctx := context.Background()
 	kid := "cedar-deny-" + time.Now().Format("150405.000000")

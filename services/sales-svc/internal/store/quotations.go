@@ -152,3 +152,20 @@ func (s *QuotationStore) Update(ctx context.Context, tid, id uuid.UUID, in Updat
 	}
 	return &q, nil
 }
+
+// Delete hard-deletes a quotation. Returns ErrNotFound when absent.
+func (s *QuotationStore) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return withTenant(ctx, s.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`DELETE FROM quotation WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}

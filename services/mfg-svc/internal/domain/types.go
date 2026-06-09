@@ -79,6 +79,7 @@ type WorkCenter struct {
 	Name              string
 	Type              WCType
 	CapacityPerDayHrs float64
+	MachineCount      int
 	Status            ItemStatus
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
@@ -198,6 +199,7 @@ type WorkOrder struct {
 	EndAt            *time.Time
 	RoutingHeaderID  *uuid.UUID
 	BOMHeaderID      *uuid.UUID
+	SourceSoID       *uuid.UUID
 	Notes            string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -249,6 +251,7 @@ type Lot struct {
 	QtyOnHand   float64
 	Status      LotStatus
 	SourceWOID  *uuid.UUID
+	Notes       string
 	CreatedAt   time.Time
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCw, ChevronRight, Calendar } from "lucide-react";
+import { Plus, RefreshCw, ChevronRight, Calendar, Trash2 } from "lucide-react";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
@@ -10,6 +10,7 @@ import { listProjects, type Project } from "@/lib/api/projects";
 import {
   listSprintsForProject,
   createSprint,
+  deleteSprint,
   type Sprint,
   type SprintStatus,
 } from "@/lib/api/sprints";
@@ -137,6 +138,67 @@ function CreateSprintDialog({ open, projects, onClose, onCreated }: CreateDialog
   );
 }
 
+// ── Delete Sprint Dialog ───────────────────────────────────────────────────
+
+function DeleteSprintDialog({
+  sprint,
+  onClose,
+  onDeleted,
+}: {
+  sprint: Sprint;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [conflict, setConflict] = useState(false);
+
+  async function handleDelete() {
+    setBusy(true);
+    setError("");
+    setConflict(false);
+    try {
+      await deleteSprint(sprint.id, sprint.version);
+      onDeleted();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete sprint";
+      if (msg.includes("409") || msg.toLowerCase().includes("conflict")) {
+        setConflict(true);
+      } else {
+        setError(msg);
+      }
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Delete sprint"
+      description="This soft-deletes the sprint. Tasks remain but lose this sprint assignment."
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={busy} onClick={() => void handleDelete()}>Delete sprint</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-ink-2">
+          Delete <span className="font-medium text-ink">{sprint.name}</span>? This action cannot be undone from here.
+        </p>
+        {conflict && (
+          <p role="alert" className="rounded-sm border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-ink-2">
+            <span className="font-medium text-warning">Conflict:</span> this sprint changed elsewhere. Refresh the list and retry.
+          </p>
+        )}
+        {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      </div>
+    </Dialog>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function SprintsPage() {
@@ -146,6 +208,7 @@ export default function SprintsPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Sprint | null>(null);
   const [error, setError] = useState("");
 
   const loadProjects = useCallback(async () => {
@@ -292,6 +355,7 @@ export default function SprintsPage() {
                     <th className="px-3 py-2.5">Dates</th>
                     <th className="px-3 py-2.5 text-right">Capacity</th>
                     <th className="px-3 py-2.5 text-right">Created</th>
+                    <th className="w-8" aria-label="Delete" />
                     <th className="w-6" aria-label="Open" />
                   </tr>
                 </thead>
@@ -333,6 +397,16 @@ export default function SprintsPage() {
                           {fmtDate(sp.createdAt)}
                         </td>
                         <td className="px-3 py-2.5 text-right">
+                          <button
+                            type="button"
+                            aria-label={`Delete ${sp.name}`}
+                            onClick={(e) => { e.stopPropagation(); setDeleteTarget(sp); }}
+                            className="rounded-sm p-1 text-ink-3 hover:bg-danger/10 hover:text-danger"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
                           <ChevronRight size={14} className="text-ink-3 opacity-50" />
                         </td>
                       </tr>
@@ -351,6 +425,17 @@ export default function SprintsPage() {
         onClose={() => setShowCreate(false)}
         onCreated={handleCreated}
       />
+
+      {deleteTarget && (
+        <DeleteSprintDialog
+          sprint={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => {
+            setDeleteTarget(null);
+            void loadSprints(selectedProjectId, projects);
+          }}
+        />
+      )}
     </div>
   );
 }

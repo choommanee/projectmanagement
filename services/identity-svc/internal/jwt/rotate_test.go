@@ -37,12 +37,20 @@ func rotatePool(t *testing.T) *pgxpool.Pool {
 		p.Close()
 		t.Skipf("postgres ping failed: %v", err)
 	}
+	// Close registered FIRST so it runs AFTER per-test signing_key cleanups
+	// (t.Cleanup is LIFO). See newPool in store_test.go for the incident note.
+	t.Cleanup(p.Close)
 	return p
 }
 
 func TestRotatePublishesBothKeysAndMarksNewestActive(t *testing.T) {
 	p := rotatePool(t)
-	defer p.Close()
+	lockSigningKeys(t, p)
+
+	// Rotate demotes every active row table-wide; snapshot + restore the
+	// shared dev DB's active set so the live identity-svc's key is not left
+	// demoted by a test run.
+	deactivateAllActives(t, p)
 
 	ctx := context.Background()
 	suffix := uniqSuffix(t)
@@ -143,7 +151,6 @@ func TestRotatePublishesBothKeysAndMarksNewestActive(t *testing.T) {
 
 func TestJWKSExcludesKeysPastGrace(t *testing.T) {
 	p := rotatePool(t)
-	defer p.Close()
 
 	ctx := context.Background()
 	suffix := uniqSuffix(t)

@@ -57,6 +57,8 @@ func createShipment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.shipment.create", "shipment", s.ID.String(), nil,
+			map[string]any{"code": s.Code, "status": s.Status})
 		writeJSON(w, 201, s)
 	}
 }
@@ -176,6 +178,72 @@ func updateShipment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.shipment.update", "shipment", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": s.Status})
 		writeJSON(w, 200, s)
+	}
+}
+
+type updateShipmentStatusReq struct {
+	Status domain.ShipmentStatus `json:"status"`
+}
+
+func updateShipmentStatus(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req updateShipmentStatusReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if req.Status == "" {
+			writeErr(w, 400, errors.New("status required"))
+			return
+		}
+		s, err := svc.Shipments.UpdateStatus(r.Context(), tid, id, req.Status)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.shipment.status", "shipment", id.String(), nil,
+			map[string]any{"status": s.Status})
+		writeJSON(w, 200, s)
+	}
+}
+
+func deleteShipment(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.Shipments.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.shipment.delete", "shipment", id.String(), nil, nil)
+		w.WriteHeader(204)
 	}
 }

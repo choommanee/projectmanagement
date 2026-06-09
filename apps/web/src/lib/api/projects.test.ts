@@ -6,26 +6,27 @@ beforeEach(() => {
 });
 
 describe("projects API client", () => {
-  it("listProjects normalizes Go-style keys and handles empty items array", async () => {
+  it("listProjects maps snake_case payload and handles empty items array", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         items: [
           {
-            ID: "abc-123",
-            TenantID: "t-001",
-            Code: "PRJ-1",
-            Name: "Test Project",
-            Description: "A test",
-            Status: "active",
-            OwnerID: null,
-            StartDate: null,
-            DueDate: "2026-12-31",
-            ProgressPct: 42,
-            Tags: ["alpha"],
-            CreatedAt: "2026-01-01T00:00:00Z",
-            UpdatedAt: "2026-05-01T00:00:00Z",
-            Version: 3,
+            id: "abc-123",
+            tenant_id: "t-001",
+            code: "PRJ-1",
+            name: "Test Project",
+            description: "A test",
+            status: "active",
+            owner_id: null,
+            start_date: null,
+            due_date: "2026-12-31",
+            progress_pct: 42,
+            tags: ["alpha"],
+            settings: { color: "blue" },
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-05-01T00:00:00Z",
+            version: 3,
           },
         ],
         total: 1,
@@ -37,7 +38,10 @@ describe("projects API client", () => {
     expect(items[0].id).toBe("abc-123");
     expect(items[0].tenantId).toBe("t-001");
     expect(items[0].code).toBe("PRJ-1");
+    expect(items[0].dueDate).toBe("2026-12-31");
     expect(items[0].progressPct).toBe(42);
+    expect(items[0].tags).toEqual(["alpha"]);
+    expect(items[0].settings).toEqual({ color: "blue" });
     expect(items[0].version).toBe(3);
   });
 
@@ -69,15 +73,16 @@ describe("projects API client", () => {
       ok: true,
       json: async () => ({
         id: "p-1",
-        tenantId: "t-1",
+        tenant_id: "t-1",
         code: "PRJ-1",
         name: "Updated",
         description: "",
         status: "active",
-        progressPct: 0,
+        progress_pct: 0,
         tags: [],
-        createdAt: "",
-        updatedAt: "",
+        settings: {},
+        created_at: "",
+        updated_at: "",
         version: 2,
       }),
     });
@@ -104,6 +109,47 @@ describe("projects API client", () => {
     expect(body).toContain('"due_date":"2026-06-20"');
   });
 
+  it("updateProject serializes empty description and null dates as explicit clears", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "p-1",
+        tenant_id: "t-1",
+        code: "PRJ-1",
+        name: "Updated",
+        description: "",
+        status: "active",
+        start_date: "2026-06-02",
+        due_date: null,
+        progress_pct: 0,
+        tags: [],
+        settings: {},
+        created_at: "",
+        updated_at: "",
+        version: 3,
+      }),
+    });
+    global.fetch = mockFetch;
+
+    const p = await updateProject("p-1", {
+      name: "Updated",
+      description: "",
+      start_date: "2026-06-02",
+      due_date: null,
+      version: 2,
+    });
+
+    // "" and null must survive JSON.stringify — they are the clear signals
+    // the backend's *string / optDate decoding relies on.
+    const body = String((mockFetch.mock.calls[0][1] as { body: string }).body);
+    expect(body).toContain('"description":""');
+    expect(body).toContain('"due_date":null');
+    expect(body).toContain('"start_date":"2026-06-02"');
+    expect(p.description).toBe("");
+    expect(p.dueDate).toBeNull();
+    expect(p.startDate).toBe("2026-06-02");
+  });
+
   it("deleteProject sends version as query param", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 204 });
     global.fetch = mockFetch;
@@ -112,6 +158,7 @@ describe("projects API client", () => {
 
     expect(mockFetch).toHaveBeenCalledWith("/api/projects/p-2?version=5", {
       method: "DELETE",
+      headers: { "X-Confirm-Destructive": "true" },
     });
   });
 });

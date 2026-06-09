@@ -132,7 +132,15 @@ func TestCreateDocumentHTTP(t *testing.T) {
 	}
 	var ws map[string]any
 	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
-	wsID := ws["ID"].(string)
+	if _, ok := ws["id"].(string); !ok {
+		t.Fatalf("workspace response missing snake_case id: %v", ws)
+	}
+	for _, k := range []string{"id", "tenant_id", "project_id", "kind", "name", "created_at"} {
+		if _, ok := ws[k]; !ok {
+			t.Fatalf("workspace response missing snake_case key %q: %v", k, ws)
+		}
+	}
+	wsID := ws["id"].(string)
 
 	// Create document
 	body := map[string]any{
@@ -148,18 +156,40 @@ func TestCreateDocumentHTTP(t *testing.T) {
 	}
 	var doc map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &doc)
-	docID, ok := doc["ID"].(string)
+	docID, ok := doc["id"].(string)
 	if !ok || docID == "" {
-		t.Fatalf("no ID in response: %v", doc)
+		t.Fatalf("no snake_case id in response: %v", doc)
+	}
+	// Assert the full snake_case contract on the create response.
+	for _, k := range []string{"id", "workspace_id", "project_id", "current_version_id", "created_at"} {
+		if _, ok := doc[k]; !ok {
+			t.Fatalf("create document response missing snake_case key %q: %v", k, doc)
+		}
+	}
+	// Ensure no PascalCase leakage.
+	for _, k := range []string{"ID", "WorkspaceID", "ProjectID", "CurrentVersionID", "CreatedAt"} {
+		if _, ok := doc[k]; ok {
+			t.Fatalf("create document response leaked PascalCase key %q: %v", k, doc)
+		}
 	}
 	t.Cleanup(func() {
 		p.Exec(ctx, "DELETE FROM document WHERE id=$1", docID)
 	})
 
-	// Verify it's retrievable
+	// Verify it's retrievable and also snake_case
 	rr = doJSON(t, h, "GET", "/v1/documents/"+docID, nil, headers)
 	if rr.Code != 200 {
 		t.Fatalf("get document: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	for _, k := range []string{"id", "workspace_id", "project_id", "current_version_id", "created_at"} {
+		if _, ok := got[k]; !ok {
+			t.Fatalf("get document response missing snake_case key %q: %v", k, got)
+		}
+	}
+	if _, ok := got["ID"]; ok {
+		t.Fatalf("get document response leaked PascalCase ID: %v", got)
 	}
 }
 
@@ -178,7 +208,7 @@ func TestListDocumentsHTTP(t *testing.T) {
 	}, headers)
 	var ws map[string]any
 	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
-	wsID := ws["ID"].(string)
+	wsID := ws["id"].(string)
 
 	// Create two documents
 	for i, title := range []string{"Doc Alpha", "Doc Beta"} {
@@ -193,7 +223,7 @@ func TestListDocumentsHTTP(t *testing.T) {
 		}
 		var d map[string]any
 		_ = json.Unmarshal(rr.Body.Bytes(), &d)
-		id := d["ID"].(string)
+		id := d["id"].(string)
 		t.Cleanup(func() { p.Exec(ctx, "DELETE FROM document WHERE id=$1", id) })
 	}
 
@@ -225,7 +255,7 @@ func TestPatchDocumentCreatesNewVersionHTTP(t *testing.T) {
 	}, headers)
 	var ws map[string]any
 	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
-	wsID := ws["ID"].(string)
+	wsID := ws["id"].(string)
 
 	// Create document
 	createResp := doJSON(t, h, "POST", "/v1/documents", map[string]any{
@@ -239,7 +269,7 @@ func TestPatchDocumentCreatesNewVersionHTTP(t *testing.T) {
 	}
 	var doc map[string]any
 	_ = json.Unmarshal(createResp.Body.Bytes(), &doc)
-	docID := doc["ID"].(string)
+	docID := doc["id"].(string)
 	t.Cleanup(func() { p.Exec(ctx, "DELETE FROM document WHERE id=$1", docID) })
 
 	// Verify version list has 1 entry
@@ -262,8 +292,8 @@ func TestPatchDocumentCreatesNewVersionHTTP(t *testing.T) {
 	}
 	var patched map[string]any
 	_ = json.Unmarshal(patchResp.Body.Bytes(), &patched)
-	if int(patched["Version"].(float64)) != 2 {
-		t.Fatalf("expected Version=2 after patch, got %v", patched["Version"])
+	if int(patched["version"].(float64)) != 2 {
+		t.Fatalf("expected version=2 after patch, got %v", patched["version"])
 	}
 
 	// Verify version list now has 2 entries
@@ -300,7 +330,7 @@ func TestPatchDocumentMetadata(t *testing.T) {
 	}
 	var ws map[string]any
 	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
-	wsID := ws["ID"].(string)
+	wsID := ws["id"].(string)
 
 	// Create an ADR document
 	createResp := doJSON(t, h, "POST", "/v1/documents", map[string]any{
@@ -314,7 +344,7 @@ func TestPatchDocumentMetadata(t *testing.T) {
 	}
 	var doc map[string]any
 	_ = json.Unmarshal(createResp.Body.Bytes(), &doc)
-	docID := doc["ID"].(string)
+	docID := doc["id"].(string)
 	t.Cleanup(func() { p.Exec(ctx, "DELETE FROM document WHERE id=$1", docID) })
 
 	// PATCH with metadata (ADR votes)
@@ -332,9 +362,9 @@ func TestPatchDocumentMetadata(t *testing.T) {
 	_ = json.Unmarshal(patchResp.Body.Bytes(), &patched)
 
 	// Assert metadata echoed in response
-	meta, ok := patched["Metadata"].(map[string]any)
+	meta, ok := patched["metadata"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected Metadata in response, got: %v", patched["Metadata"])
+		t.Fatalf("expected metadata in response, got: %v", patched["metadata"])
 	}
 	votesOut, ok := meta["votes"].([]any)
 	if !ok || len(votesOut) != 1 {
@@ -348,12 +378,143 @@ func TestPatchDocumentMetadata(t *testing.T) {
 	}
 	var fetched map[string]any
 	_ = json.Unmarshal(getResp.Body.Bytes(), &fetched)
-	fetchedMeta, ok := fetched["Metadata"].(map[string]any)
+	fetchedMeta, ok := fetched["metadata"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected Metadata in GET response, got: %v", fetched["Metadata"])
+		t.Fatalf("expected metadata in GET response, got: %v", fetched["metadata"])
 	}
 	fetchedVotes, ok := fetchedMeta["votes"].([]any)
 	if !ok || len(fetchedVotes) != 1 {
 		t.Fatalf("expected 1 persisted vote, got: %v", fetchedMeta["votes"])
+	}
+}
+
+// TestListAllWorkspacesHTTP verifies the tenant-wide workspace list (no
+// project_id) introduced for the cross-project Document Hub, plus the kind
+// filter. Regression guard: the route used to 400 ("project_id required").
+func TestListAllWorkspacesHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	pid := seedTestProject(t, p, tid)
+	h := newTestHandler(p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	for _, k := range []string{"ba", "sa", "expert"} {
+		rr := doJSON(t, h, "POST", "/v1/workspaces", map[string]any{
+			"project_id": pid.String(), "kind": k, "name": k + " ws",
+		}, headers)
+		if rr.Code != 200 {
+			t.Fatalf("ensure %s workspace: got %d: %s", k, rr.Code, rr.Body.String())
+		}
+	}
+
+	// No project_id → tenant-wide list.
+	rr := doJSON(t, h, "GET", "/v1/workspaces", nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("list all workspaces: got %d: %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Items []map[string]any `json:"items"`
+		Total int              `json:"total"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &out)
+	if out.Total < 3 || len(out.Items) < 3 {
+		t.Fatalf("expected >=3 workspaces, got total=%d len=%d", out.Total, len(out.Items))
+	}
+	if _, ok := out.Items[0]["id"]; !ok {
+		t.Fatalf("workspace item missing snake_case id: %v", out.Items[0])
+	}
+
+	// kind filter.
+	rr = doJSON(t, h, "GET", "/v1/workspaces?kind=sa", nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("list ws kind=sa: got %d: %s", rr.Code, rr.Body.String())
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &out)
+	for _, w := range out.Items {
+		if w["kind"] != "sa" {
+			t.Fatalf("kind filter leaked %v", w["kind"])
+		}
+	}
+}
+
+// TestGetWorkspaceByIDHTTP verifies the workspace detail route (used by the
+// docs workspace detail page). Regression guard: the route used to 404.
+func TestGetWorkspaceByIDHTTP(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	pid := seedTestProject(t, p, tid)
+	h := newTestHandler(p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/workspaces", map[string]any{
+		"project_id": pid.String(), "kind": "pm", "name": "Detail WS",
+	}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("ensure ws: got %d: %s", rr.Code, rr.Body.String())
+	}
+	var ws map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &ws)
+	wsID := ws["id"].(string)
+
+	rr = doJSON(t, h, "GET", "/v1/workspaces/"+wsID, nil, headers)
+	if rr.Code != 200 {
+		t.Fatalf("get workspace by id: got %d: %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["id"] != wsID || got["name"] != "Detail WS" || got["kind"] != "pm" {
+		t.Fatalf("unexpected workspace detail: %v", got)
+	}
+
+	// Unknown id → 404.
+	rr = doJSON(t, h, "GET", "/v1/workspaces/"+uuid.NewString(), nil, headers)
+	if rr.Code != 404 {
+		t.Fatalf("expected 404 for unknown ws, got %d", rr.Code)
+	}
+}
+
+// TestPatchDocumentInvalidStatus verifies a bogus status is rejected with 400
+// instead of the DB enum 500 it used to produce.
+func TestPatchDocumentInvalidStatus(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	pid := seedTestProject(t, p, tid)
+	h := newTestHandler(p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+	ctx := context.Background()
+
+	wsResp := doJSON(t, h, "POST", "/v1/workspaces", map[string]any{
+		"project_id": pid.String(), "kind": "ba", "name": "BA",
+	}, headers)
+	var ws map[string]any
+	_ = json.Unmarshal(wsResp.Body.Bytes(), &ws)
+
+	docResp := doJSON(t, h, "POST", "/v1/documents", map[string]any{
+		"workspace_id": ws["id"], "project_id": pid.String(), "type": "brd", "title": "Status Test",
+	}, headers)
+	if docResp.Code != 201 {
+		t.Fatalf("create doc: got %d: %s", docResp.Code, docResp.Body.String())
+	}
+	var doc map[string]any
+	_ = json.Unmarshal(docResp.Body.Bytes(), &doc)
+	docID := doc["id"].(string)
+	t.Cleanup(func() { p.Exec(ctx, "DELETE FROM document WHERE id=$1", docID) })
+
+	rr := doJSON(t, h, "PATCH", "/v1/documents/"+docID, map[string]any{
+		"status": "garbage", "version": 1,
+	}, headers)
+	if rr.Code != 400 {
+		t.Fatalf("expected 400 for invalid status, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// A valid transition still succeeds.
+	rr = doJSON(t, h, "PATCH", "/v1/documents/"+docID, map[string]any{
+		"status": "review", "version": 1,
+	}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("expected 200 for valid status, got %d: %s", rr.Code, rr.Body.String())
 	}
 }

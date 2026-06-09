@@ -28,7 +28,7 @@ import (
 )
 
 func main() {
-	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5433/platform?sslmode=disable")
+	dsn := envOr("DATABASE_URL", "postgres://app:app@localhost:5432/platform?sslmode=disable")
 	port := envOr("PORT", "8082")
 	issuer := envOr("JWT_ISSUER", "http://localhost:8082")
 	kid := envOr("JWT_KID", "kid-dev-1")
@@ -54,11 +54,19 @@ func main() {
 	}
 	keyStore := jwt.NewStore(p, 0) // 0 -> default 24h JWKS grace window
 	// Seed the in-memory active key so the dynamic signer is ready before
-	// the first request, then prefer the DB-backed view if a more recent
-	// active key exists (e.g. another replica rotated while we were down).
+	// the first request.
 	keyStore.Bind(kp, kid)
-	if err := keyStore.Refresh(context.Background()); err != nil {
-		log.Warn().Err(err).Msg("keyStore refresh failed; using bootstrap key")
+	// Reconcile to EXACTLY ONE active key: if legacy pollution / a crashed
+	// rotation left multiple actives, keep the newest and supersede the rest,
+	// then bind the in-memory signer to it so DB + signer + JWKS all agree on
+	// a single minting kid. Falls back to the bootstrap bind if nothing is
+	// active. This is the boot-consistency guard against the desync that caused
+	// the platform-wide 401 (signer minting a kid that JWKS no longer served).
+	if reconciledKid, err := keyStore.ReconcileActive(context.Background()); err != nil {
+		log.Warn().Err(err).Msg("keyStore reconcile failed; using bootstrap key")
+	} else if reconciledKid != "" {
+		kid = reconciledKid
+		log.Info().Str("active_kid", reconciledKid).Msg("signing key reconciled to single active")
 	}
 	// DynamicSigner re-resolves the active key on each Sign call so a
 	// rotation via POST /v1/admin/keys/rotate takes effect immediately.
@@ -170,6 +178,20 @@ func main() {
 	var _ libauth.Authorizer = authz // compile-time interface check
 	h := api.NewRouterFullWithOIDC(auth, refresh, passwordReset, mfaSvc, oidcSvc, kp, keyStore, issuer, authz, authz, p)
 	h = api.WithUserList(h, keyStore, issuer, users)
+
+	// Service-to-service token endpoint. OPTIONAL at boot: an empty
+	// SERVICE_TOKEN_SECRET leaves the endpoint UNMOUNTED entirely (404) so no
+	// token can ever be minted with an empty secret. When set, callers on the
+	// internal network present the secret via X-Service-Secret to mint a
+	// short-lived JWT for cross-service Cedar-gated calls.
+	serviceSecret := os.Getenv("SERVICE_TOKEN_SECRET")
+	svcToken := service.NewServiceToken(signer, serviceSecret, pub)
+	if svcToken.Enabled() {
+		h = api.WithServiceToken(h, svcToken)
+		log.Info().Msg("service-token endpoint enabled (POST /v1/internal/service-token)")
+	} else {
+		log.Warn().Msg("SERVICE_TOKEN_SECRET not set — POST /v1/internal/service-token disabled")
+	}
 
 	// Wrap with a thin mux that exposes /metrics before the OTEL HTTP handler.
 	mux := chi.NewRouter()

@@ -139,14 +139,16 @@ export default function DocumentsPage() {
   const [total, setTotal] = useState(0);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<DocumentType | "">("");
+  const [statusFilter, setStatusFilter] = useState<DocumentStatus | "">("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = useCallback((q?: string) => {
+  const load = useCallback((q?: string, type?: DocumentType | "", status?: DocumentStatus | "") => {
     setLoading(true);
     Promise.all([
-      listDocuments({ limit: 100, q: q || undefined }),
+      listDocuments({ limit: 100, q: q || undefined, type: type || undefined, status: status || undefined }),
       listAllWorkspaces({ limit: 200 }),
     ])
       .then(([result, ws]) => {
@@ -159,13 +161,9 @@ export default function DocumentsPage() {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    const t = setTimeout(() => load(search), search ? 300 : 0);
+    const t = setTimeout(() => load(search, typeFilter, statusFilter), search ? 300 : 0);
     return () => clearTimeout(t);
-  }, [search, load]);
+  }, [search, typeFilter, statusFilter, load]);
 
   const wsMap = Object.fromEntries(workspaces.map((w) => [w.id, w]));
 
@@ -188,8 +186,8 @@ export default function DocumentsPage() {
           </Button>
         </div>
 
-        {/* Search bar */}
-        <div className="mb-4 flex items-center gap-2">
+        {/* Search + filters bar */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative max-w-xs flex-1">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-3" />
             <Input
@@ -199,6 +197,27 @@ export default function DocumentsPage() {
               className="pl-8"
             />
           </div>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as DocumentType | "")}
+            className="rounded-sm border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            <option value="">All types</option>
+            {ALL_DOC_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as DocumentStatus | "")}
+            className="rounded-sm border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
+          >
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="review">In Review</option>
+            <option value="approved">Approved</option>
+            <option value="archived">Archived</option>
+          </select>
           <span className="font-mono text-[11px] text-ink-3 tabular-nums">
             {total} document{total !== 1 ? "s" : ""}
           </span>

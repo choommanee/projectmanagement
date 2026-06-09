@@ -108,17 +108,61 @@ func (s *Templates) ListAll(ctx context.Context, tid uuid.UUID) ([]*domain.Templ
 	return items, nil
 }
 
+// Update mutates an existing template's type/name/body. created_at and
+// is_system are immutable. Returns ErrNotFound when the row is absent for the
+// tenant.
+func (s *Templates) Update(ctx context.Context, t *domain.Template) error {
+	bodyJSON := toJSON(t.Body)
+	return s.withTenant(ctx, t.TenantID, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `
+			UPDATE document_template
+			SET type=$3, name=$4, body=$5
+			WHERE id=$1 AND tenant_id=$2`,
+			t.ID, t.TenantID, string(t.Type), t.Name, bodyJSON,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// Delete removes a template. Returns ErrNotFound when the row is absent for
+// the tenant. System-template protection is enforced in the service layer.
+func (s *Templates) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `
+			DELETE FROM document_template WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
 // GetByID fetches a single template.
 func (s *Templates) GetByID(ctx context.Context, tid, id uuid.UUID) (*domain.Template, error) {
 	var t domain.Template
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
 		var bodyBytes []byte
-		return tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			SELECT id, tenant_id, type, name, body, is_system, created_at
 			FROM document_template
 			WHERE id=$1 AND tenant_id=$2`,
 			id, tid,
-		).Scan(&t.ID, &t.TenantID, &t.Type, &t.Name, &bodyBytes, &t.IsSystem, &t.CreatedAt)
+		).Scan(&t.ID, &t.TenantID, &t.Type, &t.Name, &bodyBytes, &t.IsSystem, &t.CreatedAt); err != nil {
+			return err
+		}
+		t.Body = fromJSON(bodyBytes)
+		return nil
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrNotFound

@@ -63,6 +63,9 @@ type ListTasksOpts struct {
 	ProjectID *uuid.UUID
 	Status    string
 	Assignee  *uuid.UUID
+	Reviewer  *uuid.UUID
+	Type      string
+	Tags      []string // overlap match: returns tasks having ANY of these tags
 	Q         string
 	Limit     int
 	Offset    int
@@ -90,6 +93,21 @@ func (s *Tasks) List(ctx context.Context, tid uuid.UUID, opts ListTasksOpts) ([]
 	if opts.Assignee != nil {
 		where = append(where, fmt.Sprintf("assignee_id = $%d", idx))
 		args = append(args, *opts.Assignee)
+		idx++
+	}
+	if opts.Reviewer != nil {
+		where = append(where, fmt.Sprintf("reviewer_id = $%d", idx))
+		args = append(args, *opts.Reviewer)
+		idx++
+	}
+	if opts.Type != "" {
+		where = append(where, fmt.Sprintf("type = $%d", idx))
+		args = append(args, opts.Type)
+		idx++
+	}
+	if len(opts.Tags) > 0 {
+		where = append(where, fmt.Sprintf("tags && $%d", idx))
+		args = append(args, opts.Tags)
 		idx++
 	}
 	if opts.Q != "" {
@@ -172,6 +190,8 @@ type TaskPatch struct {
 	SortOrder   *int
 	Tags        *[]string
 	ParentID    **uuid.UUID
+	StartDate   **time.Time // outer nil = don't change; inner nil = clear
+	DueDate     **time.Time
 }
 
 // Patch applies only the non-nil fields in p to the task row identified by
@@ -215,6 +235,13 @@ func (s *Tasks) Patch(ctx context.Context, p TaskPatch) (*domain.Task, error) {
 			}
 			return *v
 		}
+		// Same outer/inner pointer convention as uuidArg, for nullable dates.
+		dateArg := func(v **time.Time) interface{} {
+			if v == nil {
+				return nil // CASE will keep old value
+			}
+			return *v // may be nil (clear) or a time value
+		}
 
 		ct, err := tx.Exec(ctx, `
 			UPDATE task SET
@@ -237,6 +264,12 @@ func (s *Tasks) Patch(ctx context.Context, p TaskPatch) (*domain.Task, error) {
 			  parent_id    = CASE WHEN $17::uuid IS NOT DISTINCT FROM NULL AND $18 THEN NULL
 			                      WHEN $17::uuid IS NOT NULL THEN $17::uuid
 			                      ELSE parent_id END,
+			  start_date   = CASE WHEN $20::date IS NOT DISTINCT FROM NULL AND $21 THEN NULL
+			                      WHEN $20::date IS NOT NULL THEN $20::date
+			                      ELSE start_date END,
+			  due_date     = CASE WHEN $22::date IS NOT DISTINCT FROM NULL AND $23 THEN NULL
+			                      WHEN $22::date IS NOT NULL THEN $22::date
+			                      ELSE due_date END,
 			  updated_at   = now(),
 			  version      = version + 1
 			WHERE id = $1 AND tenant_id = $2 AND version = $19 AND deleted_at IS NULL`,
@@ -258,6 +291,10 @@ func (s *Tasks) Patch(ctx context.Context, p TaskPatch) (*domain.Task, error) {
 			uuidArg(p.ParentID),       // $17
 			p.ParentID != nil,         // $18
 			p.Version,                 // $19
+			dateArg(p.StartDate),      // $20
+			p.StartDate != nil,        // $21
+			dateArg(p.DueDate),        // $22
+			p.DueDate != nil,          // $23
 		)
 		if err != nil {
 			return err

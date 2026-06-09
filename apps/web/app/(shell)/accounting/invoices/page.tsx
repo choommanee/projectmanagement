@@ -8,6 +8,7 @@ import {
   listInvoices, createInvoice, updateInvoice, deleteInvoice,
   type Invoice, type InvType, type InvStatus,
 } from "@/lib/api/accounting";
+import { listCustomers, type Customer } from "@/lib/api/sales";
 
 const INV_STATUSES: { value: InvStatus | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -28,7 +29,7 @@ function statusTone(s: InvStatus): "neutral" | "info" | "accent" | "success" | "
 }
 
 type FormData = {
-  counterparty: string;
+  counterpartyId: string;
   amount: string;
   currency: string;
   issue_date: string;
@@ -37,16 +38,17 @@ type FormData = {
 };
 
 const EMPTY: FormData = {
-  counterparty: "", amount: "0", currency: "THB",
+  counterpartyId: "", amount: "0", currency: "THB",
   issue_date: new Date().toISOString().split("T")[0],
   due_date: "", notes: "",
 };
 
 function InvoiceDialog({
-  open, invType, onClose, onCreated,
+  open, invType, customers, onClose, onCreated,
 }: {
   open: boolean;
   invType: InvType;
+  customers: Customer[];
   onClose: () => void;
   onCreated: (inv: Invoice) => void;
 }) {
@@ -55,18 +57,18 @@ function InvoiceDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setError(null); }
-  }, [open]);
+    if (open) { setForm({ ...EMPTY, counterpartyId: customers[0]?.id ?? "" }); setError(null); }
+  }, [open, customers]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!form.counterparty) { setError("Counterparty is required."); return; }
+    if (!form.counterpartyId) { setError("Counterparty is required."); return; }
     setLoading(true);
     setError(null);
     try {
       const inv = await createInvoice({
         inv_type: invType,
-        counterparty: form.counterparty,
+        counterparty_id: form.counterpartyId,
         amount: Number(form.amount) || 0,
         currency: form.currency || "THB",
         issue_date: form.issue_date || undefined,
@@ -103,7 +105,15 @@ function InvoiceDialog({
           <label className="mb-1 block text-xs font-medium text-ink-2">
             {invType === "AR" ? "Customer / Counterparty" : "Vendor / Counterparty"} *
           </label>
-          <Input value={form.counterparty} onChange={f("counterparty")} placeholder="Counterparty name" required />
+          <select
+            value={form.counterpartyId}
+            onChange={(e) => setForm(p => ({ ...p, counterpartyId: e.target.value }))}
+            className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+            required
+          >
+            <option value="" disabled>Select counterparty…</option>
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -139,18 +149,31 @@ export default function InvoicesPage() {
   const [invType, setInvType] = useState<InvType>("AR");
   const [statusFilter, setStatusFilter] = useState<InvStatus | "">("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [transitioning, setTransitioning] = useState<string | null>(null);
 
+  const customerName = useCallback(
+    (inv: Invoice) =>
+      inv.counterpartyName ||
+      customers.find(c => c.id === inv.counterpartyId)?.name ||
+      inv.counterpartyId,
+    [customers],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await listInvoices({ type: invType, status: statusFilter || undefined });
+      const [res, custs] = await Promise.all([
+        listInvoices({ type: invType, status: statusFilter || undefined }),
+        listCustomers().catch(() => [] as Customer[]),
+      ]);
       setInvoices(res.items);
+      setCustomers(custs);
       setTotal(res.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoices");
@@ -164,7 +187,12 @@ export default function InvoicesPage() {
   async function transition(inv: Invoice, status: InvStatus) {
     setTransitioning(inv.id);
     try {
-      const updated = await updateInvoice(inv.id, { status });
+      // Stamp the payment timestamp when marking an invoice paid so the
+      // paid_at field round-trips instead of staying null.
+      const patch = status === "paid"
+        ? { status, paid_at: new Date().toISOString(), version: inv.version }
+        : { status, version: inv.version };
+      const updated = await updateInvoice(inv.id, patch);
       setInvoices(prev => {
         const idx = prev.findIndex(x => x.id === updated.id);
         if (idx >= 0) { const n = [...prev]; n[idx] = updated; return n; }
@@ -180,7 +208,7 @@ export default function InvoicesPage() {
   async function handleDelete(inv: Invoice) {
     if (!confirm(`Delete invoice ${inv.invNo || inv.id.slice(0, 8)}?`)) return;
     try {
-      await deleteInvoice(inv.id);
+      await deleteInvoice(inv.id, inv.version);
       setInvoices(prev => prev.filter(x => x.id !== inv.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete invoice");
@@ -244,7 +272,7 @@ export default function InvoicesPage() {
               {invoices.map((inv) => (
                 <tr key={inv.id} className="border-b border-line hover:bg-surface-2 cursor-pointer" onClick={() => router.push('/accounting/invoices/' + inv.id)}>
                   <td className="px-4 py-2 font-mono text-xs uppercase text-ink">{inv.invNo || inv.id.slice(0, 8)}</td>
-                  <td className="px-4 py-2 font-medium text-ink">{inv.counterparty}</td>
+                  <td className="px-4 py-2 font-medium text-ink">{customerName(inv)}</td>
                   <td className="px-4 py-2 text-right font-mono text-xs text-ink">
                     {inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
@@ -314,6 +342,7 @@ export default function InvoicesPage() {
       <InvoiceDialog
         open={dialogOpen}
         invType={invType}
+        customers={customers}
         onClose={() => setDialogOpen(false)}
         onCreated={(inv) => {
           setDialogOpen(false);

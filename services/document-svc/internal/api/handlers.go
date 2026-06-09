@@ -1,11 +1,13 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -58,6 +60,7 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 	r.Route("/v1", func(r chi.Router) {
 		// Workspaces
 		r.Get("/workspaces", listWorkspaces(svc))
+		r.Get("/workspaces/{id}", getWorkspace(svc))
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.workspace.ensure", "*")).Post("/workspaces", ensureWorkspace(svc))
 
@@ -87,15 +90,104 @@ func NewRouterWithLoader(svc *service.Service, authz libauth.Authorizer, loader 
 		// no resource id at create time — ABAC for create gates by context.tenant_id only
 		r.With(libauth.RequireAction(authz, "document.template.create", "*")).Post("/templates", createTemplate(svc))
 		r.Get("/templates/{id}", getTemplate(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.template.update", "Template::{:id}", loaderOpts...)).Patch("/templates/{id}", patchTemplate(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.template.delete", "Template::{:id}", loaderOpts...)).Delete("/templates/{id}", deleteTemplate(svc))
 
-		// Signatures
-		r.Get("/documents/{id}/signatures", listSignatures(svc))
-		r.Post("/documents/{id}/signatures", requestSignatures(svc))
-		r.Post("/documents/{id}/signatures/{sigId}/sign", signDocument(svc))
-		r.Post("/documents/{id}/signatures/{sigId}/decline", declineSignature(svc))
+		// --- Tier-1 e-signature: envelopes ---
+		r.With(libauth.RequireActionScoped(authz, "document.sign.envelope.create", "Document::{:id}", loaderOpts...)).
+			Post("/documents/{id}/sign-envelopes", createEnvelope(svc))
+		r.Get("/documents/{id}/sign-envelopes", listEnvelopesForDoc(svc))
+		r.Get("/documents/{id}/sign-audit", docSignAudit(svc))
+		r.Get("/documents/{id}/sign-certificate", docSignCertificate(svc))
+
+		r.Get("/sign-envelopes/{id}", getEnvelope(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.send", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/send", sendEnvelope(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.void", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/void", voidEnvelope(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.view", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/signers/{signerId}/view", viewSigner(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.sign", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/signers/{signerId}/sign", signEnvelopeSigner(svc))
+		// Email-OTP step-up: same Cedar posture as document.sign.sign — any
+		// authenticated user passes; the service enforces actor == signer row.
+		r.With(libauth.RequireActionScoped(authz, "document.sign.otp.request", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/signers/{signerId}/otp/request", requestSignOTP(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.decline", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/signers/{signerId}/decline", declineEnvelopeSigner(svc))
+		r.Get("/sign-envelopes/{id}/verify", verifyEnvelope(svc))
+		r.Get("/sign-envelopes/{id}/audit", envelopeAudit(svc))
+		r.Get("/sign-envelopes/{id}/certificate", envelopeCertificate(svc))
+
+		// Trust layer (handlers_trust.go): platform cert download +
+		// certificate-PDF signature verification — reads, same posture as
+		// the verify route above.
+		registerTrustRoutes(r, svc)
+
+		// Admin: import an operator-provided X.509 document-signing certificate
+		// (BYO cert) and read the active cert's metadata. platform-admin only
+		// (Cedar action document.sign.cert.import, resource "*").
+		r.With(libauth.RequireAction(authz, "document.sign.cert.import", "*")).
+			Post("/admin/sign-cert", importSignCert(svc))
+		r.With(libauth.RequireAction(authz, "document.sign.cert.import", "*")).
+			Get("/admin/sign-cert", getActiveSignCert(svc))
+
+		// Public verification links (handlers_public.go). Create + revoke
+		// share one Cedar action (document.sign.verify_link.create —
+		// tenant-admin / project-manager / workflow-service, mirroring
+		// document.sign.send); list is an RLS-scoped read.
+		r.With(libauth.RequireActionScoped(authz, "document.sign.verify_link.create", "SignEnvelope::{:id}", loaderOpts...)).
+			Post("/sign-envelopes/{id}/verify-links", createVerifyLink(svc))
+		r.Get("/sign-envelopes/{id}/verify-links", listVerifyLinks(svc))
+		r.With(libauth.RequireActionScoped(authz, "document.sign.verify_link.create", "SignEnvelope::{:id}", loaderOpts...)).
+			Delete("/sign-envelopes/{id}/verify-links/{linkId}", revokeVerifyLink(svc))
+
+		// NOTE: the legacy /v1/documents/{id}/signatures* shim routes were
+		// REMOVED (security hardening): they bypassed Cedar + claims entirely
+		// and the FE migrated to the envelope routes above (SignaturePanel →
+		// lib/api/signing.ts). Requests now 404.
 	})
 
+	// --- PUBLIC, UNAUTHENTICATED routes (handlers_public.go) ----------------
+	// Mounted OUTSIDE the /v1 group and carrying NO RequireAction middleware:
+	// the 256-bit share token in the path is the sole credential. Unknown,
+	// revoked, and expired tokens all return an indistinguishable 404 via one
+	// indexed lookup (cheap miss path).
+	r.Get("/public/verify/{token}", publicVerify(svc))
+	r.Get("/public/verify/{token}/certificate", publicVerifyCertificate(svc))
+
 	return r
+}
+
+// auditMeta extracts request-scoped audit context (IP / UA / actor).
+func auditMeta(r *http.Request) service.AuditMeta {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.RemoteAddr
+	} else if i := indexByte(ip, ','); i >= 0 {
+		ip = ip[:i] // first hop
+	}
+	var actor *uuid.UUID
+	if c, ok := libauth.FromCtx(r.Context()); ok && c != nil && c.Subject != "" {
+		if a, err := uuid.Parse(c.Subject); err == nil {
+			actor = &a
+		}
+	}
+	return service.AuditMeta{
+		IPAddress: ip,
+		UserAgent: r.UserAgent(),
+		Geo:       r.Header.Get("X-Geo"),
+		ActorID:   actor,
+	}
+}
+
+func indexByte(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
 }
 
 // tenantOr400 parses the X-Tenant-Id header and returns the UUID or writes 400.
@@ -143,6 +235,7 @@ func ensureWorkspace(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "document.workspace.ensure", "workspace", ws.ID.String())
 		writeJSON(w, 200, ws)
 	}
 }
@@ -153,18 +246,57 @@ func listWorkspaces(svc *service.Service) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		pidStr := r.URL.Query().Get("project_id")
-		pid, err := uuid.Parse(pidStr)
-		if err != nil {
-			writeErr(w, 400, errors.New("project_id required"))
+		q := r.URL.Query()
+		// When project_id is supplied, scope to that project (legacy contract).
+		// When omitted, return all workspaces for the tenant — this powers the
+		// cross-project Document Hub (workspaces list + hub dashboard), with an
+		// optional kind filter and pagination.
+		if pidStr := q.Get("project_id"); pidStr != "" {
+			pid, err := uuid.Parse(pidStr)
+			if err != nil {
+				writeErr(w, 400, errors.New("project_id must be a valid uuid"))
+				return
+			}
+			items, err := svc.Workspaces.ListForProject(r.Context(), tid, pid)
+			if err != nil {
+				writeErr(w, 500, err)
+				return
+			}
+			writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
 			return
 		}
-		items, err := svc.Workspaces.ListForProject(r.Context(), tid, pid)
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		offset, _ := strconv.Atoi(q.Get("offset"))
+		items, total, err := svc.Workspaces.ListAll(r.Context(), tid, domain.WorkspaceKind(q.Get("kind")), limit, offset)
 		if err != nil {
 			writeErr(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
+		writeJSON(w, 200, map[string]any{"items": items, "total": total})
+	}
+}
+
+func getWorkspace(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		ws, err := svc.Workspaces.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, ws)
 	}
 }
 
@@ -210,6 +342,7 @@ func createDocument(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "document.create", "document", d.ID.String())
 		writeJSON(w, 201, d)
 	}
 }
@@ -297,6 +430,10 @@ func patchDocument(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
+		if req.Status != "" && !req.Status.Valid() {
+			writeErr(w, 400, errors.New("status must be one of draft, review, approved, archived"))
+			return
+		}
 		d, err := svc.Documents.GetByID(r.Context(), tid, id)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {
@@ -334,6 +471,8 @@ func patchDocument(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWriteMeta(svc, r, tid, "document.update", "document", d.ID.String(),
+			map[string]any{"status": string(d.Status)})
 		writeJSON(w, 200, d)
 	}
 }
@@ -363,6 +502,7 @@ func deleteDocument(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "document.delete", "document", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -451,6 +591,8 @@ func restoreDocument(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWriteMeta(svc, r, tid, "document.restore", "document", d.ID.String(),
+			map[string]any{"rev": req.Rev})
 		writeJSON(w, 200, d)
 	}
 }
@@ -497,6 +639,8 @@ func createComment(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWriteMeta(svc, r, tid, "document.comment.create", "document_comment", c.ID.String(),
+			map[string]any{"document_id": docID.String()})
 		writeJSON(w, 201, c)
 	}
 }
@@ -540,6 +684,7 @@ func resolveComment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "document.comment.resolve", "document_comment", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -559,6 +704,7 @@ func deleteComment(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "document.comment.delete", "document_comment", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -599,6 +745,7 @@ func createTemplate(svc *service.Service) http.HandlerFunc {
 			}
 			return
 		}
+		auditWrite(svc, r, tid, "document.template.create", "document_template", t.ID.String())
 		writeJSON(w, 201, t)
 	}
 }
@@ -649,116 +796,527 @@ func getTemplate(svc *service.Service) http.HandlerFunc {
 	}
 }
 
-// --- Signatures ---
+type patchTemplateReq struct {
+	Type domain.DocumentType `json:"type,omitempty"`
+	Name string              `json:"name,omitempty"`
+	Body map[string]any      `json:"body,omitempty"`
+}
 
-func listSignatures(svc *service.Service) http.HandlerFunc {
+func patchTemplate(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tid, ok := tenantOr400(w, r)
 		if !ok {
 			return
 		}
-		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
 		if err != nil {
 			writeErr(w, 400, err)
 			return
 		}
-		sigs, err := svc.Signatures.List(r.Context(), tid, docID)
-		if err != nil {
-			writeErr(w, 500, err)
-			return
-		}
-		if sigs == nil {
-			sigs = []domain.DocumentSignature{}
-		}
-		writeJSON(w, 200, map[string]any{"items": sigs})
-	}
-}
-
-type requestSignaturesReq struct {
-	Signers []struct {
-		ID    string `json:"id"`
-		Email string `json:"email"`
-	} `json:"signers"`
-}
-
-func requestSignatures(svc *service.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tid, ok := tenantOr400(w, r)
-		if !ok {
-			return
-		}
-		docID, err := uuid.Parse(chi.URLParam(r, "id"))
-		if err != nil {
-			writeErr(w, 400, err)
-			return
-		}
-		var req requestSignaturesReq
+		var req patchTemplateReq
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeErr(w, 400, err)
 			return
 		}
-		if len(req.Signers) == 0 {
-			writeErr(w, 400, errors.New("at least one signer required"))
-			return
-		}
-		var created []domain.DocumentSignature
-		for _, s := range req.Signers {
-			signerID, err := uuid.Parse(s.ID)
-			if err != nil {
-				continue
-			}
-			sig, err := svc.Signatures.Create(r.Context(), tid, docID, signerID, s.Email, nil)
-			if err != nil {
-				writeErr(w, 500, err)
+		// Fetch existing so empty (omitted) fields fall back to current values.
+		existing, err := svc.Templates.GetByID(r.Context(), tid, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
 				return
 			}
-			created = append(created, *sig)
+			writeErr(w, 500, err)
+			return
 		}
-		writeJSON(w, 201, map[string]any{"items": created})
+		in := service.UpdateTemplateInput{
+			TenantID: tid,
+			ID:       id,
+			Type:     existing.Type,
+			Name:     existing.Name,
+			Body:     req.Body, // nil → service keeps existing body
+		}
+		if req.Type != "" {
+			in.Type = req.Type
+		}
+		if req.Name != "" {
+			in.Name = req.Name
+		}
+		t, err := svc.UpdateTemplate(r.Context(), in)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
+			case errors.Is(err, domain.ErrForbidden):
+				writeErr(w, 403, errors.New("system templates are read-only"))
+			case errors.Is(err, domain.ErrInvalidInput):
+				writeErr(w, 400, err)
+			default:
+				writeErr(w, 500, err)
+			}
+			return
+		}
+		auditWrite(svc, r, tid, "document.template.update", "document_template", t.ID.String())
+		writeJSON(w, 200, t)
 	}
 }
 
-func signDocument(svc *service.Service) http.HandlerFunc {
+func deleteTemplate(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tid, ok := tenantOr400(w, r)
 		if !ok {
 			return
 		}
-		sigID, err := uuid.Parse(chi.URLParam(r, "sigId"))
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
 		if err != nil {
 			writeErr(w, 400, err)
 			return
 		}
-		sig, err := svc.Signatures.Sign(r.Context(), tid, sigID)
-		if err != nil {
-			writeErr(w, 500, err)
+		if err := svc.DeleteTemplate(r.Context(), tid, id); err != nil {
+			switch {
+			case errors.Is(err, domain.ErrNotFound):
+				writeErr(w, 404, err)
+			case errors.Is(err, domain.ErrForbidden):
+				writeErr(w, 403, errors.New("system templates cannot be deleted"))
+			default:
+				writeErr(w, 500, err)
+			}
 			return
 		}
-		writeJSON(w, 200, sig)
+		auditWrite(svc, r, tid, "document.template.delete", "document_template", id.String())
+		w.WriteHeader(204)
 	}
 }
 
-type declineReq struct{ Reason string `json:"reason"` }
+// --- Tier-1 e-signature handlers ---
 
-func declineSignature(svc *service.Service) http.HandlerFunc {
+type signerReq struct {
+	ID         string `json:"id"`
+	SignerID   string `json:"signer_id"`
+	Name       string `json:"name,omitempty"`
+	Email      string `json:"email,omitempty"`
+	AuthMethod string `json:"auth_method,omitempty"`
+}
+
+type createEnvelopeReq struct {
+	Title        string      `json:"title,omitempty"`
+	SigningOrder string      `json:"signing_order,omitempty"`
+	ExpiresAt    *time.Time  `json:"expires_at,omitempty"`
+	Signers      []signerReq `json:"signers"`
+}
+
+func createEnvelope(svc *service.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tid, ok := tenantOr400(w, r)
 		if !ok {
 			return
 		}
-		sigID, err := uuid.Parse(chi.URLParam(r, "sigId"))
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var req createEnvelopeReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		var signers []store.NewSignerInput
+		for _, s := range req.Signers {
+			raw := s.SignerID
+			if raw == "" {
+				raw = s.ID
+			}
+			sid, err := uuid.Parse(raw)
+			if err != nil {
+				writeErr(w, 400, errors.New("each signer requires a valid signer_id (uuid)"))
+				return
+			}
+			signers = append(signers, store.NewSignerInput{
+				SignerID:   sid,
+				Name:       s.Name,
+				Email:      s.Email,
+				AuthMethod: domain.AuthMethod(s.AuthMethod),
+			})
+		}
+		env, err := svc.CreateEnvelope(r.Context(), service.CreateEnvelopeInput{
+			TenantID:     tid,
+			DocumentID:   docID,
+			Title:        req.Title,
+			SigningOrder: domain.SigningOrder(req.SigningOrder),
+			CreatedBy:    auditMeta(r).ActorID,
+			ExpiresAt:    req.ExpiresAt,
+			Signers:      signers,
+		})
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		// Platform audit_log row for cross-service visibility; the signing
+		// subsystem's own hash-chained sign_event trail is recorded separately
+		// inside svc.CreateEnvelope and is not affected by this call.
+		auditWriteMeta(svc, r, tid, "document.sign.envelope.create", "sign_envelope", env.ID.String(),
+			map[string]any{"document_id": docID.String()})
+		writeJSON(w, 201, env)
+	}
+}
+
+func listEnvelopesForDoc(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		items, err := svc.Signatures.ListEnvelopesForDocument(r.Context(), tid, docID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		if items == nil {
+			items = []domain.SignEnvelope{}
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "total": len(items)})
+	}
+}
+
+func getEnvelope(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		env, err := svc.Signatures.GetEnvelope(r.Context(), tid, envID)
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, env)
+	}
+}
+
+func sendEnvelope(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		env, err := svc.SendEnvelope(r.Context(), tid, envID, auditMeta(r))
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, env)
+	}
+}
+
+func viewSigner(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, signerID, ok := envSignerIDs(w, r)
+		if !ok {
+			return
+		}
+		sg, err := svc.ViewEnvelopeSigner(r.Context(), tid, envID, signerID, auditMeta(r))
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, sg)
+	}
+}
+
+type signSignerReq struct {
+	Consent           bool   `json:"consent"`
+	TypedName         string `json:"typed_name,omitempty"`
+	SignatureImageB64 string `json:"signature_image_b64,omitempty"`
+	AuthMethod        string `json:"auth_method,omitempty"`
+	// OTPCode is required when the signer row's auth_method is email_otp.
+	OTPCode string `json:"otp_code,omitempty"`
+}
+
+func signEnvelopeSigner(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, signerID, ok := envSignerIDs(w, r)
+		if !ok {
+			return
+		}
+		var req signSignerReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if !req.Consent {
+			writeErr(w, 400, errors.New("consent:true is required (ESIGN consent-to-electronic-records)"))
+			return
+		}
+		var img []byte
+		if req.SignatureImageB64 != "" {
+			b, err := base64.StdEncoding.DecodeString(stripDataURL(req.SignatureImageB64))
+			if err != nil {
+				writeErr(w, 400, errors.New("signature_image_b64 must be valid base64"))
+				return
+			}
+			img = b
+		}
+		res, err := svc.SignEnvelopeSigner(r.Context(), service.SignInput{
+			TenantID:    tid,
+			EnvelopeID:  envID,
+			SignerRowID: signerID,
+			Consent:     req.Consent,
+			TypedName:   req.TypedName,
+			ImageBytes:  img,
+			AuthMethod:  domain.AuthMethod(req.AuthMethod),
+			OTPCode:     req.OTPCode,
+		}, auditMeta(r))
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{
+			"signer":    res.Signer,
+			"envelope":  res.Envelope,
+			"completed": res.Completed,
+		})
+	}
+}
+
+func declineEnvelopeSigner(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, signerID, ok := envSignerIDs(w, r)
+		if !ok {
+			return
+		}
+		var req declineReq
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		sg, env, err := svc.DeclineEnvelopeSigner(r.Context(), tid, envID, signerID, req.Reason, auditMeta(r))
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"signer": sg, "envelope": env})
+	}
+}
+
+func voidEnvelope(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
 		if err != nil {
 			writeErr(w, 400, err)
 			return
 		}
 		var req declineReq
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		sig, err := svc.Signatures.Decline(r.Context(), tid, sigID, req.Reason)
+		env, err := svc.VoidEnvelope(r.Context(), tid, envID, req.Reason, auditMeta(r))
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, env)
+	}
+}
+
+func verifyEnvelope(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		res, err := svc.VerifyChain(r.Context(), tid, envID)
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		writeJSON(w, 200, res)
+	}
+}
+
+func envelopeAudit(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		events, err := svc.Signatures.ListEvents(r.Context(), tid, envID)
 		if err != nil {
 			writeErr(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, sig)
+		if events == nil {
+			events = []domain.SignEvent{}
+		}
+		writeJSON(w, 200, map[string]any{"items": events, "total": len(events)})
+	}
+}
+
+func envelopeCertificate(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		envID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		pdf, err := svc.GetCertificate(r.Context(), tid, envID)
+		if err != nil {
+			writeSignErr(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", `inline; filename="certificate-of-completion.pdf"`)
+		w.WriteHeader(200)
+		_, _ = w.Write(pdf)
+	}
+}
+
+// docSignAudit aggregates audit events across all envelopes for a document.
+func docSignAudit(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		envs, err := svc.Signatures.ListEnvelopesForDocument(r.Context(), tid, docID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		all := []domain.SignEvent{}
+		for _, e := range envs {
+			evs, err := svc.Signatures.ListEvents(r.Context(), tid, e.ID)
+			if err != nil {
+				writeErr(w, 500, err)
+				return
+			}
+			all = append(all, evs...)
+		}
+		writeJSON(w, 200, map[string]any{"items": all, "total": len(all)})
+	}
+}
+
+// docSignCertificate returns the certificate of the most recent completed
+// envelope for a document.
+func docSignCertificate(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		docID, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		envs, err := svc.Signatures.ListEnvelopesForDocument(r.Context(), tid, docID)
+		if err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+		for _, e := range envs { // newest first
+			if e.Status == domain.EnvCompleted {
+				pdf, err := svc.GetCertificate(r.Context(), tid, e.ID)
+				if err != nil {
+					writeSignErr(w, err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/pdf")
+				w.Header().Set("Content-Disposition", `inline; filename="certificate-of-completion.pdf"`)
+				w.WriteHeader(200)
+				_, _ = w.Write(pdf)
+				return
+			}
+		}
+		writeErr(w, 404, domain.ErrNotFound)
+	}
+}
+
+type declineReq struct {
+	Reason string `json:"reason"`
+}
+
+func envSignerIDs(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUID, bool) {
+	envID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeErr(w, 400, err)
+		return uuid.Nil, uuid.Nil, false
+	}
+	signerID, err := uuid.Parse(chi.URLParam(r, "signerId"))
+	if err != nil {
+		writeErr(w, 400, err)
+		return uuid.Nil, uuid.Nil, false
+	}
+	return envID, signerID, true
+}
+
+func stripDataURL(s string) string {
+	if i := indexByte(s, ','); i >= 0 && len(s) > 5 && s[:5] == "data:" {
+		return s[i+1:]
+	}
+	return s
+}
+
+func writeSignErr(w http.ResponseWriter, err error) {
+	if isOTPErr(err) { // OTP step-up taxonomy: 428 / 403 / 429 (handlers_otp.go)
+		writeOTPErr(w, err)
+		return
+	}
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		writeErr(w, 404, err)
+	case errors.Is(err, domain.ErrInvalidInput):
+		writeErr(w, 400, err)
+	case errors.Is(err, domain.ErrConflict):
+		writeErr(w, 409, err)
+	case errors.Is(err, domain.ErrForbidden):
+		writeErr(w, 403, err)
+	default:
+		writeErr(w, 500, err)
 	}
 }
 

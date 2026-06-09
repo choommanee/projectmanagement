@@ -63,6 +63,7 @@ func createSupplier(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.supplier.create", "supplier", sup.ID.String())
 		writeJSON(w, 201, sup)
 	}
 }
@@ -178,6 +179,7 @@ func updateSupplier(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.supplier.update", "supplier", sup.ID.String())
 		writeJSON(w, 200, sup)
 	}
 }
@@ -201,6 +203,7 @@ func deleteSupplier(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.supplier.delete", "supplier", id.String())
 		w.WriteHeader(204)
 	}
 }
@@ -213,6 +216,7 @@ type createPOReq struct {
 	Status       domain.POStatus `json:"status,omitempty"`
 	OrderDate    *string         `json:"order_date,omitempty"`   // "YYYY-MM-DD"
 	ExpectedDate *string         `json:"expected_date,omitempty"` // "YYYY-MM-DD"
+	SourceSoID   *uuid.UUID      `json:"source_so_id,omitempty"`
 	Notes        string          `json:"notes,omitempty"`
 }
 
@@ -251,6 +255,7 @@ func createPurchaseOrder(svc *service.Service) http.HandlerFunc {
 			PONumber:   req.PONumber,
 			SupplierID: req.SupplierID,
 			Status:     req.Status,
+			SourceSoID: req.SourceSoID,
 			Notes:      req.Notes,
 			CreatedBy:  createdBy,
 			Version:    1,
@@ -269,6 +274,8 @@ func createPurchaseOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.po.create", "purchase_order", po.ID.String(),
+			map[string]any{"status": string(po.Status), "po_number": po.PONumber})
 		writeJSON(w, 201, po)
 	}
 }
@@ -313,8 +320,14 @@ func listPurchaseOrders(svc *service.Service) http.HandlerFunc {
 				supplierID = &id
 			}
 		}
+		var sourceSoID *uuid.UUID
+		if soStr := r.URL.Query().Get("source_so_id"); soStr != "" {
+			if id, err := uuid.Parse(soStr); err == nil {
+				sourceSoID = &id
+			}
+		}
 		items, total, err := svc.PurchaseOrders.List(r.Context(), tid, store.ListPOOpts{
-			Status: status, SupplierID: supplierID, Q: q, Limit: limit, Offset: offset,
+			Status: status, SupplierID: supplierID, SourceSoID: sourceSoID, Q: q, Limit: limit, Offset: offset,
 		})
 		if err != nil {
 			writeErr(w, 500, err)
@@ -329,6 +342,8 @@ type updatePOReq struct {
 	Status       domain.POStatus `json:"status,omitempty"`
 	OrderDate    *string         `json:"order_date,omitempty"`
 	ExpectedDate *string         `json:"expected_date,omitempty"`
+	// SourceSoID uses json.RawMessage so we can distinguish null (clear) from absent (keep).
+	SourceSoID   json.RawMessage `json:"source_so_id,omitempty"`
 	Notes        string          `json:"notes,omitempty"`
 	Version      int             `json:"version"`
 }
@@ -377,6 +392,17 @@ func updatePurchaseOrder(svc *service.Service) http.HandlerFunc {
 				po.ExpectedDate = &t
 			}
 		}
+		if len(req.SourceSoID) > 0 {
+			// "null" → clear; "\"<uuid>\"" → set; "\"\"" → clear
+			var soRaw *string
+			if jerr := json.Unmarshal(req.SourceSoID, &soRaw); jerr == nil {
+				if soRaw == nil || *soRaw == "" {
+					po.SourceSoID = nil
+				} else if soID, perr := uuid.Parse(*soRaw); perr == nil {
+					po.SourceSoID = &soID
+				}
+			}
+		}
 		po.Version = req.Version
 		if err := svc.PurchaseOrders.Update(r.Context(), po); err != nil {
 			if errors.Is(err, domain.ErrConflict) {
@@ -386,6 +412,8 @@ func updatePurchaseOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWriteMeta(svc, r, tid, "mfg.po.update", "purchase_order", po.ID.String(),
+			map[string]any{"status": string(po.Status)})
 		writeJSON(w, 200, po)
 	}
 }
@@ -440,6 +468,7 @@ func addPOLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.po.add_line", "po_line", l.ID.String())
 		writeJSON(w, 201, l)
 	}
 }
@@ -522,6 +551,7 @@ func updatePOLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.po.update_line", "po_line", found.ID.String())
 		writeJSON(w, 200, found)
 	}
 }
@@ -545,6 +575,7 @@ func deletePOLine(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		auditWrite(svc, r, tid, "mfg.po.delete_line", "po_line", lineID.String())
 		w.WriteHeader(204)
 	}
 }

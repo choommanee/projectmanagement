@@ -7,6 +7,16 @@ import {
   listVersions,
   createComment,
   resolveComment,
+  deleteComment,
+  restoreVersion,
+  getTemplate,
+  instantiateTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  listAllWorkspaces,
+  getWorkspace,
+  type Template,
 } from "./documents";
 
 beforeEach(() => {
@@ -16,22 +26,22 @@ beforeEach(() => {
 const mockFetch = () => global.fetch as ReturnType<typeof vi.fn>;
 
 const docRaw = {
-  ID: "doc-1",
-  TenantID: "t-1",
-  WorkspaceID: "ws-1",
-  ProjectID: "p-1",
-  Type: "brd",
-  Title: "My BRD",
-  Body: { type: "doc", content: [] },
-  Status: "draft",
-  Tags: ["alpha"],
-  CreatedAt: "2026-01-01T00:00:00Z",
-  UpdatedAt: "2026-05-01T00:00:00Z",
-  Version: 1,
+  id: "doc-1",
+  tenant_id: "t-1",
+  workspace_id: "ws-1",
+  project_id: "p-1",
+  type: "brd",
+  title: "My BRD",
+  body: { type: "doc", content: [] },
+  status: "draft",
+  tags: ["alpha"],
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-05-01T00:00:00Z",
+  version: 1,
 };
 
 describe("documents API client", () => {
-  it("listDocuments normalizes Go-style keys", async () => {
+  it("listDocuments normalizes snake_case keys", async () => {
     mockFetch().mockResolvedValueOnce({
       ok: true,
       json: async () => ({ items: [docRaw], total: 1 }),
@@ -97,15 +107,15 @@ describe("documents API client", () => {
       json: async () => ({
         items: [
           {
-            ID: "ver-1",
-            DocumentID: "doc-1",
-            Rev: 2,
-            Title: "BRD v2",
-            Body: { type: "doc", content: [] },
-            Status: "draft",
-            CreatedBy: "user-1",
-            CreatedAt: "2026-05-10T00:00:00Z",
-            Note: "Minor fix",
+            id: "ver-1",
+            document_id: "doc-1",
+            rev: 2,
+            title: "BRD v2",
+            body: { type: "doc", content: [] },
+            status: "draft",
+            created_by: "user-1",
+            created_at: "2026-05-10T00:00:00Z",
+            note: "Minor fix",
           },
         ],
       }),
@@ -123,11 +133,11 @@ describe("documents API client", () => {
     mockFetch().mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        ID: "c-1",
-        DocumentID: "doc-1",
-        Body: "Looks good.",
-        CreatedAt: "2026-05-01T00:00:00Z",
-        UpdatedAt: "2026-05-01T00:00:00Z",
+        id: "c-1",
+        document_id: "doc-1",
+        body: "Looks good.",
+        created_at: "2026-05-01T00:00:00Z",
+        updated_at: "2026-05-01T00:00:00Z",
       }),
     });
 
@@ -150,5 +160,150 @@ describe("documents API client", () => {
     expect(mockFetch()).toHaveBeenCalledWith("/api/comments/c-1/resolve", {
       method: "PATCH",
     });
+  });
+
+  it("deleteComment deletes correct url", async () => {
+    mockFetch().mockResolvedValueOnce({ ok: true, status: 204 });
+
+    await deleteComment("c-9");
+
+    expect(mockFetch()).toHaveBeenCalledWith("/api/comments/c-9", {
+      method: "DELETE",
+    });
+  });
+
+  it("restoreVersion posts rev + version to restore endpoint", async () => {
+    mockFetch().mockResolvedValueOnce({ ok: true, json: async () => docRaw });
+
+    await restoreVersion("doc-1", 2, 5);
+
+    expect(mockFetch()).toHaveBeenCalledWith(
+      "/api/documents/doc-1/restore",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"rev":2'),
+      }),
+    );
+    const call = mockFetch().mock.calls[0][1] as { body: string };
+    expect(call.body).toContain('"version":5');
+  });
+
+  it("getTemplate hits the templates proxy (not the documents path)", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "t-1", type: "brd", name: "BRD", body: { a: 1 }, is_system: true, created_at: "2026-01-01T00:00:00Z" }),
+    });
+
+    const t = await getTemplate("t-1");
+
+    expect(mockFetch()).toHaveBeenCalledWith("/api/templates/t-1", { cache: "no-store" });
+    expect(t.id).toBe("t-1");
+    expect(t.isSystem).toBe(true);
+    expect(t.type).toBe("brd");
+  });
+
+  it("instantiateTemplate creates a document from template type + body", async () => {
+    mockFetch().mockResolvedValueOnce({ ok: true, json: async () => docRaw });
+    const tmpl: Template = {
+      id: "t-1", type: "brd", name: "BRD Skeleton",
+      body: { type: "doc", content: [{ type: "heading" }] }, isSystem: true, createdAt: "2026-01-01T00:00:00Z",
+    };
+
+    await instantiateTemplate(tmpl, { workspace_id: "ws-1", project_id: "p-1", title: "New BRD" });
+
+    expect(mockFetch()).toHaveBeenCalledWith(
+      "/api/documents",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const call = mockFetch().mock.calls[0][1] as { body: string };
+    expect(call.body).toContain('"type":"brd"');
+    expect(call.body).toContain('"title":"New BRD"');
+    expect(call.body).toContain('"workspace_id":"ws-1"');
+    expect(call.body).toContain('"heading"'); // template body copied through
+  });
+
+  it("createTemplate POSTs name/type/body to the templates proxy", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "t-9", type: "note", name: "My Tmpl", body: { type: "doc", content: [] }, is_system: false, created_at: "2026-06-01T00:00:00Z" }),
+    });
+
+    const t = await createTemplate({ type: "note", name: "My Tmpl", body: { type: "doc", content: [] } });
+
+    expect(mockFetch()).toHaveBeenCalledWith(
+      "/api/templates",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const call = mockFetch().mock.calls[0][1] as { body: string };
+    expect(call.body).toContain('"type":"note"');
+    expect(call.body).toContain('"name":"My Tmpl"');
+    expect(t.id).toBe("t-9");
+    expect(t.isSystem).toBe(false);
+  });
+
+  it("updateTemplate PATCHes the template by id", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "t-9", type: "note", name: "Renamed", body: { type: "doc", content: [] }, is_system: false, created_at: "2026-06-01T00:00:00Z" }),
+    });
+
+    const t = await updateTemplate("t-9", { name: "Renamed" });
+
+    expect(mockFetch()).toHaveBeenCalledWith(
+      "/api/templates/t-9",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    const call = mockFetch().mock.calls[0][1] as { body: string };
+    expect(call.body).toContain('"name":"Renamed"');
+    expect(t.name).toBe("Renamed");
+  });
+
+  it("updateTemplate surfaces the backend error message (e.g. system template 403)", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: "system templates are read-only" }),
+    });
+
+    await expect(updateTemplate("t-sys", { name: "x" })).rejects.toThrow("system templates are read-only");
+  });
+
+  it("deleteTemplate DELETEs the template by id", async () => {
+    mockFetch().mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+    await deleteTemplate("t-9");
+
+    expect(mockFetch()).toHaveBeenCalledWith(
+      "/api/templates/t-9",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("listAllWorkspaces normalizes tenant-wide list", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [{ id: "ws-1", tenant_id: "t-1", project_id: "p-1", kind: "ba", name: "BA WS", created_at: "x", updated_at: "y" }],
+        total: 1,
+      }),
+    });
+
+    const { items, total } = await listAllWorkspaces({ limit: 200 });
+    expect(total).toBe(1);
+    expect(items[0].id).toBe("ws-1");
+    expect(items[0].projectId).toBe("p-1");
+    expect(items[0].kind).toBe("ba");
+  });
+
+  it("getWorkspace fetches workspace detail by id", async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: "ws-1", tenant_id: "t-1", project_id: "p-1", kind: "pm", name: "PM WS", created_at: "x", updated_at: "y" }),
+    });
+
+    const ws = await getWorkspace("ws-1");
+    expect(mockFetch()).toHaveBeenCalledWith("/api/workspaces/ws-1", { cache: "no-store" });
+    expect(ws.id).toBe("ws-1");
+    expect(ws.kind).toBe("pm");
   });
 });

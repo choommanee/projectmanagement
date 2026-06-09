@@ -189,11 +189,13 @@ function EditSprintDialog({ sprint, onClose, onSaved }: EditSprintDialogProps) {
     setLoading(true);
     setError("");
     try {
+      // Always send goal/dates — the backend treats "" as an explicit clear,
+      // while omitting the field leaves the old value in place.
       const updated = await updateSprint(sprint.id, {
         name: name.trim(),
-        goal: goal.trim() || undefined,
-        start_date: startDate || undefined,
-        end_date: endDate || undefined,
+        goal: goal.trim(),
+        start_date: startDate,
+        end_date: endDate,
         capacity_pts: capacityPts ? Number(capacityPts) : undefined,
         version: sprint.version,
       });

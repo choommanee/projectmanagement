@@ -154,6 +154,11 @@ export default function SchedulingPage() {
         <span className="ml-auto text-xs text-ink-3">{workOrders.length} work orders across {workCenters.length} work centers</span>
       </div>
 
+      <div className="border-b border-line bg-info/5 px-4 py-1.5 text-[11px] text-ink-3">
+        Due-date board — work orders are plotted on their assigned work center by due date (or by start/end when set).
+        This is a read-only view of existing schedules, not an automatic capacity scheduler.
+      </div>
+
       {error && <div className="m-4 rounded-sm bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
 
       {loading ? (

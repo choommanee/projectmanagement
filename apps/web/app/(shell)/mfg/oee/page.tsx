@@ -39,10 +39,14 @@ function computeOEE(wos: WorkOrder[]): OEEResult {
   // Availability: completed / all released-or-beyond
   const availability = released > 0 ? completed.length / released : 0;
 
-  // Performance: placeholder — actual cycle time data not available yet
+  // Performance: ESTIMATE — actual cycle-time capture is not wired yet, so this
+  // is a fixed nominal assumption, not a measured value. Surfaced as "(est.)"
+  // in the UI. Replace with (planned run-min / actual run-min) once WO operation
+  // actuals are captured.
   const performance = completed.length > 0 ? 0.88 : 0;
 
-  // Quality: placeholder — NCR data not joined yet
+  // Quality: ESTIMATE — first-pass yield needs NCR/inspection data from
+  // quality-svc, which is not joined here. Surfaced as "(est.)" in the UI.
   const quality = completed.length > 0 ? 0.96 : 0;
 
   const oee = availability * performance * quality;
@@ -83,10 +87,10 @@ export default function OEEDashboardPage() {
         <>
           {/* Overall KPIs */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <KpiWidget title="Overall OEE" value={pct(overall.oee)} trend={0} />
+            <KpiWidget title="Overall OEE (est.)" value={pct(overall.oee)} trend={0} />
             <KpiWidget title="Availability" value={pct(overall.availability)} trend={0} />
-            <KpiWidget title="Performance" value={pct(overall.performance)} trend={0} />
-            <KpiWidget title="Quality" value={pct(overall.quality)} trend={0} />
+            <KpiWidget title="Performance (est.)" value={pct(overall.performance)} trend={0} />
+            <KpiWidget title="Quality (est.)" value={pct(overall.quality)} trend={0} />
           </div>
 
           {/* OEE gauge */}
@@ -105,8 +109,8 @@ export default function OEEDashboardPage() {
                     value: overall.availability,
                     desc: `${overall.completed} / ${overall.total} work orders completed`,
                   },
-                  { label: "Performance", value: overall.performance, desc: "Actual vs planned cycle time" },
-                  { label: "Quality", value: overall.quality, desc: "Units produced without defects" },
+                  { label: "Performance (est.)", value: overall.performance, desc: "Estimate — cycle-time capture pending" },
+                  { label: "Quality (est.)", value: overall.quality, desc: "Estimate — NCR/inspection data pending" },
                 ].map((m) => (
                   <div key={m.label} className="flex items-center gap-3">
                     <span className="w-28 text-sm font-medium">{m.label}</span>
@@ -126,6 +130,12 @@ export default function OEEDashboardPage() {
             </div>
           </div>
 
+          <p className="-mt-2 text-xs text-ink-3">
+            Note: Availability is computed from work-order completion. Performance and Quality are
+            estimates (marked &ldquo;est.&rdquo;) — live cycle-time capture and quality (NCR/inspection)
+            integration are pending, so Overall OEE is indicative only.
+          </p>
+
           {/* Per Work Center */}
           <div>
             <h2 className="text-sm font-semibold text-ink-3 uppercase tracking-wide mb-3">
@@ -139,8 +149,8 @@ export default function OEEDashboardPage() {
                     <th className="px-4 py-2 text-right font-medium">WOs</th>
                     <th className="px-4 py-2 text-right font-medium">Completed</th>
                     <th className="px-4 py-2 text-right font-medium">Availability</th>
-                    <th className="px-4 py-2 text-right font-medium">Performance</th>
-                    <th className="px-4 py-2 text-right font-medium">Quality</th>
+                    <th className="px-4 py-2 text-right font-medium">Performance (est.)</th>
+                    <th className="px-4 py-2 text-right font-medium">Quality (est.)</th>
                     <th className="px-4 py-2 text-right font-medium">OEE</th>
                   </tr>
                 </thead>

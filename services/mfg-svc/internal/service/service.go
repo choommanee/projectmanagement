@@ -33,6 +33,7 @@ type Service struct {
 	MRPEngineURL   string
 	TraceEngineURL string
 	notif          notiflib.Publisher
+	audit          AuditPublisher
 }
 
 func New(
@@ -182,6 +183,7 @@ type CreateWorkCenterInput struct {
 	Name              string
 	Type              domain.WCType
 	CapacityPerDayHrs float64
+	MachineCount      int
 }
 
 func (svc *Service) CreateWorkCenter(ctx context.Context, in CreateWorkCenterInput) (*domain.WorkCenter, error) {
@@ -194,6 +196,9 @@ func (svc *Service) CreateWorkCenter(ctx context.Context, in CreateWorkCenterInp
 	if in.CapacityPerDayHrs <= 0 {
 		in.CapacityPerDayHrs = 8
 	}
+	if in.MachineCount <= 0 {
+		in.MachineCount = 1
+	}
 	wc := &domain.WorkCenter{
 		ID:                uuid.New(),
 		TenantID:          in.TenantID,
@@ -201,6 +206,7 @@ func (svc *Service) CreateWorkCenter(ctx context.Context, in CreateWorkCenterInp
 		Name:              in.Name,
 		Type:              in.Type,
 		CapacityPerDayHrs: in.CapacityPerDayHrs,
+		MachineCount:      in.MachineCount,
 		Status:            domain.ItemStatusActive,
 		Version:           1,
 	}

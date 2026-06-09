@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, CheckCircle, XCircle, Inbox } from "lucide-react";
-import { Button, Tag } from "@pmplatform/ui-kit";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw, Inbox } from "lucide-react";
+import { Button, Tag, Dialog } from "@pmplatform/ui-kit";
 import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
+import { useAuth } from "@/lib/auth/AuthProvider";
+import { HumanTaskForm } from "@/components/workflow/HumanTaskForm";
 import {
   listHumanTasks,
   completeHumanTask,
@@ -56,47 +58,80 @@ function KpiTile({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type Scope = "mine" | "all";
+
 export default function InboxPage() {
+  const { user } = useAuth();
+  const meId = user?.id ?? null;
+
   const [tasks, setTasks] = useState<HumanTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [completing, setCompleting] = useState<Record<string, boolean>>({});
+  const [scope, setScope] = useState<Scope>("mine");
+
+  // Active task in the completion drawer.
+  const [active, setActive] = useState<HumanTask | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { items } = await listHumanTasks({ limit: 200 });
+      // Scope to the current user when "mine" and we know who they are.
+      const params: { assignee_id?: string; status?: string; limit: number } = { limit: 200 };
+      if (scope === "mine" && meId) params.assignee_id = meId;
+      const { items } = await listHumanTasks(params);
       setTasks(items);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope, meId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const handleComplete = async (id: string, outcome: "approved" | "rejected") => {
-    setCompleting((prev) => ({ ...prev, [id]: true }));
+  const handleSubmit = async (outcome: string, data: Record<string, unknown>) => {
+    if (!active) return;
+    setSubmitting(true);
+    setDrawerError(null);
     try {
-      await completeHumanTask(id, { outcome, data: {} });
+      await completeHumanTask(active.id, { outcome, data });
+      setActive(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setCompleting((prev) => ({ ...prev, [id]: false }));
+      setDrawerError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const isOverdue = (task: HumanTask) =>
+    !!task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
+
   // KPI counts
   const pending  = tasks.filter((t) => !t.outcome).length;
+  const overdue  = tasks.filter((t) => isOverdue(t)).length;
   const approved = tasks.filter((t) => t.outcome === "approved").length;
   const rejected = tasks.filter((t) => t.outcome === "rejected").length;
 
-  const isOverdue = (task: HumanTask) =>
-    !!task.slaDeadline && !task.completedAt && new Date(task.slaDeadline) < new Date();
+  const sorted = useMemo(
+    () =>
+      [...tasks].sort((a, b) => {
+        // pending first, then overdue first, then newest
+        const ap = a.outcome ? 1 : 0;
+        const bp = b.outcome ? 1 : 0;
+        if (ap !== bp) return ap - bp;
+        const ao = isOverdue(a) ? 0 : 1;
+        const bo = isOverdue(b) ? 0 : 1;
+        if (ao !== bo) return ao - bo;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }),
+    [tasks],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -121,11 +156,35 @@ export default function InboxPage() {
           </div>
         )}
 
+        {/* Scope toggle */}
+        <div className="mb-4 flex items-center gap-2">
+          <div className="inline-flex rounded-sm border border-line bg-surface p-0.5">
+            {(["mine", "all"] as Scope[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setScope(s)}
+                className={`rounded-[3px] px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                  scope === s ? "bg-accent text-white" : "text-ink-3 hover:text-ink"
+                }`}
+              >
+                {s === "mine" ? "Mine" : "All"}
+              </button>
+            ))}
+          </div>
+          {scope === "mine" && !meId && (
+            <span className="text-[11px] text-ink-3">
+              Sign-in not detected — showing all tasks.
+            </span>
+          )}
+        </div>
+
         {/* KPI strip */}
-        <div className="mb-4 grid grid-cols-3 gap-3">
+        <div className="mb-4 grid grid-cols-4 gap-3">
           <KpiTile label="Pending" value={pending} tone="warning" />
+          <KpiTile label="Overdue" value={overdue} tone="danger" />
           <KpiTile label="Approved" value={approved} tone="success" />
-          <KpiTile label="Rejected" value={rejected} tone="danger" />
+          <KpiTile label="Rejected" value={rejected} tone="neutral" />
         </div>
 
         {/* Table */}
@@ -140,7 +199,7 @@ export default function InboxPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-line bg-surface-2 text-xs font-semibold uppercase tracking-[0.06em] text-ink-3">
-                  <th className="px-4 py-2 text-left">Workflow</th>
+                  <th className="px-4 py-2 text-left">Instance</th>
                   <th className="px-4 py-2 text-left">Step</th>
                   <th className="px-4 py-2 text-left">Prompt</th>
                   <th className="px-4 py-2 text-left">Created</th>
@@ -150,49 +209,44 @@ export default function InboxPage() {
                 </tr>
               </thead>
               <tbody>
-                {tasks.length === 0 ? (
+                {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-ink-3">
                       <Inbox size={32} className="mx-auto mb-2 opacity-30" />
-                      <p>No tasks found. You have no pending approvals.</p>
+                      <p>No tasks found.</p>
                     </td>
                   </tr>
                 ) : (
-                  tasks.map((task) => {
-                    const overdue = isOverdue(task);
+                  sorted.map((task) => {
+                    const overdueRow = isOverdue(task);
                     const isPending = !task.outcome;
-                    const busy = completing[task.id] ?? false;
                     return (
                       <tr
                         key={task.id}
-                        className="border-b border-line last:border-0 hover:bg-surface-2"
+                        className={`border-b border-line last:border-0 hover:bg-surface-2 ${
+                          overdueRow ? "bg-danger/[0.04]" : ""
+                        }`}
                       >
-                        {/* Workflow — instanceId truncated as proxy */}
                         <td className="px-4 py-2.5 font-mono text-xs text-ink-3">
                           {task.instanceId ? task.instanceId.slice(0, 8) + "…" : "—"}
                         </td>
-                        {/* Step */}
                         <td className="px-4 py-2.5 font-mono text-xs text-ink">
                           {task.stepId || "—"}
                         </td>
-                        {/* Prompt */}
                         <td className="max-w-xs truncate px-4 py-2.5 text-xs text-ink-2">
-                          {String(task.form?.prompt ?? "—")}
+                          {String(task.form?.prompt ?? task.form?.title ?? "—")}
                         </td>
-                        {/* Created */}
                         <td className="px-4 py-2.5 text-xs text-ink-3">
                           {fmtDate(task.createdAt)}
                         </td>
-                        {/* SLA Deadline */}
                         <td
                           className={`px-4 py-2.5 text-xs ${
-                            overdue ? "font-medium text-danger" : "text-ink-3"
+                            overdueRow ? "font-medium text-danger" : "text-ink-3"
                           }`}
                         >
                           {fmtDate(task.slaDeadline)}
-                          {overdue && <span className="ml-1">(overdue)</span>}
+                          {overdueRow && <span className="ml-1">(overdue)</span>}
                         </td>
-                        {/* Status */}
                         <td className="px-4 py-2.5">
                           {isPending ? (
                             <Tag tone="warning">pending</Tag>
@@ -200,31 +254,18 @@ export default function InboxPage() {
                             <Tag tone={outcomeTone(task.outcome)}>{task.outcome}</Tag>
                           )}
                         </td>
-                        {/* Actions */}
                         <td className="px-4 py-2.5">
                           {isPending && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                title="Approve"
-                                disabled={busy}
-                                onClick={() => handleComplete(task.id, "approved")}
-                                className="flex items-center gap-1 rounded border border-success/40 bg-success/5 px-2 py-1 text-[11px] font-medium text-success transition-colors hover:bg-success/15 disabled:opacity-50"
-                              >
-                                <CheckCircle size={12} />
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                title="Reject"
-                                disabled={busy}
-                                onClick={() => handleComplete(task.id, "rejected")}
-                                className="flex items-center gap-1 rounded border border-danger/40 bg-danger/5 px-2 py-1 text-[11px] font-medium text-danger transition-colors hover:bg-danger/15 disabled:opacity-50"
-                              >
-                                <XCircle size={12} />
-                                Reject
-                              </button>
-                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setDrawerError(null);
+                                setActive(task);
+                              }}
+                            >
+                              Review
+                            </Button>
                           )}
                         </td>
                       </tr>
@@ -236,6 +277,24 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Completion drawer */}
+      <Dialog
+        open={active != null}
+        onClose={() => (submitting ? undefined : setActive(null))}
+        size="md"
+        title="Complete task"
+        description={active ? `${active.stepId} · instance ${active.instanceId.slice(0, 8)}…` : undefined}
+      >
+        {active && (
+          <HumanTaskForm
+            task={active}
+            submitting={submitting}
+            error={drawerError}
+            onSubmit={handleSubmit}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

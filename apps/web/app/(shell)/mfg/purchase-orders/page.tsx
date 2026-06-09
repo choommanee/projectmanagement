@@ -10,6 +10,7 @@ import {
   addPOLine, updatePOLine, deletePOLine,
   type PurchaseOrder, type POLine, type POStatus, type Supplier, type Item,
 } from "@/lib/api/mfg";
+import { listSalesOrders, type SalesOrder } from "@/lib/api/sales";
 
 const PO_STATUSES: { value: string; label: string }[] = [
   { value: "", label: "All" },
@@ -32,20 +33,21 @@ function statusTone(s: string): "neutral" | "info" | "accent" | "success" | "war
 // ─── New PO Dialog ──────────────────────────────────────────────────────────
 
 function NewPODialog({
-  open, suppliers, onClose, onCreated,
+  open, suppliers, salesOrders, onClose, onCreated,
 }: {
   open: boolean;
   suppliers: Supplier[];
+  salesOrders: SalesOrder[];
   onClose: () => void;
   onCreated: (po: PurchaseOrder) => void;
 }) {
-  const [form, setForm] = useState({ supplier_id: "", order_date: new Date().toISOString().split("T")[0], expected_date: "", notes: "" });
+  const [form, setForm] = useState({ supplier_id: "", order_date: new Date().toISOString().split("T")[0], expected_date: "", source_so_id: "", notes: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setForm({ supplier_id: suppliers[0]?.id ?? "", order_date: new Date().toISOString().split("T")[0], expected_date: "", notes: "" });
+      setForm({ supplier_id: suppliers[0]?.id ?? "", order_date: new Date().toISOString().split("T")[0], expected_date: "", source_so_id: "", notes: "" });
       setError(null);
     }
   }, [open, suppliers]);
@@ -60,6 +62,7 @@ function NewPODialog({
         supplier_id: form.supplier_id,
         order_date: form.order_date || undefined,
         expected_date: form.expected_date || undefined,
+        source_so_id: form.source_so_id || undefined,
         notes: form.notes,
       });
       onCreated(po);
@@ -105,6 +108,18 @@ function NewPODialog({
             <label className="mb-1 block text-xs font-medium text-ink-2">Expected Date</label>
             <Input type="date" value={form.expected_date} onChange={(e) => setForm(f => ({ ...f, expected_date: e.target.value }))} />
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Source Sales Order (optional)</label>
+          <select
+            aria-label="Source sales order"
+            value={form.source_so_id}
+            onChange={(e) => setForm(f => ({ ...f, source_so_id: e.target.value }))}
+            className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+          >
+            <option value="">— none —</option>
+            {salesOrders.map(so => <option key={so.id} value={so.id}>{so.soNumber || so.id.slice(0, 8)}</option>)}
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink-2">Notes</label>
@@ -398,6 +413,7 @@ export default function PurchaseOrdersPage() {
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [supplierMap, setSupplierMap] = useState<Map<string, Supplier>>(new Map());
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -408,10 +424,11 @@ export default function PurchaseOrdersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [res, supList, itemRes] = await Promise.all([
+      const [res, supList, itemRes, soRes] = await Promise.all([
         listPurchaseOrders({ status: statusFilter, limit: 100 }),
         suppliers.length === 0 ? listSuppliers() : Promise.resolve(suppliers),
         items.length === 0 ? listItems({ limit: 200 }) : Promise.resolve({ items, total: 0 }),
+        salesOrders.length === 0 ? listSalesOrders({ limit: 200 }) : Promise.resolve({ items: salesOrders, total: 0 }),
       ]);
       setPos(res.items);
       setTotal(res.total);
@@ -422,12 +439,15 @@ export default function PurchaseOrdersPage() {
       if (items.length === 0) {
         setItems(itemRes.items);
       }
+      if (salesOrders.length === 0) {
+        setSalesOrders(soRes.items);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load purchase orders");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, suppliers, items]);
+  }, [statusFilter, suppliers, items, salesOrders]);
 
   useEffect(() => { void load(); }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -538,6 +558,7 @@ export default function PurchaseOrdersPage() {
       <NewPODialog
         open={newPoOpen}
         suppliers={suppliers}
+        salesOrders={salesOrders}
         onClose={() => setNewPoOpen(false)}
         onCreated={handleCreated}
       />

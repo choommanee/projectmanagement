@@ -207,6 +207,97 @@ func TestCedarPerInstanceDocumentRestore_AllowsSameTenant(t *testing.T) {
 	}
 }
 
+// TestCedarGatesTemplateUpdate_AllowsProjectManager exercises the new
+// document.template.update permit: a project-manager editing a same-tenant
+// custom template must pass the authz layer (no 403). The scoped loader
+// resolves Template::"<id>" → tenant_id.
+func TestCedarGatesTemplateUpdate_AllowsProjectManager(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-test-pm",
+		TenantID: tid.String(),
+		Roles:    []string{"project-manager"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	// Seed a custom (non-system) template directly so we can target an id.
+	tmplID := uuid.New()
+	if _, e := func() (any, error) {
+		tx, err := p.Begin(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		defer tx.Rollback(context.Background())
+		if _, e := tx.Exec(context.Background(), "SET LOCAL app.current_tenant = '"+tid.String()+"'"); e != nil {
+			return nil, e
+		}
+		if _, e := tx.Exec(context.Background(),
+			`INSERT INTO document_template(id,tenant_id,type,name,body,is_system) VALUES ($1,$2,'brd','T','{}'::jsonb,false)`,
+			tmplID, tid); e != nil {
+			return nil, e
+		}
+		return nil, tx.Commit(context.Background())
+	}(); e != nil {
+		t.Fatalf("seed template: %v", e)
+	}
+	t.Cleanup(func() {
+		_, _ = p.Exec(context.Background(), "DELETE FROM document_template WHERE id=$1", tmplID)
+	})
+
+	body, _ := json.Marshal(map[string]any{"name": "Renamed Template"})
+	req := httptest.NewRequest(http.MethodPatch, "/v1/templates/"+tmplID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("scoped authz unexpectedly blocked same-tenant template update: %s", rec.Body.String())
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestCedarGatesTemplateDelete_Denies403WithoutAllowedRole confirms a
+// mfg-operator (no document.template.delete permit) is blocked at 403.
+func TestCedarGatesTemplateDelete_Denies403WithoutAllowedRole(t *testing.T) {
+	p := cedarTestPool(t)
+	defer p.Close()
+	tid := seedCedarTenant(t, p)
+
+	ps, err := libpolicy.LoadShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	authz := &libpolicy.Adapter{Policies: ps}
+	router := newCedarHandlerWithLoader(p, authz)
+	h := withClaims(router, &libauth.ParsedClaims{
+		Subject:  "sub-test-mfg",
+		TenantID: tid.String(),
+		Roles:    []string{"mfg-operator"},
+		ExpireAt: time.Now().Add(5 * time.Minute),
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/templates/"+uuid.New().String(), nil)
+	req.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("want 403 got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestCedarGatesWorkspaceEnsure_Denies403WithoutAllowedRole(t *testing.T) {
 	p := cedarTestPool(t)
 	defer p.Close()

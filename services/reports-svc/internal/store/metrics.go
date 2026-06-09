@@ -27,10 +27,25 @@ func (s *Metrics) withTenantTx(ctx context.Context, tid uuid.UUID, fn func(pgx.T
 	return fn(tx)
 }
 
-// safeCount runs a query and returns 0 on error (table might not exist or be empty)
+// safeCount runs a query and returns 0 on error (table might not exist or be empty).
+//
+// Each count is executed inside its own savepoint (nested tx). Without this, a
+// single failing query — e.g. against a table that has not been migrated yet —
+// would put the surrounding transaction into an aborted state, causing EVERY
+// subsequent count in Summary to fail with "current transaction is aborted" and
+// silently return 0. Isolating each query in a savepoint means one missing
+// table degrades only its own metric, not all metrics after it.
 func safeCount(ctx context.Context, tx pgx.Tx, query string, args ...any) int {
+	sp, err := tx.Begin(ctx) // pgx: nested Begin == SAVEPOINT
+	if err != nil {
+		return 0
+	}
 	var n int
-	_ = tx.QueryRow(ctx, query, args...).Scan(&n)
+	if scanErr := sp.QueryRow(ctx, query, args...).Scan(&n); scanErr != nil {
+		_ = sp.Rollback(ctx) // ROLLBACK TO SAVEPOINT — keeps outer tx usable
+		return 0
+	}
+	_ = sp.Commit(ctx) // RELEASE SAVEPOINT
 	return n
 }
 
@@ -56,8 +71,8 @@ func (s *Metrics) Summary(ctx context.Context, tid uuid.UUID) (*domain.SummaryMe
 		m.WorkOrders.InProgress = safeCount(ctx, tx, `SELECT count(*) FROM work_order WHERE tenant_id=$1 AND status='in_progress'`, tid)
 		m.WorkOrders.Completed = safeCount(ctx, tx, `SELECT count(*) FROM work_order WHERE tenant_id=$1 AND status='completed'`, tid)
 
-		// NCRs (nonconformance_report)
-		m.NcrsOpen = safeCount(ctx, tx, `SELECT count(*) FROM nonconformance_report WHERE tenant_id=$1 AND status NOT IN ('closed','cancelled')`, tid)
+		// NCRs (nonconformance): open = not yet resolved (open + investigating)
+		m.NcrsOpen = safeCount(ctx, tx, `SELECT count(*) FROM nonconformance WHERE tenant_id=$1 AND status NOT IN ('closed','corrected')`, tid)
 
 		// FMEA high RPN (rpn > 100)
 		m.FmeaHighRpn = safeCount(ctx, tx, `SELECT count(*) FROM fmea_failure_mode WHERE tenant_id=$1 AND rpn > 100`, tid)
@@ -144,7 +159,7 @@ func (s *Metrics) ByStatus(ctx context.Context, tid uuid.UUID, metric string) ([
 	case "work_orders":
 		query = fmt.Sprintf(`SELECT status::text, count(*)::int FROM work_order WHERE tenant_id='%s' GROUP BY status ORDER BY status`, tid.String())
 	case "ncrs":
-		query = fmt.Sprintf(`SELECT status::text, count(*)::int FROM nonconformance_report WHERE tenant_id='%s' GROUP BY status ORDER BY status`, tid.String())
+		query = fmt.Sprintf(`SELECT status::text, count(*)::int FROM nonconformance WHERE tenant_id='%s' GROUP BY status ORDER BY status`, tid.String())
 	case "documents":
 		query = fmt.Sprintf(`SELECT status::text, count(*)::int FROM document WHERE tenant_id='%s' AND deleted_at IS NULL GROUP BY status ORDER BY status`, tid.String())
 	default:

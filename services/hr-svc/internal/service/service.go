@@ -5,9 +5,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pmplatform/libs/go/audit"
 	"github.com/pmplatform/services/hr-svc/internal/domain"
 	"github.com/pmplatform/services/hr-svc/internal/store"
 )
+
+// AuditPublisher is satisfied by *audit.PgPublisher and *audit.Fallback.
+type AuditPublisher interface {
+	Publish(ctx context.Context, action string, ev audit.Event) error
+}
 
 // Service aggregates all HR domain stores.
 type Service struct {
@@ -20,6 +26,16 @@ type Service struct {
 	Jobs               *store.JobStore
 	PerformanceReviews *store.PerformanceReviewStore
 	PayrollRuns        *store.PayrollRunStore
+
+	// Audit records significant mutations to audit_log. Optional: nil makes
+	// the audit helper a no-op.
+	Audit AuditPublisher
+}
+
+// WithAudit attaches an audit publisher and returns the service for chaining.
+func (s *Service) WithAudit(p AuditPublisher) *Service {
+	s.Audit = p
+	return s
 }
 
 func New(

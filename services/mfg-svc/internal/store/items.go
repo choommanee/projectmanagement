@@ -62,6 +62,19 @@ func (s *Items) GetUOMByID(ctx context.Context, tid, id uuid.UUID) (*domain.UOM,
 	return &u, nil
 }
 
+func (s *Items) DeleteUOM(ctx context.Context, tid, id uuid.UUID) error {
+	return s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `DELETE FROM uom WHERE id=$1 AND tenant_id=$2`, id, tid)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
 func (s *Items) ListUOMs(ctx context.Context, tid uuid.UUID) ([]*domain.UOM, error) {
 	var list []*domain.UOM
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {

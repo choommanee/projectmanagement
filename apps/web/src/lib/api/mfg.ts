@@ -149,6 +149,7 @@ export interface WorkOrder {
   endAt?: string | null;
   routingHeaderId?: string | null;
   bomHeaderId?: string | null;
+  sourceSoId?: string | null;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -399,6 +400,7 @@ function normWorkOrder(r: Record<string, unknown>): WorkOrder {
     endAt: (gid(r, "endAt", "end_at") ?? r["EndAt"] ?? null) as string | null,
     routingHeaderId: (gid(r, "routingHeaderId", "routing_header_id") ?? r["RoutingHeaderID"] ?? null) as string | null,
     bomHeaderId: (gid(r, "bomHeaderId", "bom_header_id") ?? r["BOMHeaderID"] ?? null) as string | null,
+    sourceSoId: (gid(r, "sourceSoId", "source_so_id") ?? r["SourceSoID"] ?? null) as string | null,
     notes: String(g(r, "notes") ?? ""),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
@@ -703,10 +705,11 @@ export async function listRoutings(params: { item_id?: string; status?: string; 
 
 // ─── Work Orders ─────────────────────────────────────────────────────────────
 
-export async function listWorkOrders(params: { status?: string; q?: string; limit?: number; offset?: number } = {}): Promise<{ items: WorkOrder[]; total: number }> {
+export async function listWorkOrders(params: { status?: string; q?: string; source_so_id?: string; limit?: number; offset?: number } = {}): Promise<{ items: WorkOrder[]; total: number }> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.q) qs.set("q", params.q);
+  if (params.source_so_id) qs.set("source_so_id", params.source_so_id);
   qs.set("limit", String(params.limit ?? 50));
   qs.set("offset", String(params.offset ?? 0));
   const r = await apiFetch(`${SVC}/work-orders?${qs}`);
@@ -715,7 +718,7 @@ export async function listWorkOrders(params: { status?: string; q?: string; limi
   return { items: ((body.items ?? []) as Record<string, unknown>[]).map(normWorkOrder), total: body.total ?? 0 };
 }
 
-export async function createWorkOrder(input: { code: string; item_id: string; qty: number; due_date?: string; priority?: WOPriority; work_center_id?: string; notes?: string }): Promise<WorkOrder> {
+export async function createWorkOrder(input: { code: string; item_id: string; qty: number; due_date?: string; priority?: WOPriority; work_center_id?: string; source_so_id?: string; notes?: string }): Promise<WorkOrder> {
   const r = await apiFetch(`${SVC}/work-orders`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createWorkOrder failed: ${r.status}`); }
   return normWorkOrder(await r.json());
@@ -727,7 +730,7 @@ export async function getWorkOrder(id: string): Promise<WorkOrder> {
   return normWorkOrder(await r.json());
 }
 
-export async function updateWorkOrder(id: string, patch: { status?: WOStatus; priority?: WOPriority; due_date?: string | null; notes?: string; work_center_id?: string | null; version: number }): Promise<WorkOrder> {
+export async function updateWorkOrder(id: string, patch: { status?: WOStatus; priority?: WOPriority; due_date?: string | null; notes?: string; work_center_id?: string | null; source_so_id?: string | null; version: number }): Promise<WorkOrder> {
   const r = await apiFetch(`${SVC}/work-orders/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updateWorkOrder failed: ${r.status}`); }
   return normWorkOrder(await r.json());
@@ -799,11 +802,44 @@ export async function getLotGenealogy(id: string): Promise<{ components: LotGene
   };
 }
 
+// mapTraceNode normalizes one trace node coming back from the
+// traceability-engine / mfg-svc fallback. The flat-closure fallback uses the
+// field `qty_on_hand`; the engine tree uses `qty`. Both are accepted here.
+function mapTraceNode(n: Record<string, unknown>): TraceNode {
+  return {
+    lot_id: String(n.lot_id ?? n.lotId ?? n.LotID ?? ""),
+    lot_no: String(n.lot_no ?? n.lotNo ?? n.lot_number ?? n.LotNo ?? ""),
+    item_id: String(n.item_id ?? n.itemId ?? n.ItemID ?? ""),
+    item_code: String(n.item_code ?? n.itemCode ?? n.ItemCode ?? ""),
+    qty: Number(n.qty ?? n.qty_on_hand ?? n.qtyOnHand ?? n.QtyOnHand ?? 0),
+    status: (n.status ?? "released") as LotStatus,
+    depth: Number(n.depth ?? 0),
+    children: Array.isArray(n.children)
+      ? (n.children as Record<string, unknown>[]).map(mapTraceNode)
+      : undefined,
+  };
+}
+
+// buildTraceTree accepts whatever shape the trace endpoint returns (engine tree
+// `{root}`, `{nodes:[...]}`, or the flat-closure JSON array `[{lot_id,qty_on_hand,depth}]`)
+// and returns a single root TraceNode. The backend's flat closure omits the
+// queried lot (depth 0), so it is synthesized as the tree root.
+function buildTraceTree(lotId: string, body: unknown): TraceNode {
+  if (body && typeof body === "object" && !Array.isArray(body) && "root" in (body as object)) {
+    return mapTraceNode((body as Record<string, unknown>).root as Record<string, unknown>);
+  }
+  const arr = Array.isArray(body)
+    ? body
+    : (((body as Record<string, unknown>)?.nodes ?? (body as Record<string, unknown>)?.items ?? []) as unknown[]);
+  const children = (arr as Record<string, unknown>[]).map(mapTraceNode);
+  return { lot_id: lotId, lot_no: "", item_id: "", item_code: "", qty: 0, status: "released" as LotStatus, depth: 0, children };
+}
+
 export async function getLotTrace(id: string): Promise<LotTraceNode> {
   const r = await apiFetch(`${SVC}/lots/${id}/trace?direction=forward&max_depth=10`);
   if (!r.ok) throw new Error(`getLotTrace failed: ${r.status}`);
-  const body = await r.json() as Record<string, unknown>;
-  return (body.root ?? body) as LotTraceNode;
+  const body = await r.json() as unknown;
+  return buildTraceTree(id, body) as LotTraceNode;
 }
 
 export async function listRoutingOperations(routingId: string): Promise<RoutingOperation[]> {
@@ -958,6 +994,7 @@ export interface PurchaseOrder {
   status: string;
   orderDate: string;
   expectedDate: string | null;
+  sourceSoId: string | null;
   notes: string;
   lines: POLine[];
 }
@@ -984,15 +1021,17 @@ function normPurchaseOrder(r: Record<string, unknown>): PurchaseOrder {
     status: String(g(r, "status") ?? "draft"),
     orderDate: String(gid(r, "orderDate", "order_date") ?? r["OrderDate"] ?? ""),
     expectedDate: (gid(r, "expectedDate", "expected_date") ?? r["ExpectedDate"] ?? null) as string | null,
+    sourceSoId: (gid(r, "sourceSoId", "source_so_id") ?? r["SourceSoID"] ?? null) as string | null,
     notes: String(g(r, "notes") ?? ""),
     lines: Array.isArray(r["lines"]) ? (r["lines"] as Record<string, unknown>[]).map(normPOLine) : [],
   };
 }
 
-export async function listPurchaseOrders(params: { status?: string; q?: string; limit?: number; offset?: number } = {}): Promise<{ items: PurchaseOrder[]; total: number }> {
+export async function listPurchaseOrders(params: { status?: string; q?: string; source_so_id?: string; limit?: number; offset?: number } = {}): Promise<{ items: PurchaseOrder[]; total: number }> {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
   if (params.q) qs.set("q", params.q);
+  if (params.source_so_id) qs.set("source_so_id", params.source_so_id);
   qs.set("limit", String(params.limit ?? 50));
   qs.set("offset", String(params.offset ?? 0));
   const r = await apiFetch(`${SVC}/purchase-orders?${qs}`);
@@ -1001,7 +1040,7 @@ export async function listPurchaseOrders(params: { status?: string; q?: string; 
   return { items: ((body.items ?? []) as Record<string, unknown>[]).map(normPurchaseOrder), total: body.total ?? 0 };
 }
 
-export async function createPurchaseOrder(input: { supplier_id: string; order_date?: string; expected_date?: string; notes?: string }): Promise<PurchaseOrder> {
+export async function createPurchaseOrder(input: { supplier_id: string; order_date?: string; expected_date?: string; source_so_id?: string; notes?: string }): Promise<PurchaseOrder> {
   const r = await apiFetch(`${SVC}/purchase-orders`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `createPurchaseOrder failed: ${r.status}`); }
   return normPurchaseOrder(await r.json());
@@ -1013,7 +1052,7 @@ export async function getPurchaseOrder(id: string): Promise<PurchaseOrder> {
   return normPurchaseOrder(await r.json());
 }
 
-export async function updatePurchaseOrder(id: string, patch: { status?: POStatus; expected_date?: string | null; notes?: string }): Promise<PurchaseOrder> {
+export async function updatePurchaseOrder(id: string, patch: { status?: POStatus; expected_date?: string | null; source_so_id?: string | null; notes?: string; version?: number }): Promise<PurchaseOrder> {
   const r = await apiFetch(`${SVC}/purchase-orders/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error((e as Record<string, string>).error ?? `updatePurchaseOrder failed: ${r.status}`); }
   return normPurchaseOrder(await r.json());
@@ -1058,8 +1097,8 @@ export async function traceForLot(
     `${SVC}/lots/${lotId}/trace?direction=${direction}&max_depth=${maxDepth}`
   );
   if (!r.ok) throw new Error(`trace failed: ${r.status}`);
-  const body = await r.json() as Record<string, unknown>;
-  return (body.root ?? body) as TraceNode;
+  const body = await r.json() as unknown;
+  return buildTraceTree(lotId, body);
 }
 
 export async function linkGenealogyLot(

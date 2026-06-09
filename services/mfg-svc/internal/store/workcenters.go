@@ -33,20 +33,20 @@ func (s *WorkCenters) withTenant(ctx context.Context, tid uuid.UUID, fn func(pgx
 }
 
 const wcSelect = `
-    SELECT id, tenant_id, code, name, type, capacity_per_day_hrs, status, created_at, updated_at, version
+    SELECT id, tenant_id, code, name, type, capacity_per_day_hrs, machine_count, status, created_at, updated_at, version
     FROM work_center`
 
 func scanWC(row interface{ Scan(...any) error }, wc *domain.WorkCenter) error {
 	return row.Scan(&wc.ID, &wc.TenantID, &wc.Code, &wc.Name, &wc.Type,
-		&wc.CapacityPerDayHrs, &wc.Status, &wc.CreatedAt, &wc.UpdatedAt, &wc.Version)
+		&wc.CapacityPerDayHrs, &wc.MachineCount, &wc.Status, &wc.CreatedAt, &wc.UpdatedAt, &wc.Version)
 }
 
 func (s *WorkCenters) Create(ctx context.Context, wc *domain.WorkCenter) error {
 	return s.withTenant(ctx, wc.TenantID, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO work_center(id, tenant_id, code, name, type, capacity_per_day_hrs, status, version)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			wc.ID, wc.TenantID, wc.Code, wc.Name, wc.Type, wc.CapacityPerDayHrs, wc.Status, wc.Version)
+			INSERT INTO work_center(id, tenant_id, code, name, type, capacity_per_day_hrs, machine_count, status, version)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			wc.ID, wc.TenantID, wc.Code, wc.Name, wc.Type, wc.CapacityPerDayHrs, wc.MachineCount, wc.Status, wc.Version)
 		return err
 	})
 }
@@ -88,10 +88,10 @@ func (s *WorkCenters) List(ctx context.Context, tid uuid.UUID) ([]*domain.WorkCe
 func (s *WorkCenters) Update(ctx context.Context, wc *domain.WorkCenter) error {
 	return s.withTenant(ctx, wc.TenantID, func(tx pgx.Tx) error {
 		ct, err := tx.Exec(ctx, `
-			UPDATE work_center SET name=$3, type=$4, capacity_per_day_hrs=$5, status=$6,
+			UPDATE work_center SET name=$3, type=$4, capacity_per_day_hrs=$5, machine_count=$6, status=$7,
 			                       updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$7`,
-			wc.ID, wc.TenantID, wc.Name, wc.Type, wc.CapacityPerDayHrs, wc.Status, wc.Version)
+			WHERE id=$1 AND tenant_id=$2 AND version=$8`,
+			wc.ID, wc.TenantID, wc.Name, wc.Type, wc.CapacityPerDayHrs, wc.MachineCount, wc.Status, wc.Version)
 		if err != nil {
 			return err
 		}

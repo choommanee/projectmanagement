@@ -333,6 +333,33 @@ func (s *Documents) GetVersion(ctx context.Context, tid, docID uuid.UUID, rev in
 	return &v, nil
 }
 
+// GetVersionByID returns a version body+title by its version UUID.
+func (s *Documents) GetVersionByID(ctx context.Context, tid, versionID uuid.UUID) (*domain.DocumentVersion, error) {
+	var v domain.DocumentVersion
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		var bodyBytes []byte
+		err := tx.QueryRow(ctx, `
+			SELECT id, document_id, tenant_id, rev, title, body, status, created_by, created_at, COALESCE(note,'')
+			FROM document_version
+			WHERE id=$1 AND tenant_id=$2`,
+			versionID, tid,
+		).Scan(&v.ID, &v.DocumentID, &v.TenantID, &v.Rev, &v.Title, &bodyBytes,
+			&v.Status, &v.CreatedBy, &v.CreatedAt, &v.Note)
+		if err != nil {
+			return err
+		}
+		v.Body = fromJSON(bodyBytes)
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
 // Restore loads a historical version body, writes a new version on top, and updates the document.
 func (s *Documents) Restore(ctx context.Context, tid, docID uuid.UUID, rev, currentVersion int) (*domain.Document, error) {
 	var restored *domain.Document

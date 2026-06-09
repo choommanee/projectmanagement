@@ -39,11 +39,14 @@ func (s *Definitions) Create(ctx context.Context, d *domain.WorkflowDefinition) 
 		trigger = json.RawMessage(`{"type":"manual"}`)
 	}
 	return s.withTenant(ctx, d.TenantID, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `
+		// RETURNING populates the DB-assigned timestamps so the create response
+		// carries real created_at/updated_at (not the zero value).
+		return tx.QueryRow(ctx, `
 			INSERT INTO workflow_definition(id, tenant_id, name, description, trigger, status, current_version, version)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			d.ID, d.TenantID, d.Name, d.Description, trigger, d.Status, d.CurrentVersion, d.Version)
-		return err
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+			RETURNING created_at, updated_at`,
+			d.ID, d.TenantID, d.Name, d.Description, trigger, d.Status, d.CurrentVersion, d.Version).
+			Scan(&d.CreatedAt, &d.UpdatedAt)
 	})
 }
 

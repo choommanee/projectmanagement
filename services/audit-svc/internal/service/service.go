@@ -35,7 +35,9 @@ func (s *Service) Buckets(ctx context.Context, tid uuid.UUID, days int) ([]domai
 	return s.store.Buckets(ctx, tid, days)
 }
 
-// ParseTime parses an ISO 8601 datetime string or returns nil.
+// ParseTime parses an ISO 8601 datetime string or returns nil. A date-only
+// value ("2006-01-02") is treated as the START of that day (00:00:00), which is
+// the correct inclusive lower bound for a `from` filter.
 func ParseTime(s string) *time.Time {
 	if s == "" {
 		return nil
@@ -47,4 +49,22 @@ func ParseTime(s string) *time.Time {
 		}
 	}
 	return nil
+}
+
+// ParseTimeUpper parses a value for use as an inclusive UPPER bound (a `to`
+// filter). A date-only value ("2006-01-02") is expanded to the END of that day
+// (23:59:59.999999999) so that `ts <= to` includes every event on that day —
+// otherwise a same-day range (from==to, e.g. the audit sparkline drill-down)
+// would match only events at exactly midnight and return nothing.
+func ParseTimeUpper(s string) *time.Time {
+	if s == "" {
+		return nil
+	}
+	// Date-only → end of that calendar day.
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		eod := t.Add(24*time.Hour - time.Nanosecond)
+		return &eod
+	}
+	// Otherwise fall back to the standard datetime parse.
+	return ParseTime(s)
 }

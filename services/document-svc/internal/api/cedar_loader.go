@@ -91,6 +91,20 @@ func (l *CedarLoader) LoadAttrs(ctx context.Context, uid string) (map[string]any
 			return map[string]any{}, nil
 		}
 		return map[string]any{"tenant_id": tid.String()}, nil
+	case "SignEnvelope":
+		var tid uuid.UUID
+		var creator *uuid.UUID
+		if err := l.withTenant(ctx, callerTenant, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx,
+				`SELECT tenant_id, created_by FROM document_sign_envelope WHERE id = $1`, id).Scan(&tid, &creator)
+		}); err != nil {
+			return map[string]any{}, nil
+		}
+		attrs := map[string]any{"tenant_id": tid.String()}
+		if creator != nil {
+			attrs["owner_user"] = creator.String()
+		}
+		return attrs, nil
 	default:
 		return map[string]any{}, nil
 	}

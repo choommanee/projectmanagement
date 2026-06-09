@@ -49,6 +49,7 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.With(libauth.RequireAction(authz, "sales.order.create", "*")).Post("/sales-orders", createSalesOrder(svc))
 		r.Get("/sales-orders/{id}", getSalesOrder(svc))
 		r.With(libauth.RequireAction(authz, "sales.order.update", "*")).Patch("/sales-orders/{id}", updateSalesOrder(svc))
+		r.With(libauth.RequireAction(authz, "sales.order.delete", "*")).Delete("/sales-orders/{id}", deleteSalesOrder(svc))
 
 		// SO Lines
 		r.With(libauth.RequireAction(authz, "sales.order.update", "*")).Post("/sales-orders/{id}/lines", addSOLine(svc))
@@ -60,24 +61,30 @@ func NewRouter(svc *service.Service, authz libauth.Authorizer) http.Handler {
 		r.With(libauth.RequireAction(authz, "sales.quotation.create", "*")).Post("/quotations", createQuotation(svc))
 		r.Get("/quotations/{id}", getQuotation(svc))
 		r.With(libauth.RequireAction(authz, "sales.quotation.update", "*")).Patch("/quotations/{id}", updateQuotation(svc))
+		r.With(libauth.RequireAction(authz, "sales.quotation.delete", "*")).Delete("/quotations/{id}", deleteQuotation(svc))
+		r.With(libauth.RequireAction(authz, "sales.order.create", "*")).Post("/quotations/{id}/convert", convertQuotation(svc))
 
 		// Invoices
 		r.Get("/invoices", listInvoices(svc))
 		r.With(libauth.RequireAction(authz, "sales.invoice.create", "*")).Post("/invoices", createInvoice(svc))
 		r.Get("/invoices/{id}", getInvoice(svc))
 		r.With(libauth.RequireAction(authz, "sales.invoice.update", "*")).Patch("/invoices/{id}", updateInvoice(svc))
+		r.With(libauth.RequireAction(authz, "sales.invoice.delete", "*")).Delete("/invoices/{id}", deleteInvoice(svc))
 
 		// Shipments
 		r.Get("/shipments", listShipments(svc))
 		r.With(libauth.RequireAction(authz, "sales.shipment.create", "*")).Post("/shipments", createShipment(svc))
 		r.Get("/shipments/{id}", getShipment(svc))
 		r.With(libauth.RequireAction(authz, "sales.shipment.update", "*")).Patch("/shipments/{id}", updateShipment(svc))
+		r.With(libauth.RequireAction(authz, "sales.shipment.update", "*")).Patch("/shipments/{id}/status", updateShipmentStatus(svc))
+		r.With(libauth.RequireAction(authz, "sales.shipment.delete", "*")).Delete("/shipments/{id}", deleteShipment(svc))
 
 		// Opportunities
 		r.Get("/opportunities", listOpportunities(svc))
 		r.With(libauth.RequireAction(authz, "sales.opportunity.create", "*")).Post("/opportunities", createOpportunity(svc))
 		r.Get("/opportunities/{id}", getOpportunity(svc))
 		r.With(libauth.RequireAction(authz, "sales.opportunity.update", "*")).Patch("/opportunities/{id}", updateOpportunity(svc))
+		r.With(libauth.RequireAction(authz, "sales.opportunity.delete", "*")).Delete("/opportunities/{id}", deleteOpportunity(svc))
 	})
 
 	return r
@@ -138,6 +145,7 @@ func createCustomer(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.customer.create", "customer", c.ID.String(), nil, map[string]any{"code": c.Code, "name": c.Name})
 		writeJSON(w, 201, c)
 	}
 }
@@ -257,6 +265,9 @@ func updateCustomer(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.customer.update", "customer", id.String(),
+			map[string]any{"name": cur.Name, "active": cur.Active},
+			map[string]any{"name": c.Name, "active": c.Active})
 		writeJSON(w, 200, c)
 	}
 }
@@ -285,6 +296,7 @@ func deleteCustomer(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.customer.delete", "customer", id.String(), nil, nil)
 		w.WriteHeader(204)
 	}
 }
@@ -320,10 +332,7 @@ func createSalesOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 400, err)
 			return
 		}
-		if req.SONumber == "" {
-			writeErr(w, 400, errors.New("so_number required"))
-			return
-		}
+		// so_number is auto-generated server-side when omitted (see store.Create).
 		if req.Status == "" {
 			req.Status = domain.SOStatusDraft
 		}
@@ -350,6 +359,8 @@ func createSalesOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		emitAudit(svc, r, "sales.order.create", "sales_order", so.ID.String(), nil,
+			map[string]any{"so_number": so.SONumber, "status": so.Status, "customer_id": so.CustomerID.String()})
 		writeJSON(w, 201, so)
 	}
 }
@@ -461,7 +472,38 @@ func updateSalesOrder(svc *service.Service) http.HandlerFunc {
 			writeErr(w, 500, err)
 			return
 		}
+		action := "sales.order.update"
+		if req.Status != "" && req.Status != cur.Status {
+			action = "sales.order.status"
+		}
+		emitAudit(svc, r, action, "sales_order", id.String(),
+			map[string]any{"status": cur.Status},
+			map[string]any{"status": so.Status})
 		writeJSON(w, 200, so)
+	}
+}
+
+func deleteSalesOrder(svc *service.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tid, ok := tenantOr400(w, r)
+		if !ok {
+			return
+		}
+		id, err := uuid.Parse(chi.URLParam(r, "id"))
+		if err != nil {
+			writeErr(w, 400, err)
+			return
+		}
+		if err := svc.SalesOrders.Delete(r.Context(), tid, id); err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				writeErr(w, 404, err)
+				return
+			}
+			writeErr(w, 500, err)
+			return
+		}
+		emitAudit(svc, r, "sales.order.delete", "sales_order", id.String(), nil, nil)
+		w.WriteHeader(204)
 	}
 }
 

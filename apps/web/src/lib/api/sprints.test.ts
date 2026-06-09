@@ -7,6 +7,7 @@ import {
   assignTaskToSprint,
   unassignTaskFromSprint,
   listSprintTasks,
+  deleteSprint,
   normSprint,
 } from "./sprints";
 
@@ -15,47 +16,47 @@ beforeEach(() => {
 });
 
 const RAW_SPRINT = {
-  ID: "sprint-001",
-  TenantID: "tenant-001",
-  ProjectID: "proj-001",
-  Name: "Sprint 1",
-  Goal: "Ship MVP",
-  Status: "planning",
-  StartDate: "2026-06-01T00:00:00Z",
-  EndDate: "2026-06-14T00:00:00Z",
-  CapacityPts: 40,
-  CreatedAt: "2026-05-01T00:00:00Z",
-  UpdatedAt: "2026-05-01T00:00:00Z",
-  Version: 1,
+  id: "sprint-001",
+  tenant_id: "tenant-001",
+  project_id: "proj-001",
+  name: "Sprint 1",
+  goal: "Ship MVP",
+  status: "planning",
+  start_date: "2026-06-01T00:00:00Z",
+  end_date: "2026-06-14T00:00:00Z",
+  capacity_pts: 40,
+  created_at: "2026-05-01T00:00:00Z",
+  updated_at: "2026-05-01T00:00:00Z",
+  version: 1,
 };
 
 const RAW_TASK = {
-  ID: "task-001",
-  TenantID: "tenant-001",
-  ProjectID: "proj-001",
-  ParentID: null,
-  Code: "T-1",
-  Title: "Sprint task",
-  Description: "",
-  Type: "task",
-  Status: "todo",
-  Priority: "med",
-  AssigneeID: null,
-  ReviewerID: null,
-  EstimateMd: 2,
-  ActualMd: 0,
-  ProgressPct: 0,
-  StartDate: null,
-  DueDate: null,
-  SortOrder: 0,
-  Tags: [],
-  CreatedAt: "2026-05-01T00:00:00Z",
-  UpdatedAt: "2026-05-01T00:00:00Z",
-  Version: 1,
+  id: "task-001",
+  tenant_id: "tenant-001",
+  project_id: "proj-001",
+  parent_id: null,
+  code: "T-1",
+  title: "Sprint task",
+  description: "",
+  type: "task",
+  status: "todo",
+  priority: "med",
+  assignee_id: null,
+  reviewer_id: null,
+  estimate_md: 2,
+  actual_md: 0,
+  progress_pct: 0,
+  start_date: null,
+  due_date: null,
+  sort_order: 0,
+  tags: [],
+  created_at: "2026-05-01T00:00:00Z",
+  updated_at: "2026-05-01T00:00:00Z",
+  version: 1,
 };
 
 describe("sprints API client", () => {
-  it("normSprint handles Go PascalCase keys", () => {
+  it("normSprint maps snake_case keys", () => {
     const sp = normSprint(RAW_SPRINT as Record<string, unknown>);
     expect(sp.id).toBe("sprint-001");
     expect(sp.tenantId).toBe("tenant-001");
@@ -134,7 +135,7 @@ describe("sprints API client", () => {
   it("updateSprint sends PATCH with version in body", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ ...RAW_SPRINT, Status: "active", Version: 2 }),
+      json: async () => ({ ...RAW_SPRINT, status: "active", version: 2 }),
     });
     global.fetch = mockFetch;
 
@@ -187,5 +188,23 @@ describe("sprints API client", () => {
     expect(tasks[0].code).toBe("T-1");
     expect(tasks[0].estimateMd).toBe(2);
     expect(tasks[0].status).toBe("todo");
+  });
+
+  it("deleteSprint sends version as query param", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    global.fetch = mockFetch;
+
+    await deleteSprint("sprint-001", 3);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/sprints/sprint-001?version=3",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("deleteSprint surfaces 409 conflict message", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: "version conflict" }) });
+    global.fetch = mockFetch;
+    await expect(deleteSprint("sprint-001", 1)).rejects.toThrow("version conflict");
   });
 });

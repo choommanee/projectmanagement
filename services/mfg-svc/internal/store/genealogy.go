@@ -58,6 +58,41 @@ func (s *Genealogy) AddGenealogy(ctx context.Context, tid, parentLotID, childLot
 	})
 }
 
+// GenealogyComponent is one parent (component) lot that went into a child lot.
+type GenealogyComponent struct {
+	LotID  uuid.UUID `json:"lot_id"`
+	LotNo  string    `json:"lot_no"`
+	ItemID uuid.UUID `json:"item_id"`
+	Qty    float64   `json:"qty"`
+}
+
+// ListComponents returns the immediate parent (component) lots that compose the
+// given child lot, with the consumed quantity per edge.
+func (s *Genealogy) ListComponents(ctx context.Context, tid, childLotID uuid.UUID) ([]GenealogyComponent, error) {
+	var out []GenealogyComponent
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT g.parent_lot_id, l.lot_no, l.item_id, COALESCE(g.qty, 0)
+			FROM lot_genealogy g
+			JOIN lot l ON l.id = g.parent_lot_id
+			WHERE g.child_lot_id = $1 AND g.tenant_id = $2
+			ORDER BY l.lot_no`, childLotID, tid)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c GenealogyComponent
+			if err := rows.Scan(&c.LotID, &c.LotNo, &c.ItemID, &c.Qty); err != nil {
+				return err
+			}
+			out = append(out, c)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
 // TraceForward returns the closure of lots reachable from root (parent→child direction).
 func (s *Genealogy) TraceForward(ctx context.Context, tid, root uuid.UUID, maxDepth int) ([]GenealogyNode, error) {
 	if maxDepth <= 0 {

@@ -6,6 +6,7 @@ import { Breadcrumb } from "@/shell/Breadcrumb";
 import { CommandBar } from "@/shell/CommandBar";
 import { Button, Input, Tag, Dialog, EmptyState, LoadingState } from "@pmplatform/ui-kit";
 import { listWorkOrders, createWorkOrder, updateWorkOrder, deleteWorkOrder, listItems, listWorkCenters, listUoms, type WorkOrder, type WOStatus, type WOPriority, type Item, type WorkCenter } from "@/lib/api/mfg";
+import { listSalesOrders, type SalesOrder } from "@/lib/api/sales";
 
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: "", label: "All" },
@@ -35,12 +36,12 @@ function priorityTone(p: WOPriority): "neutral" | "info" | "warning" | "danger" 
   return "neutral";
 }
 
-function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
-  open: boolean; items: Item[]; workCenters: WorkCenter[]; onClose: () => void; onCreated: (wo: WorkOrder) => void;
+function NewWODialog({ open, items, workCenters, salesOrders, onClose, onCreated }: {
+  open: boolean; items: Item[]; workCenters: WorkCenter[]; salesOrders: SalesOrder[]; onClose: () => void; onCreated: (wo: WorkOrder) => void;
 }) {
   const [form, setForm] = useState({
     code: "", item_id: items[0]?.id ?? "", qty: "1", due_date: "",
-    priority: "med" as WOPriority, work_center_id: "",
+    priority: "med" as WOPriority, work_center_id: "", source_so_id: "",
   });
   const [itemQuery, setItemQuery] = useState(items[0] ? `${items[0].code} — ${items[0].name}` : "");
   const [itemResults, setItemResults] = useState<Item[]>([]);
@@ -62,6 +63,7 @@ function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
         code: form.code, item_id: form.item_id, qty: Number(form.qty),
         due_date: form.due_date || undefined, priority: form.priority,
         work_center_id: form.work_center_id || undefined,
+        source_so_id: form.source_so_id || undefined,
       });
       onCreated(wo);
     } catch (err) {
@@ -139,6 +141,14 @@ function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
               </select>
             </div>
           )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-2">Source Sales Order (optional)</label>
+            <select aria-label="Source sales order" value={form.source_so_id} onChange={(e) => setForm(f => ({ ...f, source_so_id: e.target.value }))}
+              className="h-9 w-full rounded-sm border border-line bg-surface px-3 text-sm focus:border-accent focus:outline-none">
+              <option value="">— none —</option>
+              {salesOrders.map(so => <option key={so.id} value={so.id}>{so.soNumber || so.id.slice(0, 8)}</option>)}
+            </select>
+          </div>
         </form>
     </Dialog>
   );
@@ -148,14 +158,15 @@ function NewWODialog({ open, items, workCenters, onClose, onCreated }: {
 
 const EDITABLE_STATUSES: WOStatus[] = ["planned", "released", "in_progress", "completed", "closed", "cancelled"];
 
-function EditWODialog({ wo, workCenters, open, onClose, onSaved }: {
-  wo: WorkOrder | null; workCenters: WorkCenter[]; open: boolean; onClose: () => void; onSaved: (updated: WorkOrder) => void;
+function EditWODialog({ wo, workCenters, salesOrders, open, onClose, onSaved }: {
+  wo: WorkOrder | null; workCenters: WorkCenter[]; salesOrders: SalesOrder[]; open: boolean; onClose: () => void; onSaved: (updated: WorkOrder) => void;
 }) {
   const [status, setStatus] = useState<WOStatus>("planned");
   const [priority, setPriority] = useState<WOPriority>("med");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [wcId, setWcId] = useState("");
+  const [soId, setSoId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -166,6 +177,7 @@ function EditWODialog({ wo, workCenters, open, onClose, onSaved }: {
       setDueDate(wo.dueDate ? wo.dueDate.slice(0, 10) : "");
       setNotes(wo.notes);
       setWcId(wo.workCenterId ?? "");
+      setSoId(wo.sourceSoId ?? "");
       setError(null);
     }
   }, [wo]);
@@ -181,6 +193,7 @@ function EditWODialog({ wo, workCenters, open, onClose, onSaved }: {
         due_date: dueDate || null,
         notes,
         work_center_id: wcId || null,
+        source_so_id: soId || null,
         version: wo.version,
       });
       onSaved(updated);
@@ -235,6 +248,13 @@ function EditWODialog({ wo, workCenters, open, onClose, onSaved }: {
             </select>
           </div>
         )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-2">Source Sales Order</label>
+          <select aria-label="Source sales order" value={soId} onChange={(e) => setSoId(e.target.value)} className={fieldCls}>
+            <option value="">— none —</option>
+            {salesOrders.map(so => <option key={so.id} value={so.id}>{so.soNumber || so.id.slice(0, 8)}</option>)}
+          </select>
+        </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink-2">Notes</label>
           <textarea
@@ -313,14 +333,16 @@ export default function WorkOrdersPage() {
   const [deleteTarget, setDeleteTarget] = useState<WorkOrder | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [workCenters, setWorkCenters] = useState<WorkCenter[]>([]);
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [itemMap, setItemMap] = useState<Map<string, Item>>(new Map());
   const [wcMap, setWcMap] = useState<Map<string, WorkCenter>>(new Map());
 
   const loadMeta = useCallback(async () => {
     try {
-      const [itemRes, wcRes] = await Promise.all([listItems({ limit: 500 }), listWorkCenters()]);
+      const [itemRes, wcRes, soRes] = await Promise.all([listItems({ limit: 500 }), listWorkCenters(), listSalesOrders({ limit: 200 })]);
       setItems(itemRes.items);
       setWorkCenters(wcRes);
+      setSalesOrders(soRes.items);
       setItemMap(new Map(itemRes.items.map(i => [i.id, i])));
       setWcMap(new Map(wcRes.map(w => [w.id, w])));
     } catch { /* noop */ }
@@ -521,10 +543,11 @@ export default function WorkOrdersPage() {
         </div>
       </div>
 
-      <NewWODialog open={showNew} items={items} workCenters={workCenters} onClose={() => setShowNew(false)} onCreated={(wo) => { setShowNew(false); router.push(`/mfg/work-orders/${wo.id}`); }} />
+      <NewWODialog open={showNew} items={items} workCenters={workCenters} salesOrders={salesOrders} onClose={() => setShowNew(false)} onCreated={(wo) => { setShowNew(false); router.push(`/mfg/work-orders/${wo.id}`); }} />
       <EditWODialog
         wo={editTarget}
         workCenters={workCenters}
+        salesOrders={salesOrders}
         open={!!editTarget}
         onClose={() => setEditTarget(null)}
         onSaved={(updated) => {

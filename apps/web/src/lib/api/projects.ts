@@ -10,6 +10,7 @@ export interface Project {
   dueDate?: string | null;
   progressPct: number;
   tags: string[];
+  settings: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -17,24 +18,24 @@ export interface Project {
 
 const SVC = "/api/projects";
 
+// Backend is canonical snake_case — map once, cleanly.
 function normalize(raw: Record<string, unknown>): Project {
-  // Handles camelCase, PascalCase and common Go all-caps identifiers (ID, TenantID…)
-  const get = (k: string) => raw[k] ?? raw[k[0].toUpperCase() + k.slice(1)];
   return {
-    id: String(get("id") ?? raw["ID"] ?? ""),
-    tenantId: String(get("tenantId") ?? raw["TenantID"] ?? raw["tenant_id"] ?? ""),
-    code: String(get("code")),
-    name: String(get("name")),
-    description: String(get("description") ?? ""),
-    status: (get("status") ?? "planning") as Project["status"],
-    ownerId: (get("ownerId") ?? raw["OwnerID"] ?? raw["owner_id"]) as string | null | undefined,
-    startDate: (get("startDate") ?? raw["StartDate"] ?? raw["start_date"]) as string | null | undefined,
-    dueDate: (get("dueDate") ?? raw["DueDate"] ?? raw["due_date"]) as string | null | undefined,
-    progressPct: Number(get("progressPct") ?? raw["ProgressPct"] ?? raw["progress_pct"] ?? 0),
-    tags: (get("tags") ?? []) as string[],
-    createdAt: String(get("createdAt") ?? raw["CreatedAt"] ?? ""),
-    updatedAt: String(get("updatedAt") ?? raw["UpdatedAt"] ?? ""),
-    version: Number(get("version") ?? 1),
+    id:          String(raw["id"] ?? ""),
+    tenantId:    String(raw["tenant_id"] ?? ""),
+    code:        String(raw["code"] ?? ""),
+    name:        String(raw["name"] ?? ""),
+    description: String(raw["description"] ?? ""),
+    status:      (raw["status"] ?? "planning") as Project["status"],
+    ownerId:     (raw["owner_id"] ?? null) as string | null,
+    startDate:   (raw["start_date"] ?? null) as string | null,
+    dueDate:     (raw["due_date"] ?? null) as string | null,
+    progressPct: Number(raw["progress_pct"] ?? 0),
+    tags:        (raw["tags"] as string[] | null) ?? [],
+    settings:    (raw["settings"] as Record<string, unknown> | null) ?? {},
+    createdAt:   String(raw["created_at"] ?? ""),
+    updatedAt:   String(raw["updated_at"] ?? ""),
+    version:     Number(raw["version"] ?? 1),
   };
 }
 

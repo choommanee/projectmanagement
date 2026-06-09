@@ -146,35 +146,54 @@ func (s *Users) List(ctx context.Context, tid uuid.UUID, q string, limit int) ([
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	var rows pgx.Rows
-	var err error
-	if q == "" {
-		rows, err = s.p.Query(ctx,
-			`SELECT id, display_name, email FROM app_user
-			 WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY display_name LIMIT $2`,
-			tid, limit)
-	} else {
-		pattern := "%" + strings.ToLower(q) + "%"
-		rows, err = s.p.Query(ctx,
-			`SELECT id, display_name, email FROM app_user
-			 WHERE tenant_id=$1 AND deleted_at IS NULL
-			   AND (lower(display_name) LIKE $2 OR lower(email) LIKE $2)
-			 ORDER BY display_name LIMIT $3`,
-			tid, pattern, limit)
-	}
+	// roles are aggregated from tenant-scoped role_assignment rows. The whole
+	// query runs inside withTenant so role_assignment RLS resolves correctly.
+	const rolesExpr = `COALESCE(ARRAY(
+		SELECT r.name FROM role_assignment ra
+		JOIN role r ON r.id = ra.role_id
+		WHERE ra.user_id = u.id AND ra.tenant_id = u.tenant_id AND ra.scope_type = 'tenant'
+		ORDER BY r.name
+	), '{}') AS roles`
+	out := []domain.UserSummary{}
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		var rows pgx.Rows
+		var err error
+		if q == "" {
+			rows, err = tx.Query(ctx,
+				`SELECT u.id, u.display_name, u.email, u.status, u.created_at, `+rolesExpr+`
+				 FROM app_user u
+				 WHERE u.tenant_id=$1 AND u.deleted_at IS NULL ORDER BY u.display_name LIMIT $2`,
+				tid, limit)
+		} else {
+			pattern := "%" + strings.ToLower(q) + "%"
+			rows, err = tx.Query(ctx,
+				`SELECT u.id, u.display_name, u.email, u.status, u.created_at, `+rolesExpr+`
+				 FROM app_user u
+				 WHERE u.tenant_id=$1 AND u.deleted_at IS NULL
+				   AND (lower(u.display_name) LIKE $2 OR lower(u.email) LIKE $2)
+				 ORDER BY u.display_name LIMIT $3`,
+				tid, pattern, limit)
+		}
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var u domain.UserSummary
+			if err := rows.Scan(&u.ID, &u.DisplayName, &u.Email, &u.Status, &u.CreatedAt, &u.Roles); err != nil {
+				return err
+			}
+			if u.Roles == nil {
+				u.Roles = []string{}
+			}
+			out = append(out, u)
+		}
+		return rows.Err()
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := []domain.UserSummary{}
-	for rows.Next() {
-		var u domain.UserSummary
-		if err := rows.Scan(&u.ID, &u.DisplayName, &u.Email); err != nil {
-			return nil, err
-		}
-		out = append(out, u)
-	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // Update rewrites display_name and bumps updated_at + version for the user.

@@ -10,6 +10,7 @@ use (
 	./libs/go/nats
 	./libs/go/notification
 	./libs/go/otel
+	./libs/go/serviceauth
 	./libs/policy
 	./services/_template
 	./services/audit-svc

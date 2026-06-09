@@ -12,6 +12,7 @@ type Service struct {
 	ControlPlan *store.ControlPlanStore
 	Inspection  *store.InspectionStore
 	NCR         *store.NCRStore
+	audit       AuditPublisher
 }
 
 func New(

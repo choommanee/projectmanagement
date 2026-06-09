@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
-import { currentTenantId, currentAccessToken } from "@/lib/auth/serverTenant";
+import { proxyHeaders } from "@/lib/auth/serverTenant";
 
 const SVC = process.env.IDENTITY_URL ?? "http://localhost:8082";
 
-async function proxyHeaders() {
-  const [tid, at] = await Promise.all([currentTenantId(), currentAccessToken()]);
-  if (!tid) return null;
-  const h: Record<string, string> = { "X-Tenant-Id": tid };
-  if (at) h["Authorization"] = `Bearer ${at}`;
+async function makeHeaders(): Promise<Headers | NextResponse> {
+  const h = await proxyHeaders();
+  if (!(h instanceof Headers)) return NextResponse.json({ error: h.error }, { status: h.status });
   return h;
 }
 
 export async function GET(req: Request) {
-  const h = await proxyHeaders();
-  if (!h) return NextResponse.json({ error: "not authenticated" }, { status: 401 });
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
   const url = new URL(req.url);
   const res = await fetch(`${SVC}/v1/users${url.search}`, { headers: h, cache: "no-store" });
   const data = await res.json();
@@ -21,14 +19,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const h = await proxyHeaders();
-  if (!h) return NextResponse.json({ error: "not authenticated" }, { status: 401 });
+  const h = await makeHeaders();
+  if (h instanceof NextResponse) return h;
+  h.set("content-type", "application/json");
   const body = await req.text();
-  const res = await fetch(`${SVC}/v1/users`, {
-    method: "POST",
-    headers: { ...h, "content-type": "application/json" },
-    body,
-  });
+  const res = await fetch(`${SVC}/v1/users`, { method: "POST", headers: h, body });
   const text = await res.text();
   return new NextResponse(text || null, { status: res.status, headers: { "content-type": "application/json" } });
 }

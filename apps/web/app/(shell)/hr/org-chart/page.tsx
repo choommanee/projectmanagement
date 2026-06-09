@@ -112,7 +112,7 @@ function DeptNode({ node, depth }: { node: DeptTreeNode; depth: number }) {
                     {!e.positionName && e.status !== "active" && (
                       <>
                         <span className="text-ink-4">·</span>
-                        <span className={`text-[10px] ${e.status === "terminated" ? "text-danger" : e.status === "on_leave" ? "text-warning" : "text-ink-3"}`}>
+                        <span className={`text-[10px] ${e.status === "terminated" ? "text-danger" : e.status === "probation" ? "text-warning" : "text-ink-3"}`}>
                           {e.status}
                         </span>
                       </>

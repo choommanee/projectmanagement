@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -43,7 +44,7 @@ type APQPProject struct {
 	Name         string
 	Phase        APQPPhase
 	Status       APQPStatus
-	Milestones   []byte // raw JSON
+	Milestones   json.RawMessage // raw JSON array, serializes as real JSON (not base64)
 	OwnerID      *uuid.UUID
 	TargetDate   *time.Time
 	CreatedAt    time.Time
@@ -207,7 +208,7 @@ type Inspection struct {
 	InspectedAt  time.Time
 	Inspector    string
 	Result       InspectionResult
-	Measurements []byte // raw JSON
+	Measurements json.RawMessage // raw JSON array, serializes as real JSON (not base64)
 	Notes        string
 }
 

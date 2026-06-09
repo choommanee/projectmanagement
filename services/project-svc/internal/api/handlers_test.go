@@ -107,9 +107,9 @@ func TestCreateProject(t *testing.T) {
 	}
 	var resp map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &resp)
-	id, ok := resp["ID"].(string)
+	id, ok := resp["id"].(string)
 	if !ok || id == "" {
-		t.Fatalf("no ID in response: %v", resp)
+		t.Fatalf("no id in response: %v", resp)
 	}
 	t.Cleanup(func() {
 		p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", id)
@@ -131,8 +131,8 @@ func TestListProjects(t *testing.T) {
 	_ = json.Unmarshal(rr1.Body.Bytes(), &r1)
 	_ = json.Unmarshal(rr2.Body.Bytes(), &r2)
 	t.Cleanup(func() {
-		p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", r1["ID"])
-		p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", r2["ID"])
+		p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", r1["id"])
+		p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", r2["id"])
 	})
 
 	rr := doJSON(t, h, "GET", "/v1/projects", nil, map[string]string{"X-Tenant-Id": tid.String()})
@@ -162,7 +162,7 @@ func TestCreateGetPatchDeleteProject(t *testing.T) {
 	}
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	id := proj["ID"].(string)
+	id := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", id) })
 
 	// Get
@@ -179,8 +179,8 @@ func TestCreateGetPatchDeleteProject(t *testing.T) {
 	}
 	var patched map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &patched)
-	if patched["Name"] != "CGD Updated" {
-		t.Fatalf("expected updated name, got %v", patched["Name"])
+	if patched["name"] != "CGD Updated" {
+		t.Fatalf("expected updated name, got %v", patched["name"])
 	}
 
 	// Patch with stale version → 409
@@ -216,7 +216,7 @@ func TestCreateTaskUnderProject(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", projBody, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	// Create task
@@ -227,7 +227,7 @@ func TestCreateTaskUnderProject(t *testing.T) {
 	}
 	var task map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &task)
-	tid2 := task["ID"].(string)
+	tid2 := task["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", tid2) })
 
 	// List tasks
@@ -242,6 +242,205 @@ func TestCreateTaskUnderProject(t *testing.T) {
 	}
 }
 
+// TestListTasksRoleFilters exercises the role-workspace task filters added to
+// GET /v1/tasks: type, tag (array-overlap), and reviewer. Uses real Postgres.
+func TestListTasksRoleFilters(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Parent project
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "RF-P001", "name": "Role Filter Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["id"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	reviewer := uuid.New().String()
+	// Three tasks with distinct shapes.
+	mk := func(code, ttype string, tags []string, reviewerID *string) string {
+		body := map[string]any{"code": code, "title": code, "type": ttype, "tags": tags}
+		if reviewerID != nil {
+			body["reviewer_id"] = *reviewerID
+		}
+		rr := doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", body, headers)
+		if rr.Code != 201 {
+			t.Fatalf("create %s: expected 201, got %d: %s", code, rr.Code, rr.Body.String())
+		}
+		var tk map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &tk)
+		id := tk["id"].(string)
+		t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", id) })
+		return id
+	}
+	mk("RF-RISK", "risk", []string{"ba", "analysis"}, &reviewer)
+	mk("RF-ARCH", "task", []string{"go", "infra"}, nil)
+	mk("RF-PLAIN", "task", []string{}, nil)
+
+	count := func(query string) int {
+		rr := doJSON(t, h, "GET", "/v1/tasks?project="+pid+"&"+query, nil, headers)
+		if rr.Code != 200 {
+			t.Fatalf("list %q: expected 200, got %d: %s", query, rr.Code, rr.Body.String())
+		}
+		var resp struct {
+			Items []map[string]any `json:"items"`
+		}
+		_ = json.Unmarshal(rr.Body.Bytes(), &resp)
+		n := 0
+		for _, it := range resp.Items {
+			if it["project_id"] == pid {
+				n++
+			}
+		}
+		return n
+	}
+
+	if got := count("type=risk"); got != 1 {
+		t.Fatalf("type=risk: expected 1, got %d", got)
+	}
+	if got := count("tag=ba"); got != 1 {
+		t.Fatalf("tag=ba: expected 1, got %d", got)
+	}
+	if got := count("tag=go,analysis"); got != 2 {
+		t.Fatalf("tag=go,analysis overlap: expected 2, got %d", got)
+	}
+	if got := count("reviewer=" + reviewer); got != 1 {
+		t.Fatalf("reviewer filter: expected 1, got %d", got)
+	}
+}
+
+// TestTaskCreatePatchNullableFields covers the full nullable-field contract:
+// create with status/start_date/due_date/tags, patch dates, and clear
+// assignee/reviewer/dates with explicit JSON null (optUUID/optDate decoding).
+func TestTaskCreatePatchNullableFields(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	// Parent project
+	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "NF-P001", "name": "Nullable Fields Project"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["id"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	// Create with status + dates + tags (previously dropped by the handler).
+	assignee := uuid.New().String()
+	taskBody := map[string]any{
+		"code": "NF-T001", "title": "Nullable task",
+		"status": "in_progress", "start_date": "2026-06-01", "due_date": "2026-06-20",
+		"tags": []string{"alpha", "beta"}, "assignee_id": assignee,
+	}
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", taskBody, headers)
+	if rr.Code != 201 {
+		t.Fatalf("Create task: expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var task map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &task)
+	taskID := task["id"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
+	if task["status"] != "in_progress" {
+		t.Fatalf("create dropped status: got %v", task["status"])
+	}
+	if task["start_date"] == nil || task["due_date"] == nil {
+		t.Fatalf("create dropped dates: start=%v due=%v", task["start_date"], task["due_date"])
+	}
+	if tags, _ := task["tags"].([]any); len(tags) != 2 {
+		t.Fatalf("create dropped tags: %v", task["tags"])
+	}
+
+	// Invalid status is rejected.
+	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks",
+		map[string]any{"code": "NF-T002", "title": "bad status", "status": "bogus"}, headers)
+	if rr.Code != 400 {
+		t.Fatalf("invalid status: expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Patch dates (previously not updatable).
+	rr = doJSON(t, h, "PATCH", "/v1/tasks/"+taskID,
+		map[string]any{"start_date": "2026-06-05", "due_date": "2026-07-01", "version": 1}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("Patch dates: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var patched map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &patched)
+	if sd, _ := patched["start_date"].(string); sd[:10] != "2026-06-05" {
+		t.Fatalf("start_date not patched: %v", patched["start_date"])
+	}
+
+	// Explicit JSON null clears assignee + due_date (previously a silent no-op).
+	req := []byte(`{"assignee_id":null,"due_date":null,"version":2}`)
+	hr := httptest.NewRequest("PATCH", "/v1/tasks/"+taskID, bytes.NewReader(req))
+	hr.Header.Set("Content-Type", "application/json")
+	hr.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, hr)
+	if rec.Code != 200 {
+		t.Fatalf("null clear: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var cleared map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &cleared)
+	if cleared["assignee_id"] != nil {
+		t.Fatalf("assignee_id not cleared by explicit null: %v", cleared["assignee_id"])
+	}
+	if cleared["due_date"] != nil {
+		t.Fatalf("due_date not cleared by explicit null: %v", cleared["due_date"])
+	}
+	if sd, _ := cleared["start_date"].(string); sd[:10] != "2026-06-05" {
+		t.Fatalf("start_date should be untouched by absent field: %v", cleared["start_date"])
+	}
+}
+
+// TestProjectPatchClearFields covers explicit clear of description/due_date
+// and setting start_date through PATCH /v1/projects/{id}.
+func TestProjectPatchClearFields(t *testing.T) {
+	p := openTestPool(t)
+	defer p.Close()
+	tid := seedTestTenant(t, p)
+	h := newTestServer(t, p)
+	headers := map[string]string{"X-Tenant-Id": tid.String()}
+
+	rr := doJSON(t, h, "POST", "/v1/projects",
+		map[string]any{"code": "PC-P001", "name": "Clear Project", "description": "to be cleared"}, headers)
+	var proj map[string]any
+	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
+	pid := proj["id"].(string)
+	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
+
+	// Set start_date + due_date.
+	rr = doJSON(t, h, "PATCH", "/v1/projects/"+pid,
+		map[string]any{"start_date": "2026-06-02", "due_date": "2026-08-01", "version": 1}, headers)
+	if rr.Code != 200 {
+		t.Fatalf("set dates: expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Clear description ("") and due_date (null); start_date untouched.
+	body := []byte(`{"description":"","due_date":null,"version":2}`)
+	hr := httptest.NewRequest("PATCH", "/v1/projects/"+pid, bytes.NewReader(body))
+	hr.Header.Set("Content-Type", "application/json")
+	hr.Header.Set("X-Tenant-Id", tid.String())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, hr)
+	if rec.Code != 200 {
+		t.Fatalf("clear: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var cleared map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &cleared)
+	if cleared["description"] != "" {
+		t.Fatalf("description not cleared: %v", cleared["description"])
+	}
+	if cleared["due_date"] != nil {
+		t.Fatalf("due_date not cleared: %v", cleared["due_date"])
+	}
+	if sd, _ := cleared["start_date"].(string); sd[:10] != "2026-06-02" {
+		t.Fatalf("start_date should be untouched: %v", cleared["start_date"])
+	}
+}
+
 func TestGetSprintHTTP(t *testing.T) {
 	p := openTestPool(t)
 	defer p.Close()
@@ -253,7 +452,7 @@ func TestGetSprintHTTP(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "GSP-001", "name": "GetSprint Project"}, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	// Create sprint
@@ -263,7 +462,7 @@ func TestGetSprintHTTP(t *testing.T) {
 	}
 	var sprint map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
-	sprintID := sprint["ID"].(string)
+	sprintID := sprint["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
 
 	// GET /v1/sprints/:id
@@ -273,11 +472,11 @@ func TestGetSprintHTTP(t *testing.T) {
 	}
 	var got map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &got)
-	if got["ID"].(string) != sprintID {
-		t.Fatalf("expected sprint ID %s, got %v", sprintID, got["ID"])
+	if got["id"].(string) != sprintID {
+		t.Fatalf("expected sprint ID %s, got %v", sprintID, got["id"])
 	}
-	if got["Name"] != "GetSprint S1" {
-		t.Fatalf("expected name 'GetSprint S1', got %v", got["Name"])
+	if got["name"] != "GetSprint S1" {
+		t.Fatalf("expected name 'GetSprint S1', got %v", got["name"])
 	}
 }
 
@@ -292,21 +491,21 @@ func TestListSprintTasksHTTP(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "LST-S01", "name": "ListSprintTasks Project"}, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	// Create task
 	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "LST-T01", "title": "List Sprint Task"}, headers)
 	var task map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &task)
-	taskID := task["ID"].(string)
+	taskID := task["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
 
 	// Create sprint
 	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/sprints", map[string]any{"name": "List Tasks Sprint"}, headers)
 	var sprint map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
-	sprintID := sprint["ID"].(string)
+	sprintID := sprint["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
 
 	// List tasks before assign → empty
@@ -348,13 +547,13 @@ func TestListWorklogs(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "WL-P001", "name": "Worklog Project"}, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "WL-T001", "title": "Worklog Task"}, headers)
 	var task map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &task)
-	taskID := task["ID"].(string)
+	taskID := task["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
 
 	// POST a worklog entry
@@ -371,8 +570,8 @@ func TestListWorklogs(t *testing.T) {
 	}
 	var entry map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &entry)
-	if entry["ID"] == nil || entry["ID"] == "" {
-		t.Fatalf("expected ID in worklog response, got %v", entry)
+	if entry["id"] == nil || entry["id"] == "" {
+		t.Fatalf("expected id in worklog response, got %v", entry)
 	}
 
 	// GET /tasks/{id}/worklogs
@@ -398,13 +597,13 @@ func TestCreateWorklog_InvalidLoggedMd(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "WLV-P01", "name": "Worklog Val Project"}, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "WLV-T01", "title": "Worklog Val Task"}, headers)
 	var task map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &task)
-	taskID := task["ID"].(string)
+	taskID := task["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
 
 	// POST with logged_md = -1 → 400
@@ -433,14 +632,14 @@ func TestAssignTaskToSprint(t *testing.T) {
 	rr := doJSON(t, h, "POST", "/v1/projects", map[string]any{"code": "SP-P001", "name": "Sprint Test Project"}, headers)
 	var proj map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &proj)
-	pid := proj["ID"].(string)
+	pid := proj["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM project WHERE id=$1", pid) })
 
 	// Create task
 	rr = doJSON(t, h, "POST", "/v1/projects/"+pid+"/tasks", map[string]any{"code": "SP-T001", "title": "Sprint Task"}, headers)
 	var task map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &task)
-	taskID := task["ID"].(string)
+	taskID := task["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM task WHERE id=$1", taskID) })
 
 	// Create sprint
@@ -450,7 +649,7 @@ func TestAssignTaskToSprint(t *testing.T) {
 	}
 	var sprint map[string]any
 	_ = json.Unmarshal(rr.Body.Bytes(), &sprint)
-	sprintID := sprint["ID"].(string)
+	sprintID := sprint["id"].(string)
 	t.Cleanup(func() { p.Exec(context.Background(), "DELETE FROM sprint WHERE id=$1", sprintID) })
 
 	// Assign task to sprint

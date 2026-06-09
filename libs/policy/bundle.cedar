@@ -32,6 +32,16 @@ permit (
 )
 when { context.roles.contains("platform-admin") };
 
+// Allow importing an operator-provided X.509 document-signing certificate
+// (BYO cert) only to platform-admin members. Backs document-svc
+// POST/GET /v1/admin/sign-cert (atomic swap of the active signing identity).
+permit (
+  principal,
+  action == Action::"document.sign.cert.import",
+  resource
+)
+when { context.roles.contains("platform-admin") };
+
 // Allow OIDC SSO config CRUD only to tenant-admin members. Per-instance
 // ABAC for sso_config rows is Plan #6 Task 6 territory; for now this uses
 // resource "*" which the middleware wraps as Resource::"*".
@@ -96,6 +106,10 @@ permit (
     Action::"project.task.delete",
     Action::"project.task.add_dependency",
     Action::"project.task.remove_dependency",
+    Action::"project.task.comment.update",
+    Action::"project.task.comment.delete",
+    Action::"project.task.worklog.update",
+    Action::"project.task.worklog.delete",
     Action::"project.sprint.create",
     Action::"project.sprint.update",
     Action::"project.sprint.delete",
@@ -130,13 +144,76 @@ permit (
     Action::"document.comment.create",
     Action::"document.comment.resolve",
     Action::"document.comment.delete",
-    Action::"document.template.create"
+    Action::"document.template.create",
+    Action::"document.template.update",
+    Action::"document.template.delete",
+    Action::"document.sign.envelope.create",
+    Action::"document.sign.send",
+    Action::"document.sign.void"
   ],
   resource
 )
 when {
   context.roles.contains("tenant-admin") ||
   context.roles.contains("project-manager")
+};
+
+// --- Service-to-service: workflow-service role -----------------------------
+//
+// The Rust workflow runtime engine, brokered through workflow-svc, calls
+// document-svc and project-svc to materialize side effects of a running
+// workflow (create_document / request_signature / create_task /
+// update_task_status). Those calls carry a short-lived service JWT minted by
+// identity-svc's POST /v1/internal/service-token endpoint with
+// Roles=["workflow-service"] and an explicit TenantID (no RLS bypass — the
+// tenant rides in the token like any user token). This permit grants the
+// MINIMAL action set those four engine actions require; nothing else.
+//
+// Security posture: the service token is short-lived (~10m), still verified
+// through the normal JWKS path, and minted only behind a shared-secret
+// (SERVICE_TOKEN_SECRET) gate over the internal network. The cross-tenant
+// forbid layer above still applies, so a workflow-service token scoped to
+// tenant A cannot mutate tenant B's resources.
+permit (
+  principal,
+  action in [
+    Action::"document.create",
+    Action::"document.sign.envelope.create",
+    Action::"document.sign.send",
+    Action::"project.task.create",
+    Action::"project.task.update"
+  ],
+  resource
+)
+when { context.roles.contains("workflow-service") };
+
+// Signer actions (view / sign / decline / OTP step-up request) are open to
+// any authenticated HUMAN user within the tenant — the actual signer must
+// match the routed signer row, which the service layer enforces. Cedar gates
+// by authenticated principal here; the JWT middleware guarantees a principal
+// before this runs. document.sign.otp.request mirrors document.sign.sign:
+// it issues the email-OTP challenge an email_otp signer must verify to sign.
+//
+// The workflow-service service principal is explicitly EXCLUDED: per the
+// ADR-0002 least-privilege table it only gets document.create /
+// sign.envelope.create / sign.send / project.task.*, never the act-as-a-signer
+// surface. A service token has no concrete user-UUID identity, so granting it
+// these actions would let it sign/decline ANY signer row (the service layer's
+// requireActor also fails closed on nil actor — this is the matching Cedar
+// layer of that defense-in-depth).
+permit (
+  principal,
+  action in [
+    Action::"document.sign.view",
+    Action::"document.sign.sign",
+    Action::"document.sign.decline",
+    Action::"document.sign.otp.request"
+  ],
+  resource
+)
+when {
+  context.user_id != "" &&
+  !context.roles.contains("workflow-service")
 };
 
 // Manufacturing: tenant-admin and mfg-operator may write across the mfg
@@ -148,6 +225,7 @@ permit (
   principal,
   action in [
     Action::"mfg.uom.create",
+    Action::"mfg.uom.delete",
     Action::"mfg.item.create",
     Action::"mfg.item.update",
     Action::"mfg.item.delete",
@@ -245,6 +323,7 @@ permit (
     Action::"workflow.publish",
     Action::"workflow.instance.start",
     Action::"workflow.instance.resume",
+    Action::"workflow.instance.retry",
     Action::"workflow.instance.cancel",
     Action::"workflow.human_task.complete"
   ],
@@ -339,6 +418,26 @@ when {
   resource.tenant_id != context.tenant_id
 };
 
+// Document sign actions: never let a caller create/send/void an envelope or
+// mint a public verification link for a resource owned by another tenant.
+// cedar_loader resolves Document::tenant_id and SignEnvelope::tenant_id, so
+// the forbid fires whenever the loaded tenant disagrees with the JWT tenant
+// context. Same no-op-on-missing-attrs shape as document.update above.
+forbid (
+  principal,
+  action in [
+    Action::"document.sign.envelope.create",
+    Action::"document.sign.send",
+    Action::"document.sign.void",
+    Action::"document.sign.verify_link.create"
+  ],
+  resource
+)
+when {
+  resource has tenant_id &&
+  resource.tenant_id != context.tenant_id
+};
+
 // Project write actions: forbid mutating a project that belongs to a
 // different tenant, regardless of which role the principal holds.
 forbid (
@@ -401,6 +500,7 @@ forbid (
     Action::"workflow.delete",
     Action::"workflow.publish",
     Action::"workflow.instance.resume",
+    Action::"workflow.instance.retry",
     Action::"workflow.instance.cancel",
     Action::"workflow.human_task.complete",
     Action::"report.dashboard.update",
@@ -546,7 +646,19 @@ permit (
     Action::"sales.customer.delete",
     Action::"sales.order.create",
     Action::"sales.order.update",
-    Action::"sales.order.delete"
+    Action::"sales.order.delete",
+    Action::"sales.quotation.create",
+    Action::"sales.quotation.update",
+    Action::"sales.quotation.delete",
+    Action::"sales.invoice.create",
+    Action::"sales.invoice.update",
+    Action::"sales.invoice.delete",
+    Action::"sales.shipment.create",
+    Action::"sales.shipment.update",
+    Action::"sales.shipment.delete",
+    Action::"sales.opportunity.create",
+    Action::"sales.opportunity.update",
+    Action::"sales.opportunity.delete"
   ],
   resource
 )
@@ -572,7 +684,8 @@ permit (
     Action::"accounting.je.post",
     Action::"accounting.invoice.create",
     Action::"accounting.invoice.update",
-    Action::"accounting.invoice.delete"
+    Action::"accounting.invoice.delete",
+    Action::"accounting.budget.set"
   ],
   resource
 )
@@ -641,4 +754,22 @@ permit (
 when {
   context.roles.contains("platform-admin") ||
   context.roles.contains("tenant-admin")
+};
+
+// Public verification links (document-svc, Team F): minting/revoking a
+// public share link for a completed signing envelope mirrors the
+// document.sign.send permit set — tenant-admin / project-manager for humans,
+// plus the workflow-service service principal so automated flows can attach
+// a verification link to documents they routed for signature. The PUBLIC
+// lookup endpoint (GET /public/verify/{token}) is deliberately outside
+// Cedar: its sole credential is the 256-bit token.
+permit (
+  principal,
+  action == Action::"document.sign.verify_link.create",
+  resource
+)
+when {
+  context.roles.contains("tenant-admin") ||
+  context.roles.contains("project-manager") ||
+  context.roles.contains("workflow-service")
 };

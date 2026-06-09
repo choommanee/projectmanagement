@@ -147,3 +147,42 @@ func (st *ShipmentStore) Update(ctx context.Context, tid, id uuid.UUID, in Updat
 	}
 	return &s, nil
 }
+
+// UpdateStatus mutates only the shipment status. Returns ErrNotFound when absent.
+func (st *ShipmentStore) UpdateStatus(ctx context.Context, tid, id uuid.UUID, status domain.ShipmentStatus) (*domain.Shipment, error) {
+	var s domain.Shipment
+	err := withTenant(ctx, st.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE shipment SET status=$3, updated_at=now() WHERE id=$1 AND tenant_id=$2`,
+			id, tid, status,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return scanShipment(tx.QueryRow(ctx, shipmentSelect+" WHERE id=$1", id), &s)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// Delete hard-deletes a shipment. Returns ErrNotFound when absent.
+func (st *ShipmentStore) Delete(ctx context.Context, tid, id uuid.UUID) error {
+	return withTenant(ctx, st.p, tid, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`DELETE FROM shipment WHERE id=$1 AND tenant_id=$2`,
+			id, tid,
+		)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}

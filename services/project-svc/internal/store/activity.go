@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -37,9 +38,9 @@ func (s *ActivityStore) ListComments(ctx context.Context, tenantID, taskID uuid.
 	var out []domain.TaskComment
 	err := s.withTenant(ctx, tenantID, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`SELECT id, tenant_id, task_id, author_id, body, created_at, updated_at
+			`SELECT id, tenant_id, task_id, author_id, body, version, created_at, updated_at
              FROM task_comment
-             WHERE task_id = $1
+             WHERE task_id = $1 AND deleted_at IS NULL
              ORDER BY created_at ASC`, taskID)
 		if err != nil {
 			return err
@@ -47,7 +48,7 @@ func (s *ActivityStore) ListComments(ctx context.Context, tenantID, taskID uuid.
 		defer rows.Close()
 		for rows.Next() {
 			var c domain.TaskComment
-			if err := rows.Scan(&c.ID, &c.TenantID, &c.TaskID, &c.AuthorID, &c.Body, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			if err := rows.Scan(&c.ID, &c.TenantID, &c.TaskID, &c.AuthorID, &c.Body, &c.Version, &c.CreatedAt, &c.UpdatedAt); err != nil {
 				return err
 			}
 			out = append(out, c)
@@ -64,14 +65,54 @@ func (s *ActivityStore) CreateComment(ctx context.Context, tenantID, taskID, aut
 		return tx.QueryRow(ctx,
 			`INSERT INTO task_comment (tenant_id, task_id, author_id, body)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, tenant_id, task_id, author_id, body, created_at, updated_at`,
+             RETURNING id, tenant_id, task_id, author_id, body, version, created_at, updated_at`,
 			tenantID, taskID, authorID, body,
-		).Scan(&c.ID, &c.TenantID, &c.TaskID, &c.AuthorID, &c.Body, &c.CreatedAt, &c.UpdatedAt)
+		).Scan(&c.ID, &c.TenantID, &c.TaskID, &c.AuthorID, &c.Body, &c.Version, &c.CreatedAt, &c.UpdatedAt)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &c, nil
+}
+
+// UpdateComment edits a comment body with optimistic locking and returns the
+// updated record. Soft-deleted comments cannot be edited.
+func (s *ActivityStore) UpdateComment(ctx context.Context, tenantID, id uuid.UUID, body string, version int) (*domain.TaskComment, error) {
+	var c domain.TaskComment
+	err := s.withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`UPDATE task_comment
+             SET body = $3, updated_at = now(), version = version + 1
+             WHERE id = $1 AND tenant_id = $2 AND version = $4 AND deleted_at IS NULL
+             RETURNING id, tenant_id, task_id, author_id, body, version, created_at, updated_at`,
+			id, tenantID, body, version,
+		).Scan(&c.ID, &c.TenantID, &c.TaskID, &c.AuthorID, &c.Body, &c.Version, &c.CreatedAt, &c.UpdatedAt)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrConflict
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// SoftDeleteComment marks a comment deleted using optimistic locking.
+func (s *ActivityStore) SoftDeleteComment(ctx context.Context, tenantID, id uuid.UUID, version int) error {
+	return s.withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE task_comment
+             SET deleted_at = now(), updated_at = now(), version = version + 1
+             WHERE id = $1 AND tenant_id = $2 AND version = $3 AND deleted_at IS NULL`,
+			id, tenantID, version)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrConflict
+		}
+		return nil
+	})
 }
 
 // ListActivity returns the most recent 100 activity events for a task in

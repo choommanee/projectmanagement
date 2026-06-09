@@ -41,14 +41,14 @@ func (s *WorkOrders) withTenant(ctx context.Context, tid uuid.UUID, fn func(pgx.
 const woSelect = `
     SELECT id, tenant_id, code, item_id, qty, qty_completed, status, priority,
            due_date, work_center_id, start_at, end_at,
-           routing_header_id, bom_header_id, COALESCE(notes,''),
+           routing_header_id, bom_header_id, source_so_id, COALESCE(notes,''),
            created_at, updated_at, version
     FROM work_order`
 
 func scanWO(row interface{ Scan(...any) error }, wo *domain.WorkOrder) error {
 	return row.Scan(&wo.ID, &wo.TenantID, &wo.Code, &wo.ItemID, &wo.Qty, &wo.QtyCompleted,
 		&wo.Status, &wo.Priority, &wo.DueDate, &wo.WorkCenterID, &wo.StartAt, &wo.EndAt,
-		&wo.RoutingHeaderID, &wo.BOMHeaderID, &wo.Notes,
+		&wo.RoutingHeaderID, &wo.BOMHeaderID, &wo.SourceSoID, &wo.Notes,
 		&wo.CreatedAt, &wo.UpdatedAt, &wo.Version)
 }
 
@@ -56,10 +56,10 @@ func (s *WorkOrders) Create(ctx context.Context, wo *domain.WorkOrder) error {
 	return s.withTenant(ctx, wo.TenantID, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO work_order(id, tenant_id, code, item_id, qty, status, priority,
-			                       due_date, work_center_id, routing_header_id, bom_header_id, notes, version)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			                       due_date, work_center_id, routing_header_id, bom_header_id, source_so_id, notes, version)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
 			wo.ID, wo.TenantID, wo.Code, wo.ItemID, wo.Qty, wo.Status, wo.Priority,
-			wo.DueDate, wo.WorkCenterID, wo.RoutingHeaderID, wo.BOMHeaderID, wo.Notes, wo.Version)
+			wo.DueDate, wo.WorkCenterID, wo.RoutingHeaderID, wo.BOMHeaderID, wo.SourceSoID, wo.Notes, wo.Version)
 		return err
 	})
 }
@@ -79,11 +79,12 @@ func (s *WorkOrders) GetByID(ctx context.Context, tid, id uuid.UUID) (*domain.Wo
 }
 
 type ListWOOpts struct {
-	Status string
-	Q      string
-	ItemID *uuid.UUID
-	Limit  int
-	Offset int
+	Status     string
+	Q          string
+	ItemID     *uuid.UUID
+	SourceSoID *uuid.UUID
+	Limit      int
+	Offset     int
 }
 
 func (s *WorkOrders) List(ctx context.Context, tid uuid.UUID, opts ListWOOpts) ([]*domain.WorkOrder, int, error) {
@@ -107,6 +108,11 @@ func (s *WorkOrders) List(ctx context.Context, tid uuid.UUID, opts ListWOOpts) (
 	if opts.ItemID != nil {
 		where = append(where, fmt.Sprintf("item_id = $%d", idx))
 		args = append(args, *opts.ItemID)
+		idx++
+	}
+	if opts.SourceSoID != nil {
+		where = append(where, fmt.Sprintf("source_so_id = $%d", idx))
+		args = append(args, *opts.SourceSoID)
 		idx++
 	}
 	whereSQL := strings.Join(where, " AND ")
@@ -141,9 +147,11 @@ func (s *WorkOrders) Update(ctx context.Context, wo *domain.WorkOrder) error {
 	return s.withTenant(ctx, wo.TenantID, func(tx pgx.Tx) error {
 		ct, err := tx.Exec(ctx, `
 			UPDATE work_order SET status=$3, priority=$4, due_date=$5, notes=$6,
+			                      work_center_id=$7, source_so_id=$8,
 			                      updated_at=now(), version=version+1
-			WHERE id=$1 AND tenant_id=$2 AND version=$7 AND deleted_at IS NULL`,
-			wo.ID, wo.TenantID, wo.Status, wo.Priority, wo.DueDate, wo.Notes, wo.Version)
+			WHERE id=$1 AND tenant_id=$2 AND version=$9 AND deleted_at IS NULL`,
+			wo.ID, wo.TenantID, wo.Status, wo.Priority, wo.DueDate, wo.Notes,
+			wo.WorkCenterID, wo.SourceSoID, wo.Version)
 		if err != nil {
 			return err
 		}
@@ -390,13 +398,22 @@ func (s *WorkOrders) ListMaterials(ctx context.Context, tid, woID uuid.UUID) ([]
 
 // --- Lots ---
 
+const lotSelect = `
+	SELECT id, tenant_id, item_id, lot_no, qty_on_hand, status, source_wo_id, COALESCE(notes,''), created_at
+	FROM lot`
+
+func scanLot(row interface{ Scan(...any) error }, l *domain.Lot) error {
+	return row.Scan(&l.ID, &l.TenantID, &l.ItemID, &l.LotNo, &l.QtyOnHand,
+		&l.Status, &l.SourceWOID, &l.Notes, &l.CreatedAt)
+}
+
 func (s *WorkOrders) CreateLot(ctx context.Context, lot *domain.Lot) error {
 	lot.ID = uuid.New()
 	return s.withTenant(ctx, lot.TenantID, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
-			INSERT INTO lot(id, tenant_id, item_id, lot_no, qty_on_hand, status, source_wo_id)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-			lot.ID, lot.TenantID, lot.ItemID, lot.LotNo, lot.QtyOnHand, lot.Status, lot.SourceWOID)
+			INSERT INTO lot(id, tenant_id, item_id, lot_no, qty_on_hand, status, source_wo_id, notes)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			lot.ID, lot.TenantID, lot.ItemID, lot.LotNo, lot.QtyOnHand, lot.Status, lot.SourceWOID, lot.Notes)
 		return err
 	})
 }
@@ -404,17 +421,14 @@ func (s *WorkOrders) CreateLot(ctx context.Context, lot *domain.Lot) error {
 func (s *WorkOrders) ListLotsByItem(ctx context.Context, tid, itemID uuid.UUID) ([]*domain.Lot, error) {
 	var list []*domain.Lot
 	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `
-			SELECT id, tenant_id, item_id, lot_no, qty_on_hand, status, source_wo_id, created_at
-			FROM lot WHERE item_id = $1 ORDER BY created_at DESC`, itemID)
+		rows, err := tx.Query(ctx, lotSelect+` WHERE item_id = $1 ORDER BY created_at DESC`, itemID)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var l domain.Lot
-			if err := rows.Scan(&l.ID, &l.TenantID, &l.ItemID, &l.LotNo, &l.QtyOnHand,
-				&l.Status, &l.SourceWOID, &l.CreatedAt); err != nil {
+			if err := scanLot(rows, &l); err != nil {
 				return err
 			}
 			list = append(list, &l)
@@ -422,6 +436,87 @@ func (s *WorkOrders) ListLotsByItem(ctx context.Context, tid, itemID uuid.UUID) 
 		return rows.Err()
 	})
 	return list, err
+}
+
+// ListLotsOpts filters the tenant-wide lot listing.
+type ListLotsOpts struct {
+	ItemID *uuid.UUID
+	Status string
+	Limit  int
+	Offset int
+}
+
+// ListLots returns lots across the tenant with optional item_id/status filters.
+func (s *WorkOrders) ListLots(ctx context.Context, tid uuid.UUID, opts ListLotsOpts) ([]*domain.Lot, error) {
+	if opts.Limit <= 0 || opts.Limit > 500 {
+		opts.Limit = 100
+	}
+	where := []string{"tenant_id = $1"}
+	args := []any{tid}
+	idx := 2
+	if opts.ItemID != nil {
+		where = append(where, fmt.Sprintf("item_id = $%d", idx))
+		args = append(args, *opts.ItemID)
+		idx++
+	}
+	if opts.Status != "" {
+		where = append(where, fmt.Sprintf("status = $%d", idx))
+		args = append(args, opts.Status)
+		idx++
+	}
+	whereSQL := strings.Join(where, " AND ")
+	var list []*domain.Lot
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			lotSelect+" WHERE "+whereSQL+
+				fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1),
+			append(args, opts.Limit, opts.Offset)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var l domain.Lot
+			if err := scanLot(rows, &l); err != nil {
+				return err
+			}
+			list = append(list, &l)
+		}
+		return rows.Err()
+	})
+	return list, err
+}
+
+// GetLot fetches a single lot by id within the tenant.
+func (s *WorkOrders) GetLot(ctx context.Context, tid, id uuid.UUID) (*domain.Lot, error) {
+	var l domain.Lot
+	err := s.withTenant(ctx, tid, func(tx pgx.Tx) error {
+		return scanLot(tx.QueryRow(ctx, lotSelect+" WHERE id = $1 AND tenant_id = $2", id, tid), &l)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+// UpdateLot updates the mutable fields (status, notes, qty_on_hand) of a lot.
+func (s *WorkOrders) UpdateLot(ctx context.Context, lot *domain.Lot) error {
+	return s.withTenant(ctx, lot.TenantID, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `
+			UPDATE lot SET status=$3, notes=$4, qty_on_hand=$5
+			WHERE id=$1 AND tenant_id=$2`,
+			lot.ID, lot.TenantID, lot.Status, lot.Notes, lot.QtyOnHand)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
 }
 
 func (s *WorkOrders) UpdateLotStatus(ctx context.Context, tid, id uuid.UUID, status domain.LotStatus) error {

@@ -30,6 +30,7 @@ export interface ChartOfAccount {
   type: AccountType;
   currency: string;
   active: boolean;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,13 +69,17 @@ export interface Invoice {
   tenantId: string;
   invNo: string;
   invType: InvType;
-  counterparty: string;
+  /** UUID of the counterparty (customer for AR, supplier for AP). */
+  counterpartyId: string;
+  /** Human-readable counterparty name, resolved client-side from a directory. */
+  counterpartyName: string;
   amount: number;
   currency: string;
   status: InvStatus;
   issueDate: string;
   dueDate: string;
   notes: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,13 +88,14 @@ export interface Invoice {
 
 function normalizeAccount(r: Record<string, unknown>): ChartOfAccount {
   return {
-    id: String(r.id ?? ""),
+    id: String(r.id ?? r["ID"] ?? ""),
     tenantId: String(gid(r, "tenantId", "tenant_id") ?? ""),
     code: String(g(r, "code") ?? ""),
     name: String(g(r, "name") ?? ""),
-    type: (g(r, "type") ?? "asset") as AccountType,
+    type: (r["AccountType"] ?? r["account_type"] ?? g(r, "type") ?? "asset") as AccountType,
     currency: String(g(r, "currency") ?? "THB"),
     active: Boolean(g(r, "active") ?? true),
+    version: Number(g(r, "version") ?? 1),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -97,22 +103,23 @@ function normalizeAccount(r: Record<string, unknown>): ChartOfAccount {
 
 function normalizeLine(r: Record<string, unknown>): JournalLine {
   return {
-    id: String(r.id ?? ""),
+    id: String(r.id ?? r["ID"] ?? ""),
     entryId: String(gid(r, "entryId", "entry_id") ?? ""),
     lineNo: Number(gid(r, "lineNo", "line_no") ?? 0),
     accountId: String(gid(r, "accountId", "account_id") ?? ""),
     accountCode: r.account_code ? String(r.account_code) : r.accountCode ? String(r.accountCode) : undefined,
     accountName: r.account_name ? String(r.account_name) : r.accountName ? String(r.accountName) : undefined,
     debit: Number(g(r, "debit") ?? 0),
+    // Backend persists the line note as `Description` (json: description).
+    memo: String(r["Description"] ?? r["description"] ?? g(r, "memo") ?? ""),
     credit: Number(g(r, "credit") ?? 0),
-    memo: String(g(r, "memo") ?? ""),
   };
 }
 
 function normalizeJE(r: Record<string, unknown>): JournalEntry {
   const rawLines = (r.lines ?? r.Lines) as Record<string, unknown>[] | undefined;
   return {
-    id: String(r.id ?? ""),
+    id: String(r.id ?? r["ID"] ?? ""),
     tenantId: String(gid(r, "tenantId", "tenant_id") ?? ""),
     refNo: String(gid(r, "refNo", "ref_no") ?? ""),
     memo: String(g(r, "memo") ?? ""),
@@ -125,18 +132,22 @@ function normalizeJE(r: Record<string, unknown>): JournalEntry {
 }
 
 function normalizeInvoice(r: Record<string, unknown>): Invoice {
+  // Backend stores inv_type lowercase ('ar'/'ap'); surface it uppercase for the UI.
+  const rawType = String(gid(r, "invType", "inv_type") ?? "ar").toUpperCase();
   return {
-    id: String(r.id ?? ""),
+    id: String(r.id ?? r["ID"] ?? ""),
     tenantId: String(gid(r, "tenantId", "tenant_id") ?? ""),
     invNo: String(gid(r, "invNo", "inv_no") ?? ""),
-    invType: (gid(r, "invType", "inv_type") ?? "AR") as InvType,
-    counterparty: String(g(r, "counterparty") ?? ""),
+    invType: (rawType === "AP" ? "AP" : "AR") as InvType,
+    counterpartyId: String(gid(r, "counterpartyId", "counterparty_id") ?? r["CounterpartyID"] ?? ""),
+    counterpartyName: String(gid(r, "counterpartyName", "counterparty_name") ?? r["CounterpartyName"] ?? ""),
     amount: Number(g(r, "amount") ?? 0),
     currency: String(g(r, "currency") ?? "THB"),
     status: (g(r, "status") ?? "draft") as InvStatus,
     issueDate: String(gid(r, "issueDate", "issue_date") ?? ""),
     dueDate: String(gid(r, "dueDate", "due_date") ?? ""),
     notes: String(g(r, "notes") ?? ""),
+    version: Number(g(r, "version") ?? 1),
     createdAt: String(gid(r, "createdAt", "created_at") ?? ""),
     updatedAt: String(gid(r, "updatedAt", "updated_at") ?? ""),
   };
@@ -204,10 +215,12 @@ export async function createAccount(input: {
   currency?: string;
   active?: boolean;
 }): Promise<ChartOfAccount> {
+  // Backend expects `account_type`, not `type`.
+  const { type, ...rest } = input;
   const r = await apiFetch(`${SVC}/accounts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...rest, account_type: type }),
   });
   if (!r.ok) throw new Error(`createAccount: ${r.status}`);
   return normalizeAccount(await r.json() as Record<string, unknown>);
@@ -218,18 +231,21 @@ export async function updateAccount(id: string, patch: Partial<{
   type: AccountType;
   currency: string;
   active: boolean;
-}>): Promise<ChartOfAccount> {
+}> & { version: number }): Promise<ChartOfAccount> {
+  const { type, ...rest } = patch;
+  const body: Record<string, unknown> = { ...rest };
+  if (type !== undefined) body.account_type = type;
   const r = await apiFetch(`${SVC}/accounts/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`updateAccount: ${r.status}`);
   return normalizeAccount(await r.json() as Record<string, unknown>);
 }
 
-export async function deleteAccount(id: string): Promise<void> {
-  const r = await apiFetch(`${SVC}/accounts/${id}`, { method: "DELETE" });
+export async function deleteAccount(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/accounts/${id}?version=${version}`, { method: "DELETE" });
   if (!r.ok && r.status !== 204) throw new Error(`deleteAccount: ${r.status}`);
 }
 
@@ -290,11 +306,14 @@ export async function addJELine(entryId: string, line: {
   debit?: number;
   credit?: number;
   memo?: string;
+  line_no?: number;
 }): Promise<JournalLine> {
+  // Backend field is `description`, not `memo`.
+  const { memo, ...rest } = line;
   const r = await apiFetch(`${SVC}/journal-entries/${entryId}/lines`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(line),
+    body: JSON.stringify({ ...rest, description: memo }),
   });
   if (!r.ok) throw new Error(`addJELine: ${r.status}`);
   return normalizeLine(await r.json() as Record<string, unknown>);
@@ -305,10 +324,13 @@ export async function updateJELine(entryId: string, lineId: string, patch: Parti
   credit: number;
   memo: string;
 }>): Promise<JournalLine> {
+  const { memo, ...rest } = patch;
+  const body: Record<string, unknown> = { ...rest };
+  if (memo !== undefined) body.description = memo;
   const r = await apiFetch(`${SVC}/journal-entries/${entryId}/lines/${lineId}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`updateJELine: ${r.status}`);
   return normalizeLine(await r.json() as Record<string, unknown>);
@@ -344,31 +366,37 @@ export async function getInvoice(id: string): Promise<Invoice> {
 }
 
 export async function createInvoice(input: {
+  inv_no?: string;
   inv_type: InvType;
-  counterparty: string;
+  /** Counterparty UUID (customer for AR, supplier for AP). */
+  counterparty_id: string;
   amount: number;
   currency?: string;
   issue_date?: string;
   due_date?: string;
   notes?: string;
 }): Promise<Invoice> {
+  // inv_no is required by the backend; generate a fallback when omitted.
+  const inv_no = input.inv_no ?? `${input.inv_type}-${Date.now()}`;
   const r = await apiFetch(`${SVC}/invoices`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
+    // DB enum is lowercase ('ar'/'ap').
+    body: JSON.stringify({ ...input, inv_no, inv_type: input.inv_type.toLowerCase() }),
   });
   if (!r.ok) throw new Error(`createInvoice: ${r.status}`);
   return normalizeInvoice(await r.json() as Record<string, unknown>);
 }
 
 export async function updateInvoice(id: string, patch: Partial<{
-  counterparty: string;
   amount: number;
   currency: string;
   status: InvStatus;
   due_date: string;
+  /** RFC3339 timestamp; set when transitioning an invoice to `paid`. */
+  paid_at: string;
   notes: string;
-}>): Promise<Invoice> {
+}> & { version: number }): Promise<Invoice> {
   const r = await apiFetch(`${SVC}/invoices/${id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
@@ -378,7 +406,7 @@ export async function updateInvoice(id: string, patch: Partial<{
   return normalizeInvoice(await r.json() as Record<string, unknown>);
 }
 
-export async function deleteInvoice(id: string): Promise<void> {
-  const r = await apiFetch(`${SVC}/invoices/${id}`, { method: "DELETE" });
+export async function deleteInvoice(id: string, version: number): Promise<void> {
+  const r = await apiFetch(`${SVC}/invoices/${id}?version=${version}`, { method: "DELETE" });
   if (!r.ok && r.status !== 204) throw new Error(`deleteInvoice: ${r.status}`);
 }

@@ -115,7 +115,7 @@ function CpDetailPane({ cp, itemMap, onClose, onUpdated }: {
         no: Number(draft.no) || chars.length + 1,
         characteristic: draft.characteristic,
         spec: draft.spec,
-        sample_size: Number(draft.sample_size) || 1,
+        sample_size: draft.sample_size || "1",
         sample_freq: draft.sample_freq,
         measurement_method: draft.measurement_method,
         reaction_plan: draft.reaction_plan,
@@ -133,7 +133,7 @@ function CpDetailPane({ cp, itemMap, onClose, onUpdated }: {
     try {
       const updated = await updateControlPlanChar(id, {
         characteristic: editForm.characteristic, spec: editForm.spec,
-        sample_size: Number(editForm.sample_size) || 1, sample_freq: editForm.sample_freq,
+        sample_size: editForm.sample_size || "1", sample_freq: editForm.sample_freq,
         measurement_method: editForm.measurement_method, reaction_plan: editForm.reaction_plan,
       });
       setChars(prev => prev.map(c => c.id === id ? updated : c));

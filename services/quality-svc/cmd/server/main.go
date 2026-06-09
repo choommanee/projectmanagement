@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/pmplatform/libs/go/audit"
 	libauth "github.com/pmplatform/libs/go/auth"
 	libotel "github.com/pmplatform/libs/go/otel"
 	libpolicy "github.com/pmplatform/libs/policy"
@@ -46,7 +47,9 @@ func main() {
 	insp := store.NewInspection(p)
 	ncr := store.NewNCR(p)
 
-	svc := service.New(apqp, ppap, fmea, cp, insp, ncr)
+	// Audit publisher: direct Postgres write so it works with NATS down.
+	svc := service.New(apqp, ppap, fmea, cp, insp, ncr).
+		WithAuditPublisher(audit.NewPgPublisher(p, "quality-svc"))
 
 	ps, err := libpolicy.LoadShared()
 	if err != nil {

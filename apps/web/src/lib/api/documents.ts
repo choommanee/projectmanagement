@@ -86,82 +86,77 @@ export interface Template {
   isSystem: boolean; createdAt: string;
 }
 
-// g: check camelCase, all-caps (Go "ID"), and PascalCase
-const g = (r: Record<string, unknown>, k: string) =>
-  r[k] ?? r[k.toUpperCase()] ?? r[k[0].toUpperCase() + k.slice(1)];
-
-// snake: check snake_case, camelCase, PascalCase, and Go all-caps compound (e.g. "WorkspaceID")
-const snake = (r: Record<string, unknown>, snk: string, cml: string) => {
-  // Convert camelCase to PascalCase with embedded ID uppercased: workspaceId → WorkspaceID
-  const goKey = cml
-    .replace(/^(.)/, (c) => c.toUpperCase())
-    .replace(/Id$/, "ID")
-    .replace(/Id([A-Z])/, "ID$1");
-  return r[snk] ?? r[cml] ?? r[goKey] ?? r[cml[0].toUpperCase() + cml.slice(1)];
-};
+// Backend (document-svc) is canonical snake_case — map once, cleanly.
+// (Earlier drafts emitted PascalCase; that shape is dead.)
 
 function normWs(r: Record<string, unknown>): Workspace {
   return {
-    id: String(g(r, "id")), tenantId: String(snake(r, "tenant_id", "tenantId")),
-    projectId: String(snake(r, "project_id", "projectId")),
-    kind: (g(r, "kind") ?? "pm") as WorkspaceKind, name: String(g(r, "name") ?? ""),
-    createdAt: String(snake(r, "created_at", "createdAt") ?? ""),
-    updatedAt: String(snake(r, "updated_at", "updatedAt") ?? ""),
+    id: String(r["id"] ?? ""),
+    tenantId: String(r["tenant_id"] ?? ""),
+    projectId: String(r["project_id"] ?? ""),
+    kind: (r["kind"] ?? "pm") as WorkspaceKind,
+    name: String(r["name"] ?? ""),
+    createdAt: String(r["created_at"] ?? ""),
+    updatedAt: String(r["updated_at"] ?? ""),
   };
 }
 
 function normDoc(r: Record<string, unknown>): Document {
   return {
-    id: String(g(r, "id")), tenantId: String(snake(r, "tenant_id", "tenantId")),
-    workspaceId: String(snake(r, "workspace_id", "workspaceId")),
-    projectId: String(snake(r, "project_id", "projectId")),
-    type: (g(r, "type") ?? "note") as DocumentType,
-    title: String(g(r, "title") ?? ""),
-    body: (g(r, "body") ?? { type: "doc", content: [] }) as Record<string, unknown>,
-    metadata: (g(r, "metadata") ?? null) as Record<string, unknown> | null,
-    status: (g(r, "status") ?? "draft") as DocumentStatus,
-    ownerId: (snake(r, "owner_id", "ownerId")) as string | null | undefined,
-    tags: (g(r, "tags") ?? []) as string[],
-    currentVersionId: (snake(r, "current_version_id", "currentVersionId")) as string | null | undefined,
-    createdAt: String(snake(r, "created_at", "createdAt") ?? ""),
-    updatedAt: String(snake(r, "updated_at", "updatedAt") ?? ""),
-    version: Number(g(r, "version") ?? 1),
+    id: String(r["id"] ?? ""),
+    tenantId: String(r["tenant_id"] ?? ""),
+    workspaceId: String(r["workspace_id"] ?? ""),
+    projectId: String(r["project_id"] ?? ""),
+    type: (r["type"] ?? "note") as DocumentType,
+    title: String(r["title"] ?? ""),
+    body: (r["body"] ?? { type: "doc", content: [] }) as Record<string, unknown>,
+    metadata: (r["metadata"] ?? null) as Record<string, unknown> | null,
+    status: (r["status"] ?? "draft") as DocumentStatus,
+    ownerId: (r["owner_id"] ?? null) as string | null,
+    tags: (r["tags"] as string[] | null) ?? [],
+    currentVersionId: (r["current_version_id"] ?? null) as string | null,
+    createdAt: String(r["created_at"] ?? ""),
+    updatedAt: String(r["updated_at"] ?? ""),
+    version: Number(r["version"] ?? 1),
   };
 }
 
 function normVersion(r: Record<string, unknown>): DocumentVersion {
   return {
-    id: String(g(r, "id")), documentId: String(snake(r, "document_id", "documentId")),
-    rev: Number(g(r, "rev") ?? 0), title: String(g(r, "title") ?? ""),
-    body: (g(r, "body") ?? {}) as Record<string, unknown>,
-    status: (g(r, "status") ?? "draft") as DocumentStatus,
-    createdBy: (snake(r, "created_by", "createdBy")) as string | null | undefined,
-    createdAt: String(snake(r, "created_at", "createdAt") ?? ""),
-    note: String(g(r, "note") ?? ""),
+    id: String(r["id"] ?? ""),
+    documentId: String(r["document_id"] ?? ""),
+    rev: Number(r["rev"] ?? 0),
+    title: String(r["title"] ?? ""),
+    body: (r["body"] ?? {}) as Record<string, unknown>,
+    status: (r["status"] ?? "draft") as DocumentStatus,
+    createdBy: (r["created_by"] ?? null) as string | null,
+    createdAt: String(r["created_at"] ?? ""),
+    note: String(r["note"] ?? ""),
   };
 }
 
 function normComment(r: Record<string, unknown>): DocComment {
   return {
-    id: String(g(r, "id")), documentId: String(snake(r, "document_id", "documentId")),
-    parentId: (snake(r, "parent_id", "parentId")) as string | null | undefined,
-    authorId: (snake(r, "author_id", "authorId")) as string | null | undefined,
-    body: String(g(r, "body") ?? ""),
-    anchor: (g(r, "anchor")) as Record<string, unknown> | null | undefined,
-    createdAt: String(snake(r, "created_at", "createdAt") ?? ""),
-    updatedAt: String(snake(r, "updated_at", "updatedAt") ?? ""),
-    resolvedAt: (snake(r, "resolved_at", "resolvedAt")) as string | null | undefined,
+    id: String(r["id"] ?? ""),
+    documentId: String(r["document_id"] ?? ""),
+    parentId: (r["parent_id"] ?? null) as string | null,
+    authorId: (r["author_id"] ?? null) as string | null,
+    body: String(r["body"] ?? ""),
+    anchor: (r["anchor"] ?? null) as Record<string, unknown> | null,
+    createdAt: String(r["created_at"] ?? ""),
+    updatedAt: String(r["updated_at"] ?? ""),
+    resolvedAt: (r["resolved_at"] ?? null) as string | null,
   };
 }
 
 function normTemplate(r: Record<string, unknown>): Template {
   return {
-    id: String(g(r, "id")),
-    type: (g(r, "type") ?? "note") as DocumentType,
-    name: String(g(r, "name") ?? ""),
-    body: (g(r, "body") ?? {}) as Record<string, unknown>,
-    isSystem: Boolean(g(r, "is_system") ?? g(r, "isSystem")),
-    createdAt: String(snake(r, "created_at", "createdAt") ?? ""),
+    id: String(r["id"] ?? ""),
+    type: (r["type"] ?? "note") as DocumentType,
+    name: String(r["name"] ?? ""),
+    body: (r["body"] ?? {}) as Record<string, unknown>,
+    isSystem: Boolean(r["is_system"]),
+    createdAt: String(r["created_at"] ?? ""),
   };
 }
 
@@ -276,10 +271,65 @@ export async function deleteComment(id: string): Promise<void> {
 
 // Templates
 export async function getTemplate(id: string): Promise<Template> {
-  const r = await fetch(`/api/documents/templates/${id}`, { cache: "no-store" });
+  const r = await fetch(`/api/templates/${id}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`getTemplate: ${r.status}`);
   const d = await r.json();
   return normTemplate(d);
+}
+
+// instantiateTemplate creates a brand-new document seeded from a template's
+// body + type. This is the "create from template" path on the template detail
+// page. The template body is deep-copied server-side (createDocument persists
+// whatever body it receives), so future edits never mutate the template.
+export async function instantiateTemplate(
+  tmpl: Template,
+  input: { workspace_id: string; project_id: string; title: string; tags?: string[] },
+): Promise<Document> {
+  return createDocument({
+    workspace_id: input.workspace_id,
+    project_id: input.project_id,
+    type: tmpl.type,
+    title: input.title,
+    body: tmpl.body,
+    tags: input.tags,
+  });
+}
+
+// createTemplate persists a new (custom) template. Body is TipTap doc JSON —
+// the same shape document bodies use — authored via DocEditor, not raw JSON.
+export async function createTemplate(input: { type: DocumentType; name: string; body: Record<string, unknown> }): Promise<Template> {
+  const r = await fetch(`/api/templates`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type: input.type, name: input.name, body: input.body }),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({})); throw new Error(e.error ?? `create template failed: ${r.status}`);
+  }
+  return normTemplate(await r.json());
+}
+
+// updateTemplate edits a custom template's name/type/body. System templates
+// are read-only server-side (403). Omitted fields are left unchanged.
+export async function updateTemplate(id: string, patch: { type?: DocumentType; name?: string; body?: Record<string, unknown> }): Promise<Template> {
+  const r = await fetch(`/api/templates/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({})); throw new Error(e.error ?? `update template failed: ${r.status}`);
+  }
+  return normTemplate(await r.json());
+}
+
+// deleteTemplate removes a custom template. System templates cannot be deleted
+// (403 from the backend).
+export async function deleteTemplate(id: string): Promise<void> {
+  const r = await fetch(`/api/templates/${id}`, { method: "DELETE" });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({})); throw new Error(e.error ?? `delete template failed: ${r.status}`);
+  }
 }
 
 export async function listTemplates(type?: DocumentType): Promise<Template[]> {
