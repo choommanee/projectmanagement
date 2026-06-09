@@ -1,2551 +1,538 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SWK Solution — Premium Software House & Tech Solutions Agency</title>
-  <meta name="description" content="บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ให้บริการพัฒนาซอฟต์แวร์ระดับองค์กร ออกแบบ UI/UX, โลโก้ และโซลูชันระบบ IoT วิศวกรรมเทคโนโลยีครบวงจร ดำเนินงานมั่นคงด้วยทุนจดทะเบียน 1,000,000 บาท">
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
-  
-  <style>
-    /* =====================================================
-       DESIGN SYSTEM & DARK GLOWING METRICS
-    ===================================================== */
-    :root {
-      --bg:           #090d16;
-      --bg-panel:     rgba(15, 23, 42, 0.65);
-      --bg-panel-border: rgba(255, 255, 255, 0.08);
-      
-      --primary:      #2563eb;
-      --primary-l:    #3b82f6;
-      --primary-glow: rgba(37, 99, 235, 0.15);
-      
-      --cyan:         #06b6d4;
-      --cyan-l:       #22d3ee;
-      --cyan-glow:    rgba(6, 182, 212, 0.15);
-      
-      --purple:       #8b5cf6;
-      --purple-l:     #a78bfa;
-      --purple-glow:  rgba(139, 92, 246, 0.15);
-      
-      --slate-50:     #f8fafc;
-      --slate-200:    #e2e8f0;
-      --slate-300:    #cbd5e1;
-      --slate-400:    #94a3b8;
-      --slate-500:    #64748b;
-      --slate-800:    #1e293b;
-      --slate-900:    #0f172a;
-      
-      --white:        #ffffff;
-      --font-sans:    'Inter', 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono:    'Fira Code', monospace;
-      
-      --shadow-glow:  0 0 30px rgba(37, 99, 235, 0.25), 0 0 60px rgba(6, 182, 212, 0.1);
-      --shadow-panel: 0 20px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      font-family: var(--font-sans);
-      background-color: var(--bg);
-      color: var(--slate-300);
-      line-height: 1.6;
-      overflow-x: hidden;
-      -webkit-font-smoothing: antialiased;
-      /* Grid background styling */
-      background-image: 
-        radial-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
-        radial-gradient(rgba(6, 182, 212, 0.05) 1.5px, transparent 1.5px);
-      background-size: 40px 40px, 80px 80px;
-      background-position: 0 0, 40px 40px;
-    }
-
-    /* Ambient glowing lights */
-    .ambient-glow-1 {
-      position: absolute;
-      top: -10%;
-      left: 10%;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(37, 99, 235, 0.18) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .ambient-glow-2 {
-      position: absolute;
-      top: 40%;
-      right: -5%;
-      width: 700px;
-      height: 700px;
-      background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 2rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    .section {
-      padding: 7rem 0;
-      position: relative;
-    }
-
-    .section-border {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    /* =====================================================
-       TYPOGRAPHY STYLE
-    ===================================================== */
-    h1, h2, h3, h4 {
-      color: var(--white);
-      font-weight: 800;
-      line-height: 1.2;
-      letter-spacing: -0.02em;
-    }
-
-    .eyebrow {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--cyan-l);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      margin-bottom: 1rem;
-      display: inline-block;
-      background: rgba(6, 182, 212, 0.08);
-      padding: 6px 14px;
-      border-radius: 100px;
-      border: 1px solid rgba(6, 182, 212, 0.2);
-    }
-
-    .section-title {
-      font-size: 2.5rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .section-title span {
-      background: linear-gradient(135deg, var(--primary-l) 0%, var(--cyan-l) 50%, var(--purple-l) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .section-desc {
-      font-size: 1.05rem;
-      color: var(--slate-400);
-      max-width: 680px;
-      margin-bottom: 3.5rem;
-      line-height: 1.75;
-    }
-
-    .section-center {
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .section-center .section-desc {
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* =====================================================
-       BUTTONS
-    ===================================================== */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 0.85rem 2rem;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      text-decoration: none;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      cursor: pointer;
-      font-family: var(--font-sans);
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-l) 100%);
-      color: var(--white);
-      border: none;
-      box-shadow: 0 4px 18px rgba(37, 99, 235, 0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.5), 0 0 15px rgba(6, 182, 212, 0.2);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--white);
-      border: 1px solid var(--bg-panel-border);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      backdrop-filter: blur(8px);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-    }
-
-    /* =====================================================
-       HEADER FLOATING GLASS NAVBAR
-    ===================================================== */
-    .header {
-      background: rgba(9, 13, 22, 0.7);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--bg-panel-border);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      transition: all 0.3s ease;
-    }
-
-    .header-inner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-    }
-
-    .logo-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(15, 23, 42, 0.8);
-      border: 1.5px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      width: 46px;
-      height: 46px;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-
-    .logo:hover .logo-container {
-      border-color: var(--cyan-l);
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
-    }
-
-    .logo-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .logo-name {
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: var(--white);
-      letter-spacing: -0.02em;
-      line-height: 1.1;
-    }
-
-    .logo-sub {
-      font-size: 0.62rem;
-      font-weight: 700;
-      color: var(--cyan-l);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-top: 1px;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: 2.2rem;
-    }
-
-    .nav-link {
-      text-decoration: none;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--slate-400);
-      transition: color 0.2s ease, transform 0.2s;
-    }
-
-    .nav-link:hover {
-      color: var(--white);
-      transform: translateY(-1px);
-    }
-
-    /* =====================================================
-       HERO SECTION WITH TABBED VISUAL SELECTOR
-    ===================================================== */
-    .hero {
-      padding: 6rem 0 8rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-inner {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 4rem;
-      align-items: center;
-    }
-
-    .hero-content {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .hero-badge-row {
-      display: flex;
-      gap: 0.6rem;
-      margin-bottom: 1.75rem;
-      flex-wrap: wrap;
-    }
-
-    .hero-badge {
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: var(--slate-300);
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--bg-panel-border);
-      padding: 4px 12px;
-      border-radius: 100px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .hero-badge.active-op {
-      color: #4ade80;
-      background: rgba(74, 222, 128, 0.08);
-      border-color: rgba(74, 222, 128, 0.2);
-    }
-
-    .hero h1 {
-      font-size: 3.25rem;
-      line-height: 1.15;
-      margin-bottom: 1.5rem;
-    }
-
-    .hero h1 span {
-      background: linear-gradient(135deg, var(--primary-l) 0%, var(--cyan-l) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero-p {
-      font-size: 1.05rem;
-      color: var(--slate-400);
-      line-height: 1.8;
-      margin-bottom: 2.75rem;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1.25rem;
-      margin-bottom: 4rem;
-      width: 100%;
-    }
-
-    .hero-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      border-top: 1px solid var(--bg-panel-border);
-      padding-top: 2rem;
-      width: 100%;
-    }
-
-    .stat-card {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .stat-val {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--white);
-    }
-
-    .stat-val span {
-      color: var(--cyan-l);
-    }
-
-    .stat-lbl {
-      font-size: 0.75rem;
-      color: var(--slate-500);
-      font-weight: 600;
-      margin-top: 4px;
-      letter-spacing: 0.02em;
-    }
-
-    /* Tab switcher for visual panel */
-    .hero-tab-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-      perspective: 1200px;
-    }
-
-    .hero-tab-btns {
-      display: flex;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 100px;
-      padding: 5px;
-      gap: 4px;
-      margin-bottom: 1.5rem;
-      backdrop-filter: blur(10px);
-      z-index: 10;
-    }
-
-    .hero-tab-btn {
-      background: transparent;
-      border: none;
-      color: var(--slate-400);
-      padding: 8px 18px;
-      border-radius: 100px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      font-family: var(--font-sans);
-    }
-
-    .hero-tab-btn.active {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--white);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
-    }
-
-    .hero-visual-panel {
-      width: 100%;
-      display: none;
-    }
-
-    .hero-visual-panel.active {
-      display: block;
-    }
-
-    /* Premium mock layout browser template styling */
-    .browser-mockup {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: var(--shadow-panel), 0 0 35px rgba(6, 182, 212, 0.15);
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-      max-width: 480px;
-      height: 400px;
-      transform: rotateX(12deg) rotateY(-8deg);
-      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s, box-shadow 0.6s;
-    }
-
-    .hero-visual-panel:hover .browser-mockup {
-      transform: rotateX(6deg) rotateY(-3deg) translateY(-8px);
-      border-color: rgba(6, 182, 212, 0.3);
-      box-shadow: var(--shadow-panel), 0 0 50px rgba(6, 182, 212, 0.25);
-    }
-
-    .browser-header {
-      background: rgba(9, 13, 22, 0.95);
-      padding: 12px 18px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      border-bottom: 1.5px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .browser-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-    .browser-dot.red { background: #ef4444; }
-    .browser-dot.yellow { background: #eab308; }
-    .browser-dot.green { background: #22c55e; }
-
-    .browser-address {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 6px;
-      padding: 3px 14px;
-      font-size: 0.65rem;
-      color: var(--slate-400);
-      font-family: var(--font-mono);
-      flex: 1;
-      margin-left: 20px;
-      max-width: 260px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .browser-body {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: #090d16;
-      overflow: hidden;
-    }
-
-    .browser-body img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      transition: transform 0.5s ease;
-    }
-
-    .browser-mockup:hover .browser-body img {
-      transform: scale(1.03);
-    }
-
-    /* 3D System Architecture Blueprint Canvas */
-    .blueprint-canvas {
-      width: 100%;
-      max-width: 480px;
-      height: 400px;
-      background-color: #0c121e;
-      background-image: 
-        linear-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(37, 99, 235, 0.08) 1px, transparent 1px);
-      background-size: 25px 25px;
-      border: 1.5px solid rgba(37, 99, 235, 0.25);
-      border-radius: 24px;
-      box-shadow: var(--shadow-panel), 0 0 40px rgba(37, 99, 235, 0.15);
-      position: relative;
-      overflow: hidden;
-      transform: rotateX(12deg) rotateY(-8deg);
-      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s, box-shadow 0.6s;
-    }
-
-    .hero-visual-panel:hover .blueprint-canvas {
-      transform: rotateX(6deg) rotateY(-3deg) translateY(-8px);
-      border-color: var(--cyan);
-      box-shadow: var(--shadow-panel), 0 0 50px rgba(6, 182, 212, 0.25);
-    }
-
-    .bp-glow-badge {
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      background: rgba(6, 182, 212, 0.08);
-      border: 1px solid rgba(6, 182, 212, 0.2);
-      color: var(--cyan-l);
-      font-size: 0.58rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-family: var(--font-mono);
-      z-index: 5;
-    }
-
-    /* Vector connections, animated stream lines */
-    .bp-circuit-lines {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .bp-connector-path {
-      stroke: rgba(255, 255, 255, 0.04);
-      stroke-dasharray: 4 4;
-    }
-
-    .bp-connector-active {
-      stroke: var(--cyan);
-      stroke-dasharray: 5 15;
-      animation: dash-flow 8s linear infinite;
-    }
-
-    @keyframes dash-flow {
-      to {
-        stroke-dashoffset: -100;
-      }
-    }
-
-    /* System Architecture Nodes */
-    .sys-node {
-      position: absolute;
-      background: rgba(9, 13, 22, 0.95);
-      border: 1.5px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 2;
-      transition: all 0.3s ease;
-    }
-
-    .sys-node:hover {
-      border-color: var(--cyan-l);
-      transform: translateY(-2px);
-      box-shadow: 0 12px 30px rgba(6, 182, 212, 0.25);
-    }
-
-    .sys-node-title {
-      font-size: 0.58rem;
-      color: var(--slate-400);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .sys-node-desc {
-      font-size: 0.7rem;
-      color: var(--white);
-      font-weight: 700;
-      font-family: var(--font-mono);
-    }
-
-    .sys-node-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      position: absolute;
-      top: 5px;
-      right: 5px;
-    }
-
-    .dot-green { background: #10b981; box-shadow: 0 0 8px #10b981; }
-    .dot-blue { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
-    .dot-cyan { background: #06b6d4; box-shadow: 0 0 8px #06b6d4; }
-
-    /* Node Positioning */
-    .node-client { top: 70px; left: 30px; width: 120px; }
-    .node-gateway { top: 70px; right: 30px; width: 130px; }
-    .node-services { top: 220px; left: 60px; width: 130px; }
-    .node-db { bottom: 35px; right: 40px; width: 140px; }
-
-    /* Dynamic radar node inside system canvas */
-    .canvas-center-core {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 70px;
-      height: 70px;
-      z-index: 0;
-    }
-
-    .canvas-core-glow {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, transparent 70%);
-      animation: pulse-core 3s infinite ease-in-out;
-    }
-
-    @keyframes pulse-core {
-      0%, 100% { transform: scale(0.8); opacity: 0.5; }
-      50% { transform: scale(1.3); opacity: 0.9; }
-    }
-
-    /* =====================================================
-       SERVICES GRID
-    ===================================================== */
-    .services-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.5rem;
-    }
-
-    .service-card {
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      border-radius: 24px;
-      padding: 2.5rem 2rem;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      overflow: hidden;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-
-    /* Grid layout backgrounds inside cards for extreme details */
-    .service-card::before {
-      content: '';
-      position: absolute;
-      top: -30%;
-      left: -30%;
-      width: 150px;
-      height: 150px;
-      pointer-events: none;
-      border-radius: 50%;
-      filter: blur(40px);
-      opacity: 0.15;
-      transition: opacity 0.4s;
-    }
-
-    .card-custom::before { background: var(--primary); }
-    .card-saas::before { background: var(--cyan); }
-    .card-iot::before { background: var(--purple); }
-    .card-design::before { background: #f59e0b; }
-
-    .service-card:hover {
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-      transform: translateY(-6px);
-      border-color: rgba(255, 255, 255, 0.18);
-    }
-
-    .service-card:hover::before {
-      opacity: 0.3;
-    }
-
-    .service-icon-box {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.4rem;
-      margin-bottom: 1.75rem;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      transition: transform 0.4s;
-    }
-
-    .service-card:hover .service-icon-box {
-      transform: scale(1.1) rotate(5deg);
-    }
-
-    .card-custom .service-icon-box { background: rgba(37, 99, 235, 0.1); color: var(--primary-l); border-color: rgba(37, 99, 235, 0.2); }
-    .card-saas .service-icon-box { background: rgba(6, 182, 212, 0.1); color: var(--cyan-l); border-color: rgba(6, 182, 212, 0.2); }
-    .card-iot .service-icon-box { background: rgba(139, 92, 246, 0.1); color: var(--purple-l); border-color: rgba(139, 92, 246, 0.2); }
-    .card-design .service-icon-box { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
-
-    .service-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--white);
-      margin-bottom: 0.75rem;
-      letter-spacing: -0.01em;
-    }
-
-    .service-desc {
-      font-size: 0.88rem;
-      color: var(--slate-400);
-      line-height: 1.7;
-      flex: 1;
-    }
-
-    /* =====================================================
-       FLAGSHIP PRODUCTS SHOWCASE (LINE ACCOUNTING GRID)
-    ===================================================== */
-    .showcase-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      margin-top: 1rem;
-    }
-
-    .showcase-card {
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      border-radius: 24px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .showcase-card:hover {
-      transform: translateY(-6px);
-      border-color: rgba(6, 182, 212, 0.3);
-      box-shadow: 0 25px 50px rgba(6, 182, 212, 0.15);
-    }
-
-    .showcase-img-wrap {
-      width: 100%;
-      height: 200px;
-      overflow: hidden;
-      position: relative;
-      border-bottom: 1.5px solid rgba(255, 255, 255, 0.05);
-      background: #06090f;
-    }
-
-    .showcase-img-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform 0.6s ease;
-    }
-
-    .showcase-card:hover .showcase-img-wrap img {
-      transform: scale(1.05);
-    }
-
-    .showcase-card-body {
-      padding: 1.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
-
-    .showcase-card-title {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: var(--white);
-    }
-
-    .showcase-card-desc {
-      font-size: 0.85rem;
-      color: var(--slate-400);
-      line-height: 1.65;
-      flex: 1;
-    }
-
-    .showcase-card-tags {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-
-    .showcase-card-tag {
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: var(--cyan-l);
-      background: rgba(6, 182, 212, 0.06);
-      border: 1px solid rgba(6, 182, 212, 0.15);
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-
-    /* =====================================================
-       TECH SYNERGY SECTION (PM PLATFORM)
-    ===================================================== */
-    .synergy-box {
-      background: linear-gradient(135deg, #0d1322 0%, #151f38 100%);
-      border-radius: 32px;
-      padding: 5rem 4.5rem;
-      color: var(--white);
-      position: relative;
-      overflow: hidden;
-      border: 1.5px solid var(--bg-panel-border);
-      box-shadow: var(--shadow-panel);
-    }
-
-    .synergy-inner {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 5rem;
-      align-items: center;
-    }
-
-    .synergy-content {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .synergy-eyebrow {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--cyan-l);
-      background: rgba(6, 182, 212, 0.08);
-      border: 1px solid rgba(6, 182, 212, 0.2);
-      padding: 5px 14px;
-      border-radius: 100px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 1.5rem;
-    }
-
-    .synergy-box h3 {
-      color: var(--white);
-      font-size: 2.5rem;
-      margin-bottom: 1.5rem;
-      line-height: 1.2;
-    }
-
-    .synergy-box h3 span {
-      background: linear-gradient(135deg, var(--cyan-l) 0%, var(--purple-l) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .synergy-desc {
-      font-size: 1rem;
-      color: var(--slate-400);
-      line-height: 1.8;
-      margin-bottom: 2.5rem;
-    }
-
-    .synergy-benefits {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      width: 100%;
-    }
-
-    .syn-benefit-item {
-      display: flex;
-      gap: 1.25rem;
-      align-items: flex-start;
-    }
-
-    .syn-benefit-icon {
-      background: rgba(6, 182, 212, 0.08);
-      color: var(--cyan-l);
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      flex-shrink: 0;
-      border: 1px solid rgba(6, 182, 212, 0.15);
-    }
-
-    .syn-benefit-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .syn-benefit-title {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .syn-benefit-desc {
-      font-size: 0.85rem;
-      color: var(--slate-400);
-      margin-top: 3px;
-      line-height: 1.6;
-    }
-
-    /* Software platform mockup illustration */
-    .synergy-mockup {
-      background: rgba(9, 13, 22, 0.8);
-      border: 1.5px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 1.75rem;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-      position: relative;
-    }
-
-    .syn-mockup-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .syn-m-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--white);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--font-mono);
-    }
-
-    .syn-m-badge {
-      background: rgba(74, 222, 128, 0.15);
-      color: #4ade80;
-      border: 1px solid rgba(74, 222, 128, 0.3);
-      font-size: 0.6rem;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 100px;
-      font-family: var(--font-sans);
-    }
-
-    .syn-mockup-body {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .syn-m-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 0.78rem;
-    }
-
-    .syn-m-lbl {
-      color: var(--slate-400);
-      font-weight: 600;
-    }
-
-    .syn-m-val {
-      color: var(--white);
-      font-weight: 700;
-      font-family: var(--font-mono);
-    }
-
-    .syn-progress-bar {
-      height: 5px;
-      width: 90px;
-      background: rgba(255,255,255,0.08);
-      border-radius: 100px;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .syn-progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--cyan) 0%, var(--primary) 100%);
-      border-radius: 100px;
-    }
-
-    /* =====================================================
-       CREDIBILITY & CREDENTIALS SECTION
-    ===================================================== */
-    .credibility {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5rem;
-      align-items: center;
-    }
-
-    .cred-content {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .cred-badge-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      margin-top: 2rem;
-      width: 100%;
-    }
-
-    .cred-item {
-      display: flex;
-      gap: 1.25rem;
-      align-items: center;
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      padding: 16px 24px;
-      border-radius: 16px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.15);
-      backdrop-filter: blur(10px);
-    }
-
-    .cred-item-icon {
-      font-size: 1.5rem;
-      background: rgba(255, 255, 255, 0.03);
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-
-    .cred-item-info {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .cred-item-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .cred-item-desc {
-      font-size: 0.82rem;
-      color: var(--slate-400);
-      margin-top: 2px;
-    }
-
-    .cred-visual {
-      background: rgba(13, 19, 34, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 28px;
-      padding: 3rem;
-      box-shadow: var(--shadow-glow), var(--shadow-panel);
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      position: relative;
-    }
-
-    .cred-visual::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 100px;
-      height: 100px;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .cred-cert-title {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--white);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.06);
-      padding-bottom: 1rem;
-    }
-
-    .cred-cert-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.92rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      padding-bottom: 12px;
-    }
-
-    .cred-cert-row:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
-    .cred-cert-lbl {
-      color: var(--slate-400);
-      font-weight: 600;
-    }
-
-    .cred-cert-val {
-      color: var(--white);
-      font-weight: 700;
-    }
-
-    /* =====================================================
-       INTERACTIVE PROJECT ESTIMATOR (JS CALCULATOR)
-    ===================================================== */
-    .estimator-box {
-      background: var(--bg-panel);
-      border: 1.5px solid var(--bg-panel-border);
-      border-radius: 32px;
-      padding: 4rem;
-      backdrop-filter: blur(16px);
-      box-shadow: var(--shadow-panel);
-    }
-
-    .estimator-grid {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 4rem;
-      align-items: start;
-    }
-
-    .estimator-inputs {
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    .estimator-results {
-      background: rgba(9, 13, 22, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 24px;
-      padding: 2.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      position: sticky;
-      top: 100px;
-    }
-
-    .estimator-title {
-      font-size: 1.1rem;
-      font-weight: 800;
-      color: var(--white);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .range-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .range-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .range-header span:last-child {
-      color: var(--cyan-l);
-      font-family: var(--font-mono);
-    }
-
-    .range-slider {
-      -webkit-appearance: none;
-      width: 100%;
-      height: 6px;
-      border-radius: 100px;
-      background: rgba(255, 255, 255, 0.08);
-      outline: none;
-      transition: background 0.3s;
-    }
-
-    .range-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--cyan-l);
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
-      transition: transform 0.1s;
-    }
-
-    .range-slider::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-    }
-
-    .options-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-    }
-
-    .opt-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 14px;
-      padding: 1.25rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .opt-card:hover {
-      border-color: rgba(255, 255, 255, 0.15);
-      background: rgba(255, 255, 255, 0.04);
-    }
-
-    .opt-card.active {
-      border-color: var(--cyan);
-      background: rgba(6, 182, 212, 0.05);
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.1);
-    }
-
-    .opt-title {
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .opt-desc {
-      font-size: 0.72rem;
-      color: var(--slate-500);
-      line-height: 1.4;
-    }
-
-    .checkbox-list {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-    }
-
-    .cb-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.01);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      padding: 12px 16px;
-      border-radius: 12px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--slate-300);
-      transition: all 0.2s;
-    }
-
-    .cb-item:hover {
-      border-color: rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.03);
-    }
-
-    .cb-item.active {
-      border-color: var(--purple);
-      color: var(--white);
-      background: rgba(139, 92, 246, 0.05);
-    }
-
-    .cb-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 5px;
-      border: 1.5px solid rgba(255, 255, 255, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      color: transparent;
-      transition: all 0.2s;
-    }
-
-    .cb-item.active .cb-icon {
-      border-color: var(--purple);
-      background: var(--purple);
-      color: var(--white);
-    }
-
-    /* Live Output metrics */
-    .est-res-box {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      padding-bottom: 1.5rem;
-    }
-
-    .est-res-label {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--slate-500);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .est-res-price {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: var(--white);
-      background: linear-gradient(135deg, var(--cyan-l) 0%, var(--purple-l) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      font-family: var(--font-mono);
-    }
-
-    .est-res-meta {
-      font-size: 0.8rem;
-      color: var(--slate-400);
-      line-height: 1.6;
-    }
-
-    .est-res-meta strong {
-      color: var(--white);
-    }
-
-    /* =====================================================
-       CONTACT & MAP SECTION
-    ===================================================== */
-    .contact-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5rem;
-      align-items: flex-start;
-    }
-
-    .contact-form-box {
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      border-radius: 28px;
-      padding: 3rem;
-      box-shadow: var(--shadow-panel);
-      backdrop-filter: blur(12px);
-    }
-
-    .form-title {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--white);
-      margin-bottom: 0.5rem;
-    }
-
-    .form-desc {
-      font-size: 0.88rem;
-      color: var(--slate-400);
-      margin-bottom: 2.25rem;
-    }
-
-    .form-group-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.25rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 1.5rem;
-    }
-
-    .form-label {
-      font-size: 0.82rem;
-      font-weight: 700;
-      color: var(--slate-300);
-    }
-
-    .form-control {
-      background: rgba(9, 13, 22, 0.7);
-      border: 1px solid var(--bg-panel-border);
-      padding: 0.85rem 1.15rem;
-      border-radius: 12px;
-      font-size: 0.9rem;
-      font-family: var(--font-sans);
-      color: var(--white);
-      transition: all 0.2s ease;
-      width: 100%;
-    }
-
-    .form-control:focus {
-      outline: none;
-      border-color: var(--cyan);
-      background: rgba(9, 13, 22, 0.9);
-      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
-    }
-
-    /* Style the local map mockup */
-    .map-card {
-      background: var(--bg-panel);
-      border: 1px solid var(--bg-panel-border);
-      border-radius: 28px;
-      padding: 2.5rem;
-      box-shadow: var(--shadow-panel);
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-      backdrop-filter: blur(12px);
-    }
-
-    .map-visual-mockup {
-      height: 240px;
-      background: #090d16;
-      border-radius: 16px;
-      border: 1px solid var(--bg-panel-border);
-      position: relative;
-      overflow: hidden;
-      background-image: 
-        radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-        radial-gradient(rgba(255,255,255,0.02) 1.5px, transparent 1.5px);
-      background-size: 20px 20px;
-    }
-
-    /* Vector map lines representing Saimai routes */
-    .map-road {
-      position: absolute;
-      background: rgba(255,255,255,0.05);
-    }
-
-    .road-v { width: 30px; height: 100%; left: 45%; }
-    .road-h { height: 30px; width: 100%; top: 40%; }
-    .road-diag {
-      width: 140%;
-      height: 20px;
-      background: rgba(255,255,255,0.04);
-      transform: rotate(25deg);
-      top: 15%;
-      left: -20%;
-    }
-
-    /* Location pin & radar pulsing beacon */
-    .map-pin-wrap {
-      position: absolute;
-      top: 40%;
-      left: 45%;
-      transform: translate(-50%, -50%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .map-pin {
-      width: 18px;
-      height: 18px;
-      background: var(--cyan);
-      border: 3px solid var(--bg);
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.6);
-      z-index: 2;
-    }
-
-    .map-radar {
-      position: absolute;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: rgba(6, 182, 212, 0.15);
-      border: 1px solid var(--cyan-l);
-      z-index: 1;
-      animation: radar-pulse 2.2s infinite ease-out;
-    }
-
-    @keyframes radar-pulse {
-      0% { transform: scale(0.3); opacity: 1; }
-      100% { transform: scale(1.7); opacity: 0; }
-    }
-
-    .map-pin-label {
-      position: absolute;
-      top: -34px;
-      background: rgba(9, 13, 22, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--white);
-      font-size: 0.58rem;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 6px;
-      white-space: nowrap;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      font-family: var(--font-mono);
-    }
-
-    .map-pin-label::after {
-      content: '';
-      position: absolute;
-      bottom: -4px;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 4px 4px 0;
-      border-style: solid;
-      border-color: rgba(9, 13, 22, 0.95) transparent transparent;
-    }
-
-    .map-info-block {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .map-detail-item {
-      display: flex;
-      gap: 1.25rem;
-      align-items: flex-start;
-    }
-
-    .map-detail-icon {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--bg-panel-border);
-      color: var(--cyan-l);
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      flex-shrink: 0;
-    }
-
-    .map-detail-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .map-detail-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--white);
-    }
-
-    .map-detail-desc {
-      font-size: 0.85rem;
-      color: var(--slate-400);
-      line-height: 1.6;
-      margin-top: 2px;
-    }
-
-    /* =====================================================
-       FOOTER
-    ===================================================== */
-    .footer {
-      background: #06090f;
-      color: var(--slate-400);
-      padding: 5rem 0 3rem;
-      border-top: 1px solid rgba(255, 255, 255, 0.04);
-    }
-
-    .footer-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      padding-bottom: 3rem;
-      margin-bottom: 2.5rem;
-    }
-
-    .footer h4 {
-      color: var(--white);
-    }
-
-    .footer-copyright {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.82rem;
-    }
-
-    .scroll-top-btn {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: var(--slate-300);
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 0.95rem;
-      transition: all 0.2s ease;
-    }
-
-    .scroll-top-btn:hover {
-      background: var(--primary);
-      color: var(--white);
-      border-color: var(--primary);
-      transform: translateY(-2px);
-      box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
-    }
-
-    /* =====================================================
-       RESPONSIVE MEDIA QUERIES
-    ===================================================== */
-    @media (max-width: 1024px) {
-      .hero-inner,
-      .credibility,
-      .contact-grid,
-      .synergy-inner,
-      .estimator-grid {
-        grid-template-columns: 1fr;
-        gap: 4rem;
-      }
-
-      .services-grid,
-      .showcase-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .hero h1 {
-        font-size: 2.75rem;
-      }
-
-      .estimator-results {
-        position: static;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .services-grid,
-      .showcase-grid,
-      .options-grid,
-      .checkbox-list {
-        grid-template-columns: 1fr;
-      }
-
-      .header-nav-btn {
-        display: none;
-      }
-
-      .hero-actions {
-        flex-direction: column;
-      }
-
-      .hero-actions .btn {
-        width: 100%;
-      }
-
-      .header {
-        padding: 0 1rem;
-      }
-      
-      .container {
-        padding: 0 1.5rem;
-      }
-
-      .footer-top,
-      .footer-copyright {
-        flex-direction: column;
-        gap: 1.5rem;
-        text-align: center;
-      }
-      
-      .synergy-box {
-        padding: 3rem 2rem;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWK Solution — วิศวกรรมซอฟต์แวร์ระดับองค์กร & โซลูชันเทคโนโลยี</title>
+<meta name="description" content="บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ให้บริการพัฒนาซอฟต์แวร์ระดับองค์กร ออกแบบ UI/UX, โลโก้แบรนด์ และโซลูชัน IoT ครบวงจร ดำเนินกิจการมั่นคงด้วยทุนจดทะเบียน 1,000,000 บาท">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0c0d10; --ink-2:#121419; --panel:#15171d; --panel-2:#1b1e26;
+  --line:rgba(233,228,217,.12); --line-2:rgba(233,228,217,.07);
+  --fg:#ece7dd; --fg-dim:#a7a59d; --fg-mut:#74726b;
+  --accent:#ff5a1f; --accent-2:#ff8a3d; --accent-soft:rgba(255,90,31,.10);
+  --ok:#5fcf80;
+  --t:'IBM Plex Sans Thai','Archivo',sans-serif; --d:'Archivo',sans-serif; --m:'IBM Plex Mono',monospace;
+  --gut:clamp(1.2rem,4vw,4rem);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{background:var(--ink);color:var(--fg);font-family:var(--t);line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+  linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+  background-size:clamp(40px,7vw,86px) clamp(40px,7vw,86px);
+  -webkit-mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 80%);
+          mask-image:radial-gradient(ellipse 120% 90% at 50% -10%,#000 35%,transparent 80%)}
+body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;background:radial-gradient(70% 50% at 80% 0%,rgba(255,90,31,.06),transparent 60%)}
+a{color:inherit;text-decoration:none} img{display:block;max-width:100%}
+::selection{background:var(--accent);color:#fff}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:var(--gut)}
+.mono{font-family:var(--m)}
+.kicker{font-family:var(--m);font-size:.72rem;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:.6rem}
+.kicker::before{content:"";width:26px;height:1px;background:var(--accent)}
+.kicker.dim{color:var(--fg-mut)}.kicker.dim::before{background:var(--fg-mut)}
+
+/* HEADER */
+header{position:sticky;top:0;z-index:60;background:rgba(12,13,16,.82);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.hbar{display:flex;align-items:center;justify-content:space-between;height:64px;gap:1rem}
+.brand{display:flex;align-items:center;gap:.7rem}
+.brand .mark{width:34px;height:34px;border:1px solid var(--line);display:grid;place-items:center;background:var(--ink-2)}
+.brand b{font-family:var(--d);font-weight:800;font-size:1.02rem;letter-spacing:-.01em;line-height:1}
+.brand small{display:block;font-family:var(--m);font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;color:var(--fg-mut);margin-top:3px}
+nav.links{display:flex;gap:1.7rem}
+nav.links a{font-family:var(--m);font-size:.76rem;letter-spacing:.04em;color:var(--fg-dim);text-transform:uppercase;transition:color .2s;position:relative}
+nav.links a:hover{color:var(--fg)}
+nav.links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:1px;background:var(--accent);transition:width .25s}
+nav.links a:hover::after{width:100%}
+.cta{font-family:var(--m);font-size:.74rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;padding:.6rem 1.05rem;border:1px solid var(--accent);color:var(--accent);transition:.2s;white-space:nowrap}
+.cta:hover{background:var(--accent);color:#fff}.cta.solid{background:var(--accent);color:#fff}.cta.solid:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.burger{display:none;background:none;border:1px solid var(--line);color:var(--fg);width:40px;height:36px;font-size:1rem;cursor:pointer}
+#mtoggle{display:none}
+#mnav{display:none;border-bottom:1px solid var(--line);background:var(--ink-2)}
+#mnav a{display:block;padding:1rem var(--gut);border-top:1px solid var(--line-2);font-family:var(--m);font-size:.84rem;text-transform:uppercase;letter-spacing:.06em;color:var(--fg-dim)}
+#mtoggle:checked~#mnav{display:block}
+
+/* BTN */
+.btn{font-family:var(--m);font-size:.8rem;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:.95rem 1.6rem;border:1px solid var(--line);color:var(--fg);transition:.22s;display:inline-flex;align-items:center;gap:.6rem;cursor:pointer}
+.btn:hover{border-color:var(--fg);transform:translateY(-2px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+
+/* HERO */
+.hero{padding:clamp(2.6rem,7vw,5.5rem) 0 clamp(2.4rem,5vw,4rem);border-bottom:1px solid var(--line)}
+.hero-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.6rem;font-family:var(--m);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:clamp(1.4rem,3.5vw,2.6rem)}
+.badge-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.4rem}
+.badge{font-family:var(--m);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;padding:.35rem .7rem;border:1px solid var(--line);color:var(--fg-dim)}
+.badge.live{border-color:var(--accent);color:var(--accent)}
+.hero h1{font-family:var(--t);font-weight:700;font-size:clamp(2rem,5.4vw,4.2rem);line-height:1.05;letter-spacing:-.02em;max-width:18ch}
+.hero h1 span{color:var(--accent)}
+.hero-grid{display:grid;grid-template-columns:1fr 1.02fr;gap:clamp(2rem,5vw,4rem);align-items:center;margin-top:clamp(1.6rem,4vw,2.6rem)}
+.lead{font-size:clamp(.98rem,1.2vw,1.1rem);color:var(--fg-dim);max-width:48ch;border-left:2px solid var(--accent);padding-left:1.1rem;margin-bottom:1.8rem}
+.hero-actions{display:flex;gap:.9rem;flex-wrap:wrap}
+.specs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);margin-top:clamp(2rem,5vw,3.2rem)}
+.specs div{padding:1.3rem 0;border-right:1px solid var(--line)} .specs div:last-child{border-right:0}
+.specs .n{font-family:var(--d);font-weight:800;font-size:clamp(1.5rem,3.2vw,2.3rem);line-height:1;letter-spacing:-.02em}
+.specs .n em{color:var(--accent);font-style:normal}
+.specs .l{font-family:var(--m);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-mut);margin-top:.5rem;max-width:24ch}
+
+/* hero tabs + panels */
+.tabbtns{display:flex;gap:0;border:1px solid var(--line);margin-bottom:-1px;width:fit-content}
+.tabbtn{font-family:var(--m);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:.6rem 1rem;background:none;border:0;border-right:1px solid var(--line);color:var(--fg-mut);cursor:pointer;transition:.2s}
+.tabbtn:last-child{border-right:0}.tabbtn.active{background:var(--accent);color:#fff}
+.panel{display:none}.panel.active{display:block}
+.plate{position:relative;border:1px solid var(--line);background:var(--ink-2);padding:10px}
+.plate::before,.plate::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--accent)}
+.plate::before{top:-1px;left:-1px;border-right:0;border-bottom:0}.plate::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.plate .barlbl{display:flex;align-items:center;gap:.5rem;font-family:var(--m);font-size:.64rem;color:var(--fg-mut);padding:.2rem .2rem .55rem;letter-spacing:.08em}
+.plate .barlbl i{width:8px;height:8px;border-radius:50%;background:var(--fg-mut)}.plate .barlbl i:first-child{background:var(--accent)}
+.plate img{width:100%;border:1px solid var(--line-2)}
+/* topology */
+.topo{border:1px solid var(--line);background:var(--ink-2);padding:1.4rem;min-height:340px;position:relative;display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-content:center}
+.topo .node{border:1px solid var(--line);padding:.9rem;background:var(--ink)}
+.topo .node .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:.5rem}
+.topo .node b{font-size:.86rem;display:block;margin-bottom:.2rem}
+.topo .node span{font-family:var(--m);font-size:.68rem;color:var(--fg-mut)}
+.topo .core{position:absolute;inset:0;margin:auto;width:64px;height:64px;border:1px solid var(--accent);border-radius:50%;display:grid;place-items:center;background:var(--ink);box-shadow:0 0 0 6px var(--ink)}
+.topo .core::after{content:"";width:14px;height:14px;background:var(--accent);border-radius:50%;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
+/* SECTION */
+section{padding:clamp(3.2rem,7vw,6rem) 0;border-bottom:1px solid var(--line)}
+.sec-head{margin-bottom:clamp(2rem,5vw,3.4rem);max-width:52rem}
+.sec-head h2{font-family:var(--t);font-weight:700;font-size:clamp(1.6rem,3.4vw,2.6rem);letter-spacing:-.015em;line-height:1.12;margin:1rem 0 .8rem}
+.sec-head h2 span{color:var(--accent)}
+.sec-head p{color:var(--fg-dim);max-width:54ch}
+
+/* SERVICES */
+.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line)}
+.svc{padding:clamp(1.4rem,2.5vw,2rem);border-right:1px solid var(--line);transition:background .2s;position:relative}
+.svc:last-child{border-right:0}.svc:hover{background:var(--accent-soft)}
+.svc .code{font-family:var(--m);font-size:.66rem;color:var(--fg-mut);letter-spacing:.14em}
+.svc .ic{width:32px;height:32px;color:var(--accent);margin:1.1rem 0 1rem}
+.svc .ic svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
+.svc h3{font-family:var(--t);font-weight:600;font-size:1.12rem;margin-bottom:.6rem}
+.svc p{color:var(--fg-dim);font-size:.88rem}
+
+/* SHOWCASE */
+.show-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(1rem,2vw,1.5rem)}
+.show{border:1px solid var(--line);background:var(--ink-2);transition:.22s}
+.show:hover{border-color:var(--accent);transform:translateY(-4px)}
+.show .imgw{border-bottom:1px solid var(--line);overflow:hidden;aspect-ratio:16/10;background:var(--ink)}
+.show .imgw img{width:100%;height:100%;object-fit:cover;filter:saturate(.92)}
+.show .b{padding:1.3rem}
+.show h3{font-family:var(--t);font-weight:600;font-size:1.08rem;margin-bottom:.5rem}
+.show p{color:var(--fg-dim);font-size:.84rem;margin-bottom:1rem}
+.show .tags{display:flex;flex-wrap:wrap;gap:.4rem}
+.show .tags span{font-family:var(--m);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut);border:1px solid var(--line);padding:.25rem .5rem}
+
+/* SYNERGY */
+.syn{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(2rem,4vw,3.5rem);align-items:center;border:1px solid var(--line);padding:clamp(1.6rem,4vw,3rem)}
+.syn h3{font-family:var(--t);font-weight:700;font-size:clamp(1.5rem,3vw,2.1rem);letter-spacing:-.01em;margin:.9rem 0 1rem;line-height:1.15}
+.syn h3 span{color:var(--accent)}
+.syn>div>p{color:var(--fg-dim);margin-bottom:1.6rem;max-width:48ch}
+.benefit{display:flex;gap:.9rem;padding:1rem 0;border-top:1px solid var(--line)}
+.benefit .bi{width:26px;height:26px;flex:none;color:var(--accent)}.benefit .bi svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
+.benefit b{display:block;font-weight:600;font-size:.94rem;margin-bottom:.25rem}
+.benefit span{color:var(--fg-dim);font-size:.84rem}
+.monitor{border:1px solid var(--line);background:#0a0b0e;font-family:var(--m)}
+.monitor .h{display:flex;justify-content:space-between;align-items:center;padding:.8rem 1rem;border-bottom:1px solid var(--line);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut)}
+.monitor .h .on{color:var(--ok)}
+.monitor .r{display:flex;justify-content:space-between;padding:.8rem 1rem;border-bottom:1px solid var(--line-2);font-size:.8rem}
+.monitor .r:last-child{border-bottom:0}
+.monitor .r .lbl{color:var(--fg-mut)} .monitor .r .v{color:var(--fg)} .monitor .r .v.ok{color:var(--ok)} .monitor .r .v.ac{color:var(--accent-2)}
+.bar{height:8px;border:1px solid var(--line);width:120px;align-self:center}.bar>div{height:100%;background:var(--accent)}
+
+/* ESTIMATOR */
+.est{display:grid;grid-template-columns:1.3fr .7fr;border:1px solid var(--line)}
+.est-in{padding:clamp(1.4rem,3vw,2.2rem);border-right:1px solid var(--line)}
+.grp{margin-bottom:1.8rem}.grp:last-child{margin-bottom:0}
+.grp .gh{display:flex;justify-content:space-between;font-family:var(--m);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.8rem}
+.grp .gh span:last-child{color:var(--accent)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.opt-card{border:1px solid var(--line);padding:.85rem;cursor:pointer;transition:.18s}
+.opt-card:hover{border-color:var(--fg-dim)}
+.opt-card.active{border-color:var(--accent);background:var(--accent-soft)}
+.opt-title{display:block;font-weight:600;font-size:.9rem;margin-bottom:.2rem}
+.opt-desc{display:block;font-family:var(--m);font-size:.66rem;color:var(--fg-mut)}
+.range-slider{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:var(--line);outline:none}
+.range-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;background:var(--accent);cursor:pointer;border:3px solid var(--ink)}
+.range-slider::-moz-range-thumb{width:18px;height:18px;background:var(--accent);cursor:pointer;border:3px solid var(--ink);border-radius:0}
+.cbs{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.cb-item{display:flex;align-items:center;gap:.6rem;border:1px solid var(--line);padding:.7rem .8rem;cursor:pointer;font-size:.84rem;transition:.18s}
+.cb-item:hover{border-color:var(--fg-dim)}
+.cb-item.active{border-color:var(--accent)}
+.cb-icon{width:16px;height:16px;border:1px solid var(--fg-mut);display:grid;place-items:center;font-size:.7rem;color:transparent;flex:none}
+.cb-item.active .cb-icon{background:var(--accent);border-color:var(--accent);color:#fff}
+.est-out{padding:clamp(1.4rem,3vw,2.2rem);display:flex;flex-direction:column;justify-content:center;background:var(--ink-2)}
+.est-out .el{font-family:var(--m);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.6rem}
+.est-out .ep{font-family:var(--d);font-weight:800;font-size:clamp(2rem,4.5vw,3rem);letter-spacing:-.02em;color:var(--accent);line-height:1}
+.est-meta{font-size:.8rem;color:var(--fg-dim);margin:1.4rem 0;line-height:1.9}
+.est-meta strong{color:var(--fg)}
+
+/* ABOUT */
+.about{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,4vw,3.5rem);align-items:start}
+.cred-item{display:flex;gap:.9rem;padding:1rem 0;border-top:1px solid var(--line)}
+.cred-item .ci{width:26px;height:26px;flex:none;color:var(--accent)}.cred-item .ci svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
+.cred-item b{display:block;font-weight:600;font-size:.92rem;margin-bottom:.25rem}.cred-item span{color:var(--fg-dim);font-size:.84rem}
+.dbd{border:1px solid var(--line)}
+.dbd .dh{font-family:var(--m);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
+.dbd .dr{display:flex;justify-content:space-between;gap:1rem;padding:.9rem 1.2rem;border-bottom:1px solid var(--line-2);font-size:.86rem}
+.dbd .dr:last-child{border-bottom:0}
+.dbd .dr .k{color:var(--fg-mut);font-family:var(--m);font-size:.74rem;white-space:nowrap}
+.dbd .dr .vv{text-align:right}
+
+/* CONTACT */
+.contact{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.6rem,4vw,3rem)}
+.cbox{border:1px solid var(--line);padding:clamp(1.4rem,3vw,2.2rem)}
+.cbox h3{font-family:var(--t);font-weight:700;font-size:1.3rem;margin-bottom:.6rem}
+.cbox .fd{color:var(--fg-dim);font-size:.88rem;margin-bottom:1.6rem}
+.fg{margin-bottom:1rem}.frow{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.fl{display:block;font-family:var(--m);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut);margin-bottom:.5rem}
+.fc{width:100%;background:var(--ink-2);border:1px solid var(--line);color:var(--fg);font-family:var(--t);font-size:.92rem;padding:.75rem .85rem;transition:.2s}
+.fc:focus{outline:none;border-color:var(--accent)}
+textarea.fc{resize:vertical;min-height:96px}
+.mapcard{border:1px solid var(--line);background:var(--ink-2);padding:clamp(1.4rem,3vw,2rem)}
+.mapcard h3{font-family:var(--t);font-weight:700;font-size:1.2rem;margin-bottom:.5rem}
+.mapcard .fd{color:var(--fg-dim);font-size:.85rem;margin-bottom:1.2rem}
+.mapgrid{border:1px solid var(--line);height:160px;position:relative;background:
+  linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);background-size:22px 22px;margin-bottom:1.2rem;overflow:hidden}
+.mappin{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;background:var(--accent);border-radius:50%;box-shadow:0 0 0 6px rgba(255,90,31,.18)}
+.mappin::after{content:"📍 SWK HQ";position:absolute;top:-28px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--m);font-size:.6rem;color:var(--accent);letter-spacing:.1em}
+.minfo{display:flex;gap:.8rem;padding:.8rem 0;border-top:1px solid var(--line)}
+.minfo .mi{width:22px;height:22px;flex:none;color:var(--accent)}.minfo .mi svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.4;fill:none}
+.minfo b{display:block;font-size:.84rem;font-weight:600;margin-bottom:.2rem}.minfo span{color:var(--fg-dim);font-size:.8rem}
+
+/* FOOTER */
+footer{padding:clamp(2.6rem,5vw,3.6rem) 0 2rem}
+.foot-top{display:flex;justify-content:space-between;gap:2rem;flex-wrap:wrap;align-items:flex-start;padding-bottom:1.8rem;border-bottom:1px solid var(--line)}
+.foot-top p{font-family:var(--m);font-size:.78rem;color:var(--fg-dim);max-width:46ch;line-height:1.7;text-align:right}
+.foot-bot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1.4rem;font-family:var(--m);font-size:.72rem;color:var(--fg-mut);letter-spacing:.04em}
+.totop{border:1px solid var(--line);background:none;color:var(--fg-dim);font-family:var(--m);font-size:.7rem;letter-spacing:.1em;padding:.5rem .9rem;cursor:pointer;transition:.2s;text-transform:uppercase}
+.totop:hover{border-color:var(--accent);color:var(--accent)}
+
+/* reveal */
+[data-rev]{opacity:0;transform:translateY(20px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+[data-rev].in{opacity:1;transform:none}
+
+/* RESPONSIVE */
+@media(max-width:980px){
+  .svc-grid{grid-template-columns:1fr 1fr}.svc:nth-child(2){border-right:0}.svc{border-bottom:1px solid var(--line)}
+  .show-grid{grid-template-columns:1fr 1fr}
+  .syn,.est,.about,.contact{grid-template-columns:1fr}
+  .est-in{border-right:0;border-bottom:1px solid var(--line)}
+}
+@media(max-width:900px){nav.links,.hbar .cta{display:none}.burger{display:grid;place-items:center}.hero-grid{grid-template-columns:1fr}}
+@media(max-width:600px){
+  .svc-grid{grid-template-columns:1fr}.svc{border-right:0;border-bottom:1px solid var(--line)}
+  .show-grid{grid-template-columns:1fr}
+  .specs{grid-template-columns:1fr}.specs div{border-right:0;border-bottom:1px solid var(--line);padding:1rem 0}
+  .opts,.cbs,.frow{grid-template-columns:1fr}
+  .foot-top p{text-align:left}
+  .dbd .dr{flex-direction:column;gap:.2rem}.dbd .dr .vv{text-align:left}
+}
+</style>
 </head>
 <body>
 
-  <!-- Ambient background glow structures -->
-  <div class="ambient-glow-1"></div>
-  <div class="ambient-glow-2"></div>
+<header>
+  <div class="wrap"><div class="hbar">
+    <a href="#" class="brand">
+      <span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span>
+    </a>
+    <nav class="links">
+      <a href="#services">บริการ</a>
+      <a href="#showcase">ผลงาน</a>
+      <a href="product.html">แพลตฟอร์ม PM×การผลิต</a>
+      <a href="#estimator">ประเมินราคา</a>
+      <a href="#about">เกี่ยวกับเรา</a>
+      <a href="#contact">ติดต่อ</a>
+    </nav>
+    <a href="#estimator" class="cta solid">คำนวณราคา</a>
+    <label for="mtoggle" class="burger">☰</label>
+  </div></div>
+  <input type="checkbox" id="mtoggle">
+  <div id="mnav">
+    <a href="#services">บริการ</a>
+    <a href="#showcase">ผลงาน</a>
+    <a href="product.html">แพลตฟอร์ม PM×การผลิต</a>
+    <a href="#estimator">ประเมินราคา</a>
+    <a href="#about">เกี่ยวกับเรา</a>
+    <a href="#contact">ติดต่อ</a>
+  </div>
+</header>
 
-  <!-- ══ HEADER (FLOATING GLASS NAVBAR) ══ -->
-  <header class="header" id="navbar">
-    <div class="container">
-      <div class="header-inner">
-        <!-- Logo -->
-        <a href="#" class="logo" id="header-logo">
-          <div class="logo-container">
-            <!-- Custom Geometric Glowing "S" Logo -->
-            <svg width="34" height="34" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#3b82f6" />
-                  <stop offset="100%" stop-color="#06b6d4" />
-                </linearGradient>
-                <filter id="logoGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <blur stdDeviation="5" />
-                </filter>
-              </defs>
-              <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="url(#logoGrad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity="0.4" filter="url(#logoGlow)" />
-              <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="url(#logoGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
-              <circle cx="30" cy="30" r="4.5" fill="#ffffff" />
-              <circle cx="72" cy="30" r="4.5" fill="#ffffff" />
-              <circle cx="45" cy="45" r="4.5" fill="#ffffff" />
-              <circle cx="72" cy="60" r="4.5" fill="#ffffff" />
-              <circle cx="30" cy="60" r="4.5" fill="#ffffff" />
-            </svg>
-          </div>
-          <div class="logo-text">
-            <span class="logo-name">SWK Solution</span>
-            <span class="logo-sub">Technology Solutions Agency</span>
-          </div>
-        </a>
-        
-        <!-- Navigation Links -->
-        <nav class="nav" id="main-nav">
-          <a href="#" class="nav-link">หน้าแรก</a>
-          <a href="#services" class="nav-link">บริการของเรา</a>
-          <a href="#showcase" class="nav-link">ผลงานซอฟต์แวร์</a>
-          <a href="product.html" class="nav-link">แพลตฟอร์ม PM×การผลิต</a>
-          <a href="#estimator" class="nav-link">ประเมินราคา</a>
-          <a href="#about" class="nav-link">เกี่ยวกับเรา</a>
-          <a href="#contact" class="nav-link">ติดต่อ</a>
-        </nav>
-        
-        <!-- CTA Header Button -->
-        <a href="#estimator" class="btn btn-primary header-nav-btn" style="padding: 0.6rem 1.4rem; font-size: 0.85rem;" id="nav-cta-btn">คำนวณราคาโครงการ</a>
+<!-- HERO -->
+<div class="hero"><div class="wrap">
+  <div class="hero-meta">
+    <span>SWK SOLUTION CO., LTD.</span>
+    <span>SOFTWARE · UI/UX · IoT</span>
+    <span>EST. 2559 — BANGKOK</span>
+  </div>
+  <div class="badge-row">
+    <span class="badge live">● ดำเนินกิจการอยู่</span>
+    <span class="badge">จัดตั้งปี 2559</span>
+    <span class="badge">ทุนจดทะเบียน 1,000,000 บาท</span>
+  </div>
+  <h1>เราพัฒนาซอฟต์แวร์ระดับองค์กร<br>และ<span>โซลูชันนวัตกรรม</span>ล้ำสมัย</h1>
+  <div class="hero-grid">
+    <div data-rev>
+      <p class="lead">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ดิจิทัลเอเจนซีผู้เชี่ยวชาญงานรับพัฒนาซอฟต์แวร์ Custom, ออกแบบ UI/UX และอัตลักษณ์โลโก้แบรนด์พรีเมียม ตลอดจนบูรณาการซอฟต์แวร์ควบคุมฮาร์ดแวร์ IoT ครบวงจร</p>
+      <div class="hero-actions">
+        <a href="#estimator" class="btn primary">คำนวณราคาค่าบริการ</a>
+        <a href="#services" class="btn">สำรวจบริการ</a>
+      </div>
+      <div class="specs">
+        <div><div class="n">10<em>+</em></div><div class="l">ปี ความมั่นคงในการดำเนินกิจการ</div></div>
+        <div><div class="n">100<em>%</em></div><div class="l">อัตราความสำเร็จของโปรเจกต์</div></div>
+        <div><div class="n">DBD</div><div class="l">นิติบุคคลจดทะเบียนถูกต้อง</div></div>
       </div>
     </div>
-  </header>
-
-  <!-- ══ HERO SECTION WITH TABBED VISUAL SELECTOR ══ -->
-  <section class="hero" id="hero-section">
-    <div class="container">
-      <div class="hero-inner">
-        
-        <!-- Hero Details Column -->
-        <div class="hero-content">
-          <div class="hero-badge-row">
-            <span class="hero-badge active-op">● ดำเนินกิจการอยู่ (Active)</span>
-            <span class="hero-badge">จัดตั้งปี 2559</span>
-            <span class="hero-badge">ทุนจดทะเบียน 1,000,000 บาท</span>
-          </div>
-          
-          <h1>เราพัฒนาซอฟต์แวร์ระดับองค์กร<br><span>และโซลูชันนวัตกรรมล้ำสมัย</span></h1>
-          <p class="hero-p">
-            บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด ดิจิทัลเอเจนซีผู้เชี่ยวชาญด้านงานจ้างรับพัฒนาซอฟต์แวร์แบบ Custom, ออกแบบระบบ UI/UX สวยงามพรีเมียมสร้างสรรค์อัตลักษณ์โลโก้แบรนด์, ตลอดจนบูรณาการซอฟต์แวร์ควบคุมฮาร์ดแวร์ IoT ครบวงจร มุ่งขับเคลื่อนธุรกิจด้วยเสถียรภาพและคุณภาพระดับสูง
-          </p>
-          
-          <div class="hero-actions">
-            <a href="#estimator" class="btn btn-primary">คำนวณราคาค่าบริการ</a>
-            <a href="#services" class="btn btn-secondary">สำรวจบริการของเรา</a>
-          </div>
-          
-          <!-- Hero Stats Dashboard -->
-          <div class="hero-stats">
-            <div class="stat-card">
-              <span class="stat-val">10+ <span>ปี</span></span>
-              <span class="stat-lbl">ความมั่นคงในการดำเนินกิจการ</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-val">100%</span>
-              <span class="stat-lbl">อัตราความสำเร็จของโปรเจกต์</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-val">0105559...</span>
-              <span class="stat-lbl">ทะเบียนนิติบุคคลอย่างเป็นทางการ</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Hero Visual Tabbed Column -->
-        <div class="hero-tab-container">
-          <!-- Tab Controller -->
-          <div class="hero-tab-btns">
-            <button class="hero-tab-btn active" data-target="panel-dashboard">📊 Product Dashboard</button>
-            <button class="hero-tab-btn" data-target="panel-topology">🌐 System Topology</button>
-          </div>
-
-          <!-- Panel 1: Product Dashboard Image View -->
-          <div class="hero-visual-panel active" id="panel-dashboard">
-            <div class="browser-mockup">
-              <div class="browser-header">
-                <span class="browser-dot red"></span>
-                <span class="browser-dot yellow"></span>
-                <span class="browser-dot green"></span>
-                <span class="browser-address">swk-solution.com/line-accounting</span>
-              </div>
-              <div class="browser-body">
-                <img src="assets/hero_real_1_1777219776698.png" alt="LINE Accounting / TaxSmart Premium Hero Dashboard UI Screenshot">
-              </div>
-            </div>
-          </div>
-
-          <!-- Panel 2: System Topology Interactive Canvas -->
-          <div class="hero-visual-panel" id="panel-topology">
-            <div class="blueprint-canvas" id="interactive-blueprint">
-              <div class="bp-glow-badge">SWK Topology Node</div>
-              
-              <!-- Animated Path Lines inside SVG Grid -->
-              <svg class="bp-circuit-lines" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                <line x1="90" y1="95" x2="330" y2="95" class="bp-connector-path" />
-                <line x1="90" y1="95" x2="90" y2="245" class="bp-connector-path" />
-                <line x1="90" y1="245" x2="310" y2="245" class="bp-connector-path" />
-                <line x1="310" y1="245" x2="310" y2="330" class="bp-connector-path" />
-                
-                <path d="M 90,95 L 330,95 L 330,330 L 125,330" fill="none" class="bp-connector-active" />
-                <path d="M 90,245 L 310,245 L 310,330" fill="none" class="bp-connector-active" style="stroke: var(--purple); animation-delay: -3s;" />
-              </svg>
-              
-              <!-- Interactive Node Elements -->
-              <div class="sys-node node-client">
-                <span class="sys-node-dot dot-green"></span>
-                <span class="sys-node-title">Client Application</span>
-                <span class="sys-node-desc">Custom_UI.tsx</span>
-              </div>
-              
-              <div class="sys-node node-gateway">
-                <span class="sys-node-dot dot-cyan"></span>
-                <span class="sys-node-title">API Gateways</span>
-                <span class="sys-node-desc">GraphQL / gRPC</span>
-              </div>
-              
-              <div class="sys-node node-services">
-                <span class="sys-node-dot dot-blue"></span>
-                <span class="sys-node-title">Enterprise Services</span>
-                <span class="sys-node-desc">Microservice_Core</span>
-              </div>
-              
-              <div class="sys-node node-db">
-                <span class="sys-node-dot dot-green"></span>
-                <span class="sys-node-title">Data Storage Layer</span>
-                <span class="sys-node-desc">Postgres & Redis</span>
-              </div>
-              
-              <!-- Central spinning core glow -->
-              <div class="canvas-center-core">
-                <div class="canvas-core-glow"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+    <div data-rev>
+      <div class="tabbtns">
+        <button class="tabbtn active" data-target="panel-dashboard">Product Dashboard</button>
+        <button class="tabbtn" data-target="panel-topology">System Topology</button>
       </div>
-    </div>
-  </section>
-
-  <!-- ══ SERVICES GRID SECTION ══ -->
-  <section class="section section-border" id="services">
-    <div class="container">
-      <div class="section-center">
-        <span class="eyebrow">บริการเฉพาะทางระดับมืออาชีพ</span>
-        <h2 class="section-title">เสาหลักความเชี่ยวชาญทางเทคโนโลยี<br><span>วิศวกรรมซอฟต์แวร์ครบวงจร</span></h2>
-        <p class="section-desc">
-          เรามุ่งมั่นในการออกแบบสถาปัตยกรรมดิจิทัลชั้นยอด พัฒนาโค้ดที่ยืดหยุ่น และสร้างสรรค์งานออกแบบที่มีสไตล์ เพื่อสร้างประสบการณ์ผู้ใช้งานและยกระดับแบรนด์ของคุณ
-        </p>
+      <div class="panel active" id="panel-dashboard">
+        <div class="plate">
+          <div class="barlbl"><i></i><i></i><i></i>&nbsp;swk-solution.com/line-accounting</div>
+          <img src="assets/hero_real_1_1777219776698.png" alt="LINE Accounting / TaxSmart dashboard">
+        </div>
       </div>
-      
-      <div class="services-grid">
-        <!-- Service 1: Custom Software Development -->
-        <div class="service-card card-custom" id="service-custom">
-          <div class="service-icon-box">💻</div>
-          <h3 class="service-title">Custom Software</h3>
-          <p class="service-desc">รับพัฒนาซอฟต์แวร์ระบบงานตามสั่ง (Tailor-made) สำหรับเว็บแอปพลิเคชัน โมบายแอป ระบบจัดการคลังสินค้า และสถาปัตยกรรม Cloud Backend ที่มีความยืดหยุ่นและขยายตัวได้ดีเยี่ยม</p>
-        </div>
-        
-        <!-- Service 2: Enterprise SaaS Platform -->
-        <div class="service-card card-saas" id="service-saas">
-          <div class="service-icon-box">📊</div>
-          <h3 class="service-title">Enterprise SaaS</h3>
-          <p class="service-desc">ผู้พัฒนาและให้บริการแพลตฟอร์มระบบริหารจัดการโครงการอัจฉริยะ (PM Platform) ที่มีโครงสร้างแบบ All-in-one ไม่ต้องบูรณาการ ข้อมูลไหลเชื่อมโยงแบบ Real-time ทั่วทั้งองค์กรทันที</p>
-        </div>
-        
-        <!-- Service 3: IoT & Hardware Integration -->
-        <div class="service-card card-iot" id="service-iot">
-          <div class="service-icon-box">⚡</div>
-          <h3 class="service-title">IoT & Automation</h3>
-          <p class="service-desc">วางระบบและเขียนซอฟต์แวร์เชื่อมต่อฮาร์ดแวร์อัจฉริยะ ระบบเซ็นเซอร์วัดพลังงาน, คอนโทรลเลอร์ PLC, ระบบออโตเมชันในอาคารและโรงงาน ผสานรวมฐานข้อมูลกายภาพเข้ากับซอฟต์แวร์แดชบอร์ดอย่างแม่นยำ</p>
-        </div>
-        
-        <!-- Service 4: UI/UX & Logo Branding Design -->
-        <div class="service-card card-design" id="service-design">
-          <div class="service-icon-box">🎨</div>
-          <h3 class="service-title">Branding & UI/UX</h3>
-          <p class="service-desc">สตูดิโอรับออกแบบโลโก้แบรนด์พรีเมียมสวยงาม ออกแบบและปรับปรุงดีไซน์ (Redesign) เว็บไซต์เดิมให้ทันสมัยระดับสากล ผ่านการคำนึงถึง User Experience (UX) ที่สะดวก ลื่นไหล น่าใช้งาน</p>
+      <div class="panel" id="panel-topology">
+        <div class="topo">
+          <div class="node"><b><span class="dot"></span>Client App</b><span>Custom_UI.tsx</span></div>
+          <div class="node"><b><span class="dot"></span>API Gateway</b><span>GraphQL / gRPC</span></div>
+          <div class="node"><b><span class="dot"></span>Services</b><span>Microservice_Core</span></div>
+          <div class="node"><b><span class="dot"></span>Data Layer</b><span>Postgres &amp; Redis</span></div>
+          <div class="core"></div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</div></div>
 
-  <!-- ══ FLAGSHIP PRODUCTS SHOWCASE (LINE ACCOUNTING / TAXSMART) ══ -->
-  <section class="section section-border" id="showcase">
-    <div class="container">
-      <div class="section-center">
-        <span class="eyebrow">ขีดความสามารถการพัฒนา</span>
-        <h2 class="section-title">ขุมพลังเทคโนโลยีองค์กร<br><span>โมดูลระบบ LINE Accounting & TaxSmart</span></h2>
-        <p class="section-desc">
-          การันตีฝีมือความประณีตในการออกแบบ User Interface ระดับเวิลด์คลาส คมชัดสวยงาม ทันสมัย อัดแน่นด้วยฟังก์ชันวิเคราะห์ระบบชั้นสูงที่รองรับข้อมูลปริมาณมาก
-        </p>
+<!-- SERVICES -->
+<section id="services"><div class="wrap">
+  <div class="sec-head" data-rev>
+    <span class="kicker">บริการเฉพาะทางระดับมืออาชีพ</span>
+    <h2>เสาหลักความเชี่ยวชาญ<br><span>วิศวกรรมซอฟต์แวร์ครบวงจร</span></h2>
+    <p>ออกแบบสถาปัตยกรรมดิจิทัลชั้นยอด พัฒนาโค้ดที่ยืดหยุ่น และงานออกแบบที่มีสไตล์ เพื่อยกระดับประสบการณ์ผู้ใช้และแบรนด์ของคุณ</p>
+  </div>
+  <div class="svc-grid" data-rev>
+    <div class="svc"><span class="code">S-01</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></div>
+      <h3>Custom Software</h3><p>รับพัฒนาซอฟต์แวร์ตามสั่ง เว็บแอป โมบายแอป ระบบคลังสินค้า และ Cloud Backend ที่ยืดหยุ่นและขยายตัวได้ดี</p>
+    </div>
+    <div class="svc"><span class="code">S-02</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5"/><rect x="3" y="11" width="18" height="5"/><path d="M3 18h12"/></svg></div>
+      <h3>Enterprise SaaS</h3><p>ผู้พัฒนาแพลตฟอร์มบริหารโครงการ (PM Platform) แบบ All-in-one ข้อมูลไหลเชื่อมโยงเรียลไทม์ทั่วทั้งองค์กร</p>
+    </div>
+    <div class="svc"><span class="code">S-03</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></svg></div>
+      <h3>IoT &amp; Automation</h3><p>วางระบบและเขียนซอฟต์แวร์เชื่อมต่อฮาร์ดแวร์ เซ็นเซอร์พลังงาน PLC และออโตเมชันในโรงงาน ผสานข้อมูลกายภาพกับแดชบอร์ด</p>
+    </div>
+    <div class="svc"><span class="code">S-04</span>
+      <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20l5-1L20 8a2 2 0 0 0-3-3L6 16z"/><path d="M14 6l3 3"/></svg></div>
+      <h3>Branding &amp; UI/UX</h3><p>สตูดิโอออกแบบโลโก้แบรนด์พรีเมียม และ Redesign เว็บไซต์เดิมให้ทันสมัยระดับสากล เน้น UX ที่ลื่นไหลน่าใช้งาน</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- SHOWCASE -->
+<section id="showcase"><div class="wrap">
+  <div class="sec-head" data-rev>
+    <span class="kicker dim">ขีดความสามารถการพัฒนา</span>
+    <h2>ขุมพลังเทคโนโลยีองค์กร<br><span>โมดูล LINE Accounting &amp; TaxSmart</span></h2>
+    <p>การันตีความประณีตในการออกแบบ User Interface ระดับเวิลด์คลาส อัดแน่นด้วยฟังก์ชันวิเคราะห์ชั้นสูงที่รองรับข้อมูลปริมาณมาก</p>
+  </div>
+  <div class="show-grid">
+    <div class="show" data-rev><div class="imgw"><img src="assets/feat_real_line_1777221074642.png" alt="LINE Bot Accounting"></div><div class="b"><h3>LINE Bot Accounting</h3><p>ทำบัญชีผ่านแชท บันทึกรายรับรายจ่าย ดูยอดสรุปภาษีผ่าน LINE LIFF ไม่ต้องออกจากหน้าแชท</p><div class="tags"><span>LINE OA</span><span>LIFF App</span></div></div></div>
+    <div class="show" data-rev><div class="imgw"><img src="assets/real_scanner.png" alt="AI Receipt Scanner"></div><div class="b"><h3>AI Receipt Scanner</h3><p>ดึงข้อมูลจากใบเสร็จด้วย AI OCR อ่านยอด วันที่ เลขผู้เสียภาษี คีย์ลงบัญชีคู่อัตโนมัติ แม่นยำกว่า 95%</p><div class="tags"><span>AI OCR</span><span>Auto Extract</span></div></div></div>
+    <div class="show" data-rev><div class="imgw"><img src="assets/feat_real_accounting_1777221032495.png" alt="Ledger Cockpit"></div><div class="b"><h3>Professional Ledger Cockpit</h3><p>สมุดบัญชีแยกประเภทระบบบัญชีคู่ ปิดงบ ออกรายงาน P&amp;L และงบฐานะการเงินตามมาตรฐานสภาวิชาชีพบัญชี</p><div class="tags"><span>Double-Entry</span><span>Chart of Accounts</span></div></div></div>
+    <div class="show" data-rev><div class="imgw"><img src="assets/feat_real_tax_1777221046221.png" alt="Thai Tax Filing"></div><div class="b"><h3>Thai Tax Filing Automation</h3><p>คำนวณภาษีไทยอัตโนมัติ รองรับมาตรา 40 ครบ 8 ประเภท พร้อมส่งออก ภ.พ.30, ภ.ง.ด.3/53 และ ภ.ง.ด.90/91</p><div class="tags"><span>Revenue Compliant</span><span>E-Filing</span></div></div></div>
+    <div class="show" data-rev><div class="imgw"><img src="assets/feat_real_reports_1777221060612.png" alt="Analytical Dashboards"></div><div class="b"><h3>Analytical Dashboards</h3><p>วิเคราะห์และจัดทำรายงานกราฟการเงิน แสดงแนวโน้มกระแสเงินสด รายได้สะสม และจุดคุ้มทุน</p><div class="tags"><span>Visual Dashboard</span><span>Cashflow</span></div></div></div>
+    <div class="show" data-rev><div class="imgw"><img src="assets/feat_real_security_1777221088537.png" alt="Workspace Security"></div><div class="b"><h3>Workspace &amp; Audit Security</h3><p>สถาปัตยกรรมแบ่งกลุ่มบริษัท (Multi-tenant) จำกัดสิทธิ์ระดับสูง พร้อม Audit Trail มาตรฐานองค์กรใหญ่</p><div class="tags"><span>Row-Level Security</span><span>Audit Trail</span></div></div></div>
+  </div>
+</div></section>
+
+<!-- SYNERGY -->
+<section id="synergy"><div class="wrap">
+  <div class="syn" data-rev>
+    <div>
+      <span class="kicker">Enterprise SaaS Solutions</span>
+      <h3>ความลงตัวทางเทคโนโลยี<br>ด้วยแพลตฟอร์ม <span>PM Platform</span></h3>
+      <p>ระบบ PM Platform ของ SWK Solution ขจัดความยุ่งยากในการเชื่อมต่อหลายระบบ มอบความลื่นไหลด้วยข้อมูลเรียลไทม์ โมดูลเชื่อมต่อกันทันทีโดยไม่ต้อง integrate เพิ่ม ครอบคลุมการควบคุมคุณภาพตามมาตรฐานเข้มงวด</p>
+      <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><b>Dynamic Gantt Chart &amp; Critical Path</b><span>คำนวณเส้นทางวิกฤตของทุกโมดูล ประเมินความเสี่ยงและแจ้งเตือนความคืบหน้าทันทีเมื่อมีการเปลี่ยนแปลง</span></div></div>
+      <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8"/></svg></span><div><b>BOM &amp; Inventory Traceability</b><span>คลังและชิ้นส่วนเชื่อมโยงใบจัดซื้ออัตโนมัติ ติดตาม Lot การใช้งานแบบ end-to-end</span></div></div>
+      <div class="benefit"><span class="bi"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/></svg></span><div><b>ระบบบริหารคุณภาพ APQP/PPAP/FMEA</b><span>รองรับมาตรฐานยานยนต์และการผลิตระดับสูง ออกใบ NCR และแผน CAPA ทันทีในระบบ</span></div></div>
+    </div>
+    <div class="monitor">
+      <div class="h"><span>SWK PM · MONITOR</span><span class="on">● ACTIVE</span></div>
+      <div class="r"><span class="lbl">Project Health</span><span class="v ok">EXCELLENT 100%</span></div>
+      <div class="r"><span class="lbl">Quality Audit</span><span class="v">PASSED · Cpk 1.84</span></div>
+      <div class="r"><span class="lbl">DB Nodes</span><span class="v ac">99.99% UPTIME</span></div>
+      <div class="r"><span class="lbl">Deployments</span><span class="bar"><div style="width:95%"></div></span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ESTIMATOR -->
+<section id="estimator"><div class="wrap">
+  <div class="sec-head" data-rev>
+    <span class="kicker">คำนวณงบประมาณด่วน</span>
+    <h2>วางแผนงบประมาณโครงการ<br><span>ประเมินราคาอัจฉริยะ</span></h2>
+    <p>เลือกความต้องการและการตั้งค่าระบบ เพื่อคำนวณงบประมาณเบื้องต้นสำหรับโครงการซอฟต์แวร์ ดีไซน์ หรือออโตเมชันของคุณ</p>
+  </div>
+  <div class="est" data-rev>
+    <div class="est-in">
+      <div class="grp">
+        <div class="gh"><span>ประเภทบริการหลัก</span></div>
+        <div class="opts" id="project-type">
+          <div class="opt-card active" data-type="software" data-multiplier="1"><span class="opt-title">Custom Software</span><span class="opt-desc">เว็บแอป · Backend · Cloud</span></div>
+          <div class="opt-card" data-type="saas" data-multiplier="0.8"><span class="opt-title">PM Platform (SaaS)</span><span class="opt-desc">แพลตฟอร์มบริหารโครงการ</span></div>
+          <div class="opt-card" data-type="iot" data-multiplier="1.3"><span class="opt-title">IoT &amp; Automation</span><span class="opt-desc">เชื่อมฮาร์ดแวร์ ออโตเมชัน</span></div>
+          <div class="opt-card" data-type="design" data-multiplier="0.5"><span class="opt-title">Logo &amp; Design</span><span class="opt-desc">โลโก้ · Redesign UI/UX</span></div>
+        </div>
       </div>
-
-      <div class="showcase-grid">
-        <!-- Card 1: LINE Bot Accounting -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/feat_real_line_1777221074642.png" alt="LINE Bot Accounting Integration UI Screenshot">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">LINE Bot Accounting</h3>
-            <p class="showcase-card-desc">
-              ระบบทำบัญชีผ่านแชทแอปยอดนิยม บันทึกรายได้ รายจ่าย ส่งพิมพ์เอกสารรายงาน หรือดูยอดสรุปภาษีได้ง่ายๆ ผ่าน LINE LIFF ไม่ต้องออกจากหน้าแชท สะดวก รวดเร็ว
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">LINE OA Integration</span>
-              <span class="showcase-card-tag">LIFF Application</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 2: AI Receipt Scanner -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/real_scanner.png" alt="AI Receipt Scanner and OCR Screen UI">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">AI Receipt Scanner</h3>
-            <p class="showcase-card-desc">
-              ระบบดึงข้อมูลอัจฉริยะจากใบเสร็จ (AI OCR) ถ่ายรูปปุ๊บ อ่านข้อความ ยอดเงิน วันที่ และเลขประจำตัวผู้เสียภาษี คีย์ลงสมุดบัญชีคู่ให้อัตโนมัติในเสี้ยววินาที แม่นยำกว่า 95%
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">AI OCR Engine</span>
-              <span class="showcase-card-tag">Auto Data Extraction</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 3: Double-Entry Ledger -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/feat_real_accounting_1777221032495.png" alt="Double Entry Journal Ledger UI">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">Professional Ledger Cockpit</h3>
-            <p class="showcase-card-desc">
-              สมุดบัญชีแยกประเภทและสมุดรายวันระบบบัญชีคู่ (Double-entry Ledger) ปิดงบการเงิน ออกรายงานกำไรขาดทุน (P&L) และงบแสดงฐานะการเงินได้รวดเร็วตามมาตรฐานสภาวิชาชีพบัญชี
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">Double-Entry Validated</span>
-              <span class="showcase-card-tag">Chart of Accounts</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 4: Thai Tax Filing Automation -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/feat_real_tax_1777221046221.png" alt="Thai Tax Filing Automation screen UI">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">Thai Tax Filing Automation</h3>
-            <p class="showcase-card-desc">
-              คำนวณภาษีไทยอัตโนมัติ รองรับรายได้มาตรา 40 ครบทั้ง 8 ประเภท ค่าลดหย่อนครอบคลุม พร้อมส่งออกเอกสารแบบยื่นภาษี ภ.พ.30, ภ.ง.ด.3, ภ.ง.ด.53 และ ภ.ง.ด.90/91 ได้ทันที
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">Revenue Code Compliant</span>
-              <span class="showcase-card-tag">Tax E-Filing Form</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 5: Analytical Reports -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/feat_real_reports_1777221060612.png" alt="SaaS Reports and Financial Analytics UI">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">Analytical Dashboards</h3>
-            <p class="showcase-card-desc">
-              ส่วนวิเคราะห์และจัดทำรายงานกราฟการเงินสีสันสวยงาม เข้าใจง่าย แสดงแนวโน้มกระแสเงินสด วิเคราะห์รายได้สะสม และประเมินจุดคุ้มทุนเพื่อความคล่องตัวของเจ้าของกิจการ
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">Visual Dashboards</span>
-              <span class="showcase-card-tag">Cashflow Trends</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card 6: Workspace & Tenant Security -->
-        <div class="showcase-card">
-          <div class="showcase-img-wrap">
-            <img src="assets/feat_real_security_1777221088537.png" alt="Multi Tenant Workspace Security System UI">
-          </div>
-          <div class="showcase-card-body">
-            <h3 class="showcase-card-title">Workspace & Audit Security</h3>
-            <p class="showcase-card-desc">
-              ระบบสถาปัตยกรรมแบ่งกลุ่มบริษัท (Multi-tenant Workspaces) จำกัดสิทธิ์ผู้ใช้งานระดับสูง มีระบบ Log ติดตามการดำเนินงาน (Audit Trail) มาตรฐานความปลอดภัยระดับองค์กรใหญ่
-            </p>
-            <div class="showcase-card-tags">
-              <span class="showcase-card-tag">Row-Level Security</span>
-              <span class="showcase-card-tag">Audit Trail Logs</span>
-            </div>
-          </div>
+      <div class="grp">
+        <div class="gh"><label for="complexity-range">ขนาดและความซับซ้อน</label><span id="range-val-complexity">ระดับกลาง</span></div>
+        <input type="range" id="complexity-range" class="range-slider" min="1" max="5" value="3">
+      </div>
+      <div class="grp">
+        <div class="gh"><span>ฟีเจอร์เสริม</span></div>
+        <div class="cbs">
+          <div class="cb-item active" data-addon="15000"><span class="cb-icon">✓</span><span>UI/UX Custom Design</span></div>
+          <div class="cb-item" data-addon="25000"><span class="cb-icon">✓</span><span>Multilingual Support</span></div>
+          <div class="cb-item active" data-addon="30000"><span class="cb-icon">✓</span><span>API Integration Hub</span></div>
+          <div class="cb-item" data-addon="40000"><span class="cb-icon">✓</span><span>AI Data Analytics</span></div>
         </div>
       </div>
     </div>
-  </section>
+    <div class="est-out">
+      <span class="el">งบประมาณเริ่มต้นโดยประมาณ</span>
+      <span class="ep" id="calc-display-price">฿135,000</span>
+      <div class="est-meta">
+        ● รวม <strong>ซอร์สโค้ดลิขสิทธิ์ 100%</strong><br>
+        ● ฟรี Maintenance <strong>1 ปีเต็ม</strong><br>
+        ● ทีมวิศวกรซอฟต์แวร์ไทยมากประสบการณ์
+      </div>
+      <a href="#contact" class="btn primary" id="estimate-send-btn" style="width:100%;justify-content:center">ขอรับใบเสนอราคา</a>
+    </div>
+  </div>
+</div></section>
 
-  <!-- ══ TECH SYNERGY SECTION ══ -->
-  <section class="section section-border" id="synergy">
-    <div class="container">
-      <div class="synergy-box" id="saas-synergy-banner">
-        <div class="synergy-inner">
-          
-          <!-- Value content -->
-          <div class="synergy-content">
-            <span class="synergy-eyebrow">Enterprise SaaS Solutions</span>
-            <h3>ความลงตัวทางเทคโนโลยี<br>ด้วยแพลตฟอร์ม <span>PM Platform</span></h3>
-            <p class="synergy-desc">
-              ระบบ **PM Platform** ของ SWK Solution ขจัดความยุ่งยากในการเชื่อมต่อซอฟต์แวร์หลายระบบด้วยการเป็นทางเลือกที่ 4 (The 4th Choice) มอบความลื่นไหลด้วยข้อมูลเรียลไทม์ โครงสร้างโมดูลการทำงานเชื่อมต่อกันทันทีโดยไม่ต้อง integrate เพิ่มเติม ครอบคลุมการควบคุมคุณภาพและแผนงานตามมาตรฐานที่เข้มงวดที่สุด
-            </p>
-            
-            <div class="synergy-benefits">
-              <div class="syn-benefit-item">
-                <div class="syn-benefit-icon">⏱️</div>
-                <div class="syn-benefit-text">
-                  <span class="syn-benefit-title">จัดลำดับตารางงานอัปเดตแบบ Dynamic Gantt Chart</span>
-                  <span class="syn-benefit-desc">คำนวณ Critical Path ของทุกโมดูลเพื่อประเมินความเสี่ยงและแจ้งเตือนความคืบหน้าโครงการทันทีในกรณีที่มีการเปลี่ยนแปลง</span>
-                </div>
-              </div>
-              <div class="syn-benefit-item">
-                <div class="syn-benefit-icon">📦</div>
-                <div class="syn-benefit-text">
-                  <span class="syn-benefit-title">ความสมบูรณ์แบบของ BOM & Inventory Traceability</span>
-                  <span class="syn-benefit-desc">ระบบคลังและชิ้นส่วนของโปรเจกต์เชื่อมโยงกับใบงานจัดซื้ออัตโนมัติ ติดตาม Lot การใช้งานของชิ้นส่วนแบบ end-to-end</span>
-                </div>
-              </div>
-              <div class="syn-benefit-item">
-                <div class="syn-benefit-icon">🛡️</div>
-                <div class="syn-benefit-text">
-                  <span class="syn-benefit-title">เชื่อมโยงระบบบริหารคุณภาพ (APQP/PPAP/FMEA)</span>
-                  <span class="syn-benefit-desc">รองรับมาตรฐานอุตสาหกรรมยานยนต์และการผลิตระดับสูง ออกใบงานความบกพร่อง (NCR) และแผนปฏิบัติการ CAPA ทันทีในระบบ</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Mockup widget -->
-          <div class="synergy-mockup">
-            <div class="syn-mockup-header">
-              <div class="syn-m-title">
-                <span>📊 SWK PM Dashboard Monitoring</span>
-                <span class="syn-m-badge">Active Connection</span>
-              </div>
-            </div>
-            <div class="syn-mockup-body">
-              <div class="syn-m-row">
-                <span class="syn-m-lbl">Project Health Score</span>
-                <span class="syn-m-val" style="color: #4ade80;">EXCELLENT (100%)</span>
-              </div>
-              <div class="syn-m-row">
-                <span class="syn-m-lbl">Quality Audit Status</span>
-                <span class="syn-m-val">PASSED (Cpk 1.84)</span>
-              </div>
-              <div class="syn-m-row">
-                <span class="syn-m-lbl">Database Nodes Online</span>
-                <span class="syn-m-val" style="color: var(--cyan-l);">99.99% Uptime</span>
-              </div>
-              <div class="syn-m-row">
-                <span class="syn-m-lbl">Dynamic Deployments</span>
-                <div class="syn-progress-bar">
-                  <div class="syn-progress-fill" style="width: 95%;"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
+<!-- ABOUT -->
+<section id="about"><div class="wrap">
+  <div class="about">
+    <div data-rev>
+      <span class="kicker dim">เกี่ยวกับบริษัท</span>
+      <h2 style="font-family:var(--t);font-weight:700;font-size:clamp(1.6rem,3.4vw,2.4rem);letter-spacing:-.015em;line-height:1.12;margin:1rem 0 .9rem">พันธมิตรเทคโนโลยีที่มั่นคง<br><span style="color:var(--accent)">ดำเนินกิจการอย่างมืออาชีพ</span></h2>
+      <p style="color:var(--fg-dim);max-width:50ch">องค์กรวิศวกรรมเทคโนโลยีและผู้พัฒนาซอฟต์แวร์ที่จดทะเบียนมายาวนานกว่า 10 ปี มุ่งยกระดับประสิทธิภาพกระบวนการขององค์กรลูกค้าด้วยซอฟต์แวร์คุณภาพสูง และการบูรณาการระบบควบคุมทางกายภาพอย่างลงตัว</p>
+      <div style="margin-top:1.4rem">
+        <div class="cred-item"><span class="ci"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5"/></svg></span><div><b>จดทะเบียนถูกต้องตามกฎหมาย</b><span>สถานะ "ยังดำเนินกิจการอยู่" (Active) โครงสร้างการเงินโปร่งใส ปราศจากหนี้สิน</span></div></div>
+        <div class="cred-item"><span class="ci"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg></span><div><b>เลขทะเบียนนิติบุคคล 0105559018855</b><span>จดทะเบียนจัดตั้งเมื่อ 2 กุมภาพันธ์ พ.ศ. 2559 ตรวจสอบได้</span></div></div>
       </div>
     </div>
-  </section>
-
-  <!-- ══ INTERACTIVE PROJECT ESTIMATOR SECTION ══ -->
-  <section class="section section-border" id="estimator">
-    <div class="container">
-      <div class="section-center">
-        <span class="eyebrow">คำนวณงบประมาณด่วน</span>
-        <h2 class="section-title">วางแผนงบประมาณโครงการ<br><span>ประเมินราคาอัจฉริยะ</span></h2>
-        <p class="section-desc">
-          เลือกความต้องการและการตั้งค่าระบบที่ต้องการใช้งาน เพื่อทำการคำนวณงบประมาณเบื้องต้นสำหรับโครงการซอฟต์แวร์ ดีไซน์ หรือระบบออโตเมชันของคุณ
-        </p>
-      </div>
-
-      <div class="estimator-box">
-        <div class="estimator-grid">
-          
-          <!-- Input settings -->
-          <div class="estimator-inputs">
-            <!-- Project Selector cards -->
-            <div class="range-group">
-              <span class="range-header"><label for="project-type" style="display:none">ประเภทบริการ</label>ประเภทบริการหลักของโครงการ</span>
-              <div class="options-grid" id="project-type">
-                <div class="opt-card active" data-type="software" data-multiplier="1">
-                  <span class="opt-title">Custom Software</span>
-                  <span class="opt-desc">เว็บแอป, Backend API, Cloud Server</span>
-                </div>
-                <div class="opt-card" data-type="saas" data-multiplier="0.8">
-                  <span class="opt-title">PM Platform (SaaS)</span>
-                  <span class="opt-desc">แพลตฟอร์มบริหารโครงการสากล</span>
-                </div>
-                <div class="opt-card" data-type="iot" data-multiplier="1.3">
-                  <span class="opt-title">IoT & Automation</span>
-                  <span class="opt-desc">โปรแกรมต่อเชื่อมฮาร์ดแวร์ ออโตเมชัน</span>
-                </div>
-                <div class="opt-card" data-type="design" data-multiplier="0.5">
-                  <span class="opt-title">Premium Logo & Design</span>
-                  <span class="opt-desc">ออกแบบโลโก้, Redesign UI/UX</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Volume slider -->
-            <div class="range-group">
-              <div class="range-header">
-                <label for="complexity-range">ขนาดและความซับซ้อนของระบบ</label>
-                <span id="range-val-complexity">ระดับกลาง (Medium Scale)</span>
-              </div>
-              <input type="range" id="complexity-range" class="range-slider" min="1" max="5" value="3">
-            </div>
-
-            <!-- Features Checkboxes -->
-            <div class="range-group">
-              <span class="range-header">ฟีเจอร์และออปชันเสริมของระบบ</span>
-              <div class="checkbox-list">
-                <div class="cb-item active" data-addon="15000">
-                  <span class="cb-icon">✓</span>
-                  <span>UI/UX Custom Design</span>
-                </div>
-                <div class="cb-item" data-addon="25000">
-                  <span class="cb-icon">✓</span>
-                  <span>Multilingual Support</span>
-                </div>
-                <div class="cb-item active" data-addon="30000">
-                  <span class="cb-icon">✓</span>
-                  <span>API Integration Hub</span>
-                </div>
-                <div class="cb-item" data-addon="40000">
-                  <span class="cb-icon">✓</span>
-                  <span>AI Data Analytics Engine</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Dynamic calculation output display -->
-          <div class="estimator-results">
-            <div class="est-res-box">
-              <span class="est-res-label">งบประมาณเริ่มต้นโดยประมาณ</span>
-              <span class="est-res-price" id="calc-display-price">฿135,000</span>
-            </div>
-            
-            <div class="est-res-meta">
-              <span>● ประเมินรวมค่าบริการ <strong>ซอร์สโค้ดลิขสิทธิ์ 100%</strong></span><br>
-              <span>● ฟรีบริการดูแลรักษาระบบ (Maintenance) <strong>นาน 1 ปีเต็ม</strong></span><br>
-              <span>● ดำเนินงานโดยทีมวิศวกรซอฟต์แวร์ไทยมากประสบการณ์</span>
-            </div>
-
-            <a href="#contact" class="btn btn-primary" style="width: 100%;" id="estimate-send-btn">สนใจขอรับใบเสนอราคาโครงการนี้</a>
-          </div>
-
-        </div>
-      </div>
+    <div class="dbd" data-rev>
+      <div class="dh">DBD Corporate Profile</div>
+      <div class="dr"><span class="k">ชื่อ (ไทย)</span><span class="vv">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด</span></div>
+      <div class="dr"><span class="k">ชื่อ (EN)</span><span class="vv">SWK Solution Company Limited</span></div>
+      <div class="dr"><span class="k">เลขนิติบุคคล</span><span class="vv mono">0105559018855</span></div>
+      <div class="dr"><span class="k">วันจัดตั้ง</span><span class="vv">2 กุมภาพันธ์ 2559</span></div>
+      <div class="dr"><span class="k">ทุนจดทะเบียน</span><span class="vv">1,000,000 บาท</span></div>
+      <div class="dr"><span class="k">ที่ตั้ง</span><span class="vv">224/58 ม.อาร์เค พาร์ค ถ.สายไหม เขตสายไหม กรุงเทพฯ 10220</span></div>
     </div>
-  </section>
+  </div>
+</div></section>
 
-  <!-- ══ ABOUT US & CORPORATE PROFILE SECTION ══ -->
-  <section class="section section-border" id="about">
-    <div class="container">
-      <div class="credibility">
-        
-        <!-- Corporate profile content -->
-        <div class="cred-content">
-          <span class="eyebrow">เกี่ยวกับบริษัท เอส ดับบลิว เค โซลูชั่น จำกัด</span>
-          <h2 class="section-title">พันธมิตรเทคโนโลยีที่มั่นคง<br><span>ดำเนินกิจการอย่างมืออาชีพ</span></h2>
-          <p class="section-desc">
-            เราคือองค์กรวิศวกรรมเทคโนโลยีและผู้พัฒนาซอฟต์แวร์ที่จดทะเบียนจัดตั้งมายาวนานกว่า 10 ปี มุ่งมั่นที่จะยกระดับประสิทธิภาพกระบวนการขององค์กรลูกค้าด้วยซอฟต์แวร์ระบบคุณภาพสูง ตลอดจนการบูรณาการระบบควบคุมทางกายภาพและเทคโนโลยีอย่างลงตัว 
-          </p>
-          
-          <div class="cred-badge-list">
-            <div class="cred-item">
-              <span class="cred-item-icon">🏢</span>
-              <div class="cred-item-info">
-                <span class="cred-item-title">สถานะบริษัทจดทะเบียนถูกต้องตามกฎหมาย</span>
-                <span class="cred-item-desc">มีสถานะ "ยังดำเนินกิจการอยู่" (Active) ด้วยโครงสร้างการเงินโปร่งใส ปราศจากหนี้สิน</span>
-              </div>
-            </div>
-            <div class="cred-item">
-              <span class="cred-item-icon">📜</span>
-              <div class="cred-item-info">
-                <span class="cred-item-title">เลขทะเบียนนิติบุคคล 0105559018855</span>
-                <span class="cred-item-desc">จดทะเบียนจัดตั้งเมื่อวันที่ 2 กุมภาพันธ์ พ.ศ. 2559 ด้วยความโปร่งใส ตรวจสอบได้</span>
-              </div>
-            </div>
-          </div>
+<!-- CONTACT -->
+<section id="contact"><div class="wrap">
+  <div class="contact">
+    <div class="cbox" data-rev>
+      <h3>ส่งคำขอปรึกษาโครงการ</h3>
+      <p class="fd">กรอกความต้องการเบื้องต้น ทีมวิศวกรสถาปัตยกรรมระบบของ SWK Solution จะวิเคราะห์และติดต่อกลับโดยด่วน</p>
+      <form onsubmit="alert('ขอบคุณสำหรับข้อมูลครับ ทีมงาน SWK Solution จะติดต่อกลับโดยเร็วที่สุด!'); return false;">
+        <div class="frow">
+          <div class="fg"><label class="fl" for="username">ชื่อผู้ติดต่อ / บริษัท</label><input class="fc" id="username" type="text" placeholder="คุณสมชาย ใจดี" required></div>
+          <div class="fg"><label class="fl" for="tel">เบอร์โทรศัพท์</label><input class="fc" id="tel" type="tel" placeholder="081-234-5678" required></div>
         </div>
-        
-        <!-- Credibility visual table card -->
-        <div class="cred-visual" id="credibility-profile-card">
-          <div class="cred-cert-title">
-            <span>📜</span> ข้อมูลจดทะเบียนของบริษัท (DBD Profile)
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">ชื่อภาษาไทย</span>
-            <span class="cred-cert-val">บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด</span>
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">ชื่อภาษาอังกฤษ</span>
-            <span class="cred-cert-val">SWK Solution Company Limited</span>
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">เลขทะเบียนนิติบุคคล</span>
-            <span class="cred-cert-val" style="font-family: var(--font-mono);">0105559018855</span>
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">วันที่จัดตั้งจดทะเบียน</span>
-            <span class="cred-cert-val">2 กุมภาพันธ์ 2559</span>
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">ทุนจดทะเบียนชำระเต็ม</span>
-            <span class="cred-cert-val">1,000,000 บาท</span>
-          </div>
-          <div class="cred-cert-row">
-            <span class="cred-cert-lbl">ที่ตั้งจดทะเบียนหลัก</span>
-            <span class="cred-cert-val" style="text-align: right; max-width: 65%; font-size: 0.8rem;">224/58 ม.อาร์เค พาร์ค ถ.สายไหม แขวงสายไหม เขตสายไหม กรุงเทพมหานคร</span>
-          </div>
+        <div class="fg"><label class="fl" for="email">อีเมลหน่วยงาน</label><input class="fc" id="email" type="email" placeholder="somchai@company.com"></div>
+        <div class="fg"><label class="fl" for="service-select">บริการที่สนใจ</label>
+          <select class="fc" id="service-select">
+            <option value="software">Custom Web / Mobile Application</option>
+            <option value="saas">PM Platform (SaaS)</option>
+            <option value="iot">IoT &amp; Hardware Automation</option>
+            <option value="design">UI/UX &amp; Logo Branding</option>
+          </select>
         </div>
-
-      </div>
+        <div class="fg"><label class="fl" for="details">รายละเอียดโครงการ</label><textarea class="fc" id="details" placeholder="โปรดระบุขอบเขตงาน หรืออุปสรรคของระบบเดิมที่ต้องการปรับปรุง..."></textarea></div>
+        <button type="submit" class="btn primary" style="width:100%;justify-content:center">ส่งคำขอปรึกษาฟรี</button>
+      </form>
     </div>
-  </section>
-
-  <!-- ══ CONTACT & INTERACTIVE MAP SECTION ══ -->
-  <section class="section" id="contact">
-    <div class="container">
-      <div class="contact-grid">
-        
-        <!-- Interactive Contact Form Box -->
-        <div class="contact-form-box">
-          <h3 class="form-title">ส่งคำขอปรึกษาโครงการ / ตกลงจ้างงาน</h3>
-          <p class="form-desc">กรอกข้อมูลความต้องการทางเทคนิคเบื้องต้น ทีมวิศวกรสถาปัตยกรรมระบบของ SWK Solution จะวิเคราะห์ประเมินเบื้องต้นและติดต่อกลับด่วน</p>
-          
-          <form onsubmit="alert('ขอบคุณสำหรับข้อมูลครับ ทีมงาน SWK Solution จะติดต่อกลับเพื่อนำเสนอรายละเอียดอย่างรวดเร็วที่สุด!'); return false;" id="project-contact-form">
-            <div class="form-group-row">
-              <div class="form-group">
-                <label class="form-label" for="username">ชื่อผู้ติดต่อ / บริษัท</label>
-                <input type="text" id="username" class="form-control" placeholder="คุณสมชาย ใจดี" required>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="tel">เบอร์โทรศัพท์ติดต่อ</label>
-                <input type="tel" id="tel" class="form-control" placeholder="081-234-5678" required>
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="email">อีเมลหน่วยงาน</label>
-              <input type="email" id="email" class="form-control" placeholder="somchai@company.com">
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="service-select">บริการหลักที่สนใจ</label>
-              <select id="service-select" class="form-control">
-                <option value="custom">Custom Web / Mobile Application Development</option>
-                <option value="saas">SaaS PM Platform Integration</option>
-                <option value="iot">IoT & Hardware Automation System</option>
-                <option value="design">UI/UX Redesign & Logo Brand Identity</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="details">รายละเอียดและเงื่อนไขของโครงการ</label>
-              <textarea id="details" class="form-control" rows="4" placeholder="โปรดระบุขอบเขตระบบงาน หรือ อุปสรรคของระบบงานเดิมที่ต้องการแก้ไขปรับปรุง..."></textarea>
-            </div>
-            
-            <button type="submit" class="btn btn-primary" style="width: 100%; border: none;" id="form-submit-btn">ส่งคำขอปรึกษาโครงการฟรี</button>
-          </form>
-        </div>
-        
-        <!-- Styled Localized Maps Card -->
-        <div class="map-card" id="map-address-panel">
-          <h3 class="form-title">ที่ทำการสำนักงานหลัก</h3>
-          <p class="form-desc" style="margin-bottom: 0.5rem;">ตั้งอยู่ ณ หมู่บ้านอาร์เค พาร์ค ถนนสายไหม กรุงเทพมหานคร รองรับการเข้าประชุม นำเสนองาน และทดสอบอุปกรณ์ฮาร์ดแวร์ควบคุม</p>
-          
-          <!-- Styled Map Mockup Area -->
-          <div class="map-visual-mockup" id="vector-map">
-            <!-- Road grids -->
-            <div class="map-road road-v"></div>
-            <div class="map-road road-h"></div>
-            <div class="map-road road-diag"></div>
-            
-            <!-- Pin Ripple beacon -->
-            <div class="map-pin-wrap">
-              <div class="map-pin"></div>
-              <div class="map-radar"></div>
-              <div class="map-pin-label">📍 SWK TECH HUB HQ</div>
-            </div>
-          </div>
-          
-          <!-- Contact Detail Icons list -->
-          <div class="map-info-block">
-            <div class="map-detail-item">
-              <div class="map-detail-icon">📍</div>
-              <div class="map-detail-text">
-                <span class="map-detail-title">ที่อยู่สำนักงานใหญ่จดทะเบียน</span>
-                <span class="map-detail-desc">224/58 หมู่บ้านอาร์เค พาร์ค ถนนสายไหม แขวงสายไหม เขตสายไหม กรุงเทพมหานคร 10220</span>
-              </div>
-            </div>
-            <div class="map-detail-item">
-              <div class="map-detail-icon">📞</div>
-              <div class="map-detail-text">
-                <span class="map-detail-title">ฝ่ายสนับสนุนวิศวกรรมสถาปัตยกรรมระบบ</span>
-                <span class="map-detail-desc">02-123-4567 (สายตรงฝ่ายพัฒนาธุรกิจและงานขาย)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
+    <div class="mapcard" data-rev>
+      <h3>ที่ทำการสำนักงานหลัก</h3>
+      <p class="fd">ม.อาร์เค พาร์ค ถ.สายไหม กรุงเทพฯ — รองรับการเข้าประชุม นำเสนองาน และทดสอบอุปกรณ์ฮาร์ดแวร์ควบคุม</p>
+      <div class="mapgrid"><span class="mappin"></span></div>
+      <div class="minfo"><span class="mi"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-7-10a7 7 0 0 1 14 0c0 5.5-7 10-7 10z"/><circle cx="12" cy="11" r="2.5"/></svg></span><div><b>ที่อยู่จดทะเบียน</b><span>224/58 ม.อาร์เค พาร์ค ถ.สายไหม แขวงสายไหม เขตสายไหม กรุงเทพมหานคร 10220</span></div></div>
+      <div class="minfo"><span class="mi"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></span><div><b>ฝ่ายพัฒนาธุรกิจและงานขาย</b><span>02-123-4567 (สายตรง)</span></div></div>
     </div>
-  </section>
+  </div>
+</div></section>
 
-  <!-- ══ FOOTER ══ -->
-  <footer class="footer" id="footer-section">
-    <div class="container">
-      <div class="footer-top">
-        <a href="#" class="logo">
-          <div class="logo-container" style="background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.08);">
-            <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="url(#logoGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </div>
-          <div class="logo-text">
-            <span class="logo-name">SWK Solution</span>
-            <span class="logo-sub">Technology Solutions Agency</span>
-          </div>
-        </a>
-        
-        <h4 style="font-size: 0.88rem; font-weight: 700; opacity: 0.7; max-width: 500px; line-height: 1.6; text-align: right;">
-          ผู้ให้บริการซอฟต์แวร์นวัตกรรม แพลตฟอร์มบริหารโครงการ และการออกแบบแบรนด์อัตลักษณ์ดิจิทัลครบวงจรด้วยวิศวกรรมขั้นสูง
-        </h4>
-      </div>
-      
-      <div class="footer-copyright">
-        <span>© 2026 บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด — เลขทะเบียนนิติบุคคล 0105559018855. สงวนลิขสิทธิ์ทั้งหมด.</span>
-        <button class="scroll-top-btn" onclick="window.scrollTo({ top: 0, behavior: 'smooth' });">▲</button>
-      </div>
-    </div>
-  </footer>
+<!-- FOOTER -->
+<footer><div class="wrap">
+  <div class="foot-top">
+    <a href="#" class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><path d="M30,30 L55,15 L72,30 L45,45 L72,60 L55,75 L30,60" stroke="#ff5a1f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>SWK&nbsp;Solution</b><small>Technology Agency</small></span></a>
+    <p>ผู้ให้บริการซอฟต์แวร์นวัตกรรม แพลตฟอร์มบริหารโครงการ และการออกแบบแบรนด์อัตลักษณ์ดิจิทัลครบวงจร ด้วยวิศวกรรมขั้นสูง</p>
+  </div>
+  <div class="foot-bot">
+    <span>© 2026 บริษัท เอส ดับบลิว เค โซลูชั่น จำกัด · ทะเบียน 0105559018855</span>
+    <button class="totop" onclick="scrollTo({top:0,behavior:'smooth'})">↑ กลับขึ้นบน</button>
+  </div>
+</div></footer>
 
-  <!-- =====================================================
-       DYNAMIC INTERACTIVE CALCULATOR & OBSERVER SCRIPTS
-  ===================================================== -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // 1. DYNAMIC TAB VIEW SELECTOR IN HERO
-      const tabButtons = document.querySelectorAll('.hero-tab-btn');
-      const visualPanels = document.querySelectorAll('.hero-visual-panel');
-
-      tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          tabButtons.forEach(b => b.classList.remove('active'));
-          visualPanels.forEach(p => p.classList.remove('active'));
-
-          btn.classList.add('active');
-          const targetId = btn.getAttribute('data-target');
-          document.getElementById(targetId).classList.add('active');
-        });
-      });
-
-      // 2. PROJECT ESTIMATOR LOGIC
-      const projectCards = document.querySelectorAll('.opt-card');
-      const complexityRange = document.getElementById('complexity-range');
-      const rangeValComplexity = document.getElementById('range-val-complexity');
-      const addonItems = document.querySelectorAll('.cb-item');
-      const priceDisplay = document.getElementById('calc-display-price');
-      const estimateSendBtn = document.getElementById('estimate-send-btn');
-      const serviceSelect = document.getElementById('service-select');
-
-      const basePrices = {
-        software: 80000,
-        saas: 50000,
-        iot: 110000,
-        design: 25000
-      };
-
-      const scaleLabels = [
-        "สเกลเริ่มต้น (MVP / Startup)",
-        "สเกลขนาดเล็ก (SME Custom)",
-        "ระดับกลาง (Medium Scale / Enterprise Lite)",
-        "ระดับใหญ่ (Large Scale Enterprise)",
-        "ระบบซับซ้อนพิเศษ (Highly Custom Distributed System)"
-      ];
-
-      function updateCalculator() {
-        let activeCard = document.querySelector('.opt-card.active');
-        if (!activeCard) return;
-        
-        let projectType = activeCard.dataset.type;
-        let baseMultiplier = parseFloat(activeCard.dataset.multiplier);
-        
-        let baseCost = basePrices[projectType];
-        let complexityVal = parseInt(complexityRange.value);
-        rangeValComplexity.textContent = scaleLabels[complexityVal - 1];
-        
-        let complexityMultiplier = 0.5 + (complexityVal - 1) * 0.45;
-        
-        let addonCost = 0;
-        document.querySelectorAll('.cb-item.active').forEach(item => {
-          addonCost += parseFloat(item.dataset.addon);
-        });
-
-        let totalPrice = (baseCost * baseMultiplier * complexityMultiplier) + addonCost;
-
-        priceDisplay.textContent = '฿' + Math.round(totalPrice).toLocaleString();
-
-        if (serviceSelect) {
-          serviceSelect.value = projectType;
-        }
-
-        let textDetails = `ประเภทบริการ: ${activeCard.querySelector('.opt-title').textContent}, สเกลระบบ: ${scaleLabels[complexityVal - 1]}, งบประมาณที่คำนวณเบื้องต้น: ฿${Math.round(totalPrice).toLocaleString()}`;
-        estimateSendBtn.href = `#contact?details=${encodeURIComponent('สนใจประเมินราคาโปรเจกต์ ' + textDetails)}`;
-      }
-
-      projectCards.forEach(card => {
-        card.addEventListener('click', () => {
-          projectCards.forEach(c => c.classList.remove('active'));
-          card.classList.add('active');
-          updateCalculator();
-        });
-      });
-
-      complexityRange.addEventListener('input', updateCalculator);
-
-      addonItems.forEach(item => {
-        item.addEventListener('click', () => {
-          item.classList.toggle('active');
-          updateCalculator();
-        });
-      });
-
-      estimateSendBtn.addEventListener('click', (e) => {
-        let activeCard = document.querySelector('.opt-card.active');
-        let complexityVal = parseInt(complexityRange.value);
-        let selectedAddons = [];
-        document.querySelectorAll('.cb-item.active').forEach(item => {
-          selectedAddons.push(item.querySelector('span:last-child').textContent);
-        });
-
-        let detailTextarea = document.getElementById('details');
-        if (detailTextarea) {
-          detailTextarea.value = `สวัสดีครับ สนใจติดตั้งระบบงาน:\n` +
-            `- ประเภท: ${activeCard.querySelector('.opt-title').textContent}\n` +
-            `- ขนาดสเกล: ${scaleLabels[complexityVal - 1]}\n` +
-            `- ฟีเจอร์เสริมที่เลือก: ${selectedAddons.join(', ') || 'ไม่มี'}\n` +
-            `- งบประมาณประเมินจากหน้าเว็บ: ${priceDisplay.textContent}`;
-        }
-      });
-
-      updateCalculator();
-
-      // 3. FADE-IN SCROLL REVEAL OBSERVER
-      const animatedBlocks = document.querySelectorAll('.service-card, .showcase-card, .cred-item, .cred-visual, .estimator-box, .synergy-box, .contact-form-box, .map-card, .hero-content, .hero-tab-container');
-      
-      animatedBlocks.forEach((k, i) => {
-        k.style.opacity = '0';
-        k.style.transform = 'translateY(24px)';
-        k.style.transition = 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)';
-      });
-      
-      const revealObserver = new IntersectionObserver(entries => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            e.target.style.opacity = '1';
-            e.target.style.transform = 'translateY(0)';
-            revealObserver.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.08, rootMargin: '0px 0px -50px 0px' });
-
-      animatedBlocks.forEach(block => {
-        revealObserver.observe(block);
-      });
-    });
-  </script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  // tabs
+  const tabs=document.querySelectorAll('.tabbtn'),panels=document.querySelectorAll('.panel');
+  tabs.forEach(b=>b.addEventListener('click',()=>{
+    tabs.forEach(t=>t.classList.remove('active'));panels.forEach(p=>p.classList.remove('active'));
+    b.classList.add('active');document.getElementById(b.dataset.target).classList.add('active');
+  }));
+  // estimator
+  const cards=document.querySelectorAll('.opt-card'),range=document.getElementById('complexity-range'),
+    rLbl=document.getElementById('range-val-complexity'),addons=document.querySelectorAll('.cb-item'),
+    price=document.getElementById('calc-display-price'),sendBtn=document.getElementById('estimate-send-btn'),
+    svcSel=document.getElementById('service-select');
+  const base={software:80000,saas:50000,iot:110000,design:25000};
+  const labels=["สเกลเริ่มต้น (MVP)","สเกลขนาดเล็ก (SME)","ระดับกลาง (Medium)","ระดับใหญ่ (Enterprise)","ซับซ้อนพิเศษ (Distributed)"];
+  function calc(){
+    const a=document.querySelector('.opt-card.active');if(!a)return;
+    const t=a.dataset.type,m=parseFloat(a.dataset.multiplier),c=parseInt(range.value);
+    rLbl.textContent=labels[c-1];
+    const cm=0.5+(c-1)*0.45;let add=0;
+    document.querySelectorAll('.cb-item.active').forEach(i=>add+=parseFloat(i.dataset.addon));
+    const total=Math.round(base[t]*m*cm+add);
+    price.textContent='฿'+total.toLocaleString();
+    if(svcSel)svcSel.value=t;
+  }
+  cards.forEach(c=>c.addEventListener('click',()=>{cards.forEach(x=>x.classList.remove('active'));c.classList.add('active');calc();}));
+  range.addEventListener('input',calc);
+  addons.forEach(i=>i.addEventListener('click',()=>{i.classList.toggle('active');calc();}));
+  sendBtn.addEventListener('click',()=>{
+    const a=document.querySelector('.opt-card.active'),c=parseInt(range.value),sel=[];
+    document.querySelectorAll('.cb-item.active').forEach(i=>sel.push(i.querySelector('span:last-child').textContent));
+    const d=document.getElementById('details');
+    if(d)d.value=`สวัสดีครับ สนใจติดตั้งระบบงาน:\n- ประเภท: ${a.querySelector('.opt-title').textContent}\n- ขนาด: ${labels[c-1]}\n- ฟีเจอร์เสริม: ${sel.join(', ')||'ไม่มี'}\n- งบประมาณประเมิน: ${price.textContent}`;
+  });
+  calc();
+  // reveal
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}}),{threshold:.08,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('[data-rev]').forEach(el=>io.observe(el));
+});
+</script>
 </body>
 </html>
