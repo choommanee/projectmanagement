@@ -3,5 +3,6 @@
 # Build context = repo root. On Railway set RAILWAY_DOCKERFILE_PATH=swk-solution/Dockerfile
 FROM caddy:2-alpine
 COPY swk-solution /srv
-# Railway injects PORT; serve the static folder on it.
-CMD ["sh", "-c", "caddy file-server --root /srv --listen :${PORT:-80}"]
+COPY swk-solution/Caddyfile /etc/caddy/Caddyfile
+# Railway injects PORT; the Caddyfile listens on it and sets cache headers.
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

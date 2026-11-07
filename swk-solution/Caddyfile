@@ -1,0 +1,24 @@
+# SWK Solution static site. Railway injects PORT.
+{
+	admin off
+}
+
+:{$PORT:80} {
+	root * /srv
+	encode gzip
+
+	# Build files live in the same folder; don't serve them.
+	@build path /Caddyfile /Dockerfile
+	respond @build 404
+
+	# Pages and the stylesheet change with every site update: make browsers
+	# revalidate each time (cheap 304 via ETag) so visitors never see an old version.
+	@revalidate path / *.html *.css
+	header @revalidate Cache-Control "no-cache"
+
+	# Images rarely change; cache for a day.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=86400"
+
+	file_server
+}
